@@ -1,50 +1,50 @@
-# QR (Quality Review)
+# QR（Quality Review）
 
-## Overview
+## 概述
 
-Quality Review modules perform validation with severity-based blocking thresholds. Each module validates specific aspects of plans or implementations at designated workflow gates.
+Quality Review 模块执行基于严重性阻塞阈值的验证。每个模块在指定的工作流 gate 处验证计划或实现的特定方面。
 
-## Modules
+## 模块
 
-**plan_completeness.py**: Validates plan structure, milestone definitions, and acceptance criteria completeness.
+**plan_completeness.py**：验证计划结构、milestone 定义与验收标准的完整性。
 
-**plan_code.py**: Reviews code diffs for correctness, edge cases, and implementation quality.
+**plan_code.py**：审查代码 diff 的正确性、边界情况与实现质量。
 
-**plan_docs.py**: Verifies documentation completeness, clarity, and alignment with implementation.
+**plan_docs.py**：验证文档的完整性、清晰度及与实现的一致性。
 
-**post_impl_code.py**: Post-implementation code validation against plan specifications.
+**post_impl_code.py**：根据计划规范对实现后代码进行验证。
 
-**post_impl_doc.py**: Post-implementation documentation review for accuracy and completeness.
+**post_impl_doc.py**：审查实现后文档的准确性与完整性。
 
-**reconciliation.py**: Verifies plan matches implementation, ensures all milestones delivered.
+**reconciliation.py**：验证计划与实现是否匹配，确保所有 milestone 均已交付。
 
-## QA State Tracking Integration
+## QA 状态追踪集成
 
-QR gates now integrate with QA state tracking for structured verification. QA decomposition applies plan-and-solve methodology to quality verification by breaking monolithic reviews into parallelizable checklist items.
+QR gate 现已集成 QA 状态追踪，用于结构化验证。QA 拆解将「计划与求解」方法论应用于质量验证，将整体性审查拆分为可并行的清单条目。
 
-### Philosophy: Minimal State, Dumb Main Agent, Just-In-Time Prompting
+### 哲学：最小状态、哑主 agent、即时 prompt
 
-**Minimal State Files**: Store ONLY authoritative data -- item statuses (TODO/PASS/FAIL). Sub-agents compute status overview on-demand when THEY need it. No derived values stored.
+**最小状态文件**：只存储权威数据——条目状态（TODO/PASS/FAIL）。子 agent 在需要时按需计算状态概览。不存储派生值。
 
-**Dumb Main Agent**: Main agent dispatches and routes. It needs ONE bit: PASS or FAIL. The LLM reads responses naturally and follows instructions. No parsing logic required in main agent.
+**哑主 agent**：主 agent 负责派发和路由。它只需要一位信息：PASS 还是 FAIL。LLM 自然地读取响应并按指令行事。主 agent 中无需任何解析逻辑。
 
-**Just-In-Time Prompting**: Executor sub-agent (fixer) invokes script and sees prompts about what failed. Main agent never sees these details. Details are injected only when needed, only to the agent that needs them.
+**即时 prompt**：执行子 agent（修复者）调用脚本并获取关于失败内容的 prompt。主 agent 从不看到这些细节。细节仅在需要时、仅注入给需要的 agent。
 
-### Why Main Agent Doesn't Parse
+### 为何主 agent 不解析
 
-The LLM reads sub-agent responses and follows instructions naturally. No JSON parsing, no status extraction logic. Sub-agents return text responses with embedded instructions like "PASS: continue to next phase" or "FAIL: invoke fixer with items [...]". Main agent reads and follows.
+LLM 自然地读取子 agent 响应并按指令行事。无需 JSON 解析，无需状态提取逻辑。子 agent 返回嵌入指令的文本响应，如「PASS: 继续下一阶段」或「FAIL: 使用条目 [...] 调用修复者」。主 agent 读取并遵循。
 
-This eliminates an entire class of bugs: parsing errors, schema mismatches, JSON escaping issues. The LLM's natural language understanding handles all response interpretation.
+这消除了一整类 bug：解析错误、schema 不匹配、JSON 转义问题。LLM 的自然语言理解处理所有响应解释。
 
-### Why Status Overview is Sub-Agent Only
+### 为何状态概览只对子 agent 可见
 
-The executor needs to see "5 items: 3 PASS, 2 FAIL" to decide what to fix. The main agent doesn't. The main agent only needs to know: did verification pass or fail?
+执行者需要看到「5 条条目：3 PASS，2 FAIL」才能决定修复什么。主 agent 不需要。主 agent 只需知道：验证通过还是失败？
 
-Status overview is computed on-demand by the executor when it runs. It's not stored in qr-{phase}.json because it's derived data. Storing it would violate the minimal state principle and create consistency risks (what if counts don't match items?).
+状态概览由执行者在运行时按需计算。不存入 qr-{phase}.json，因为它是派生数据。存储它会违反最小状态原则，并产生一致性风险（如果计数与条目不匹配怎么办？）。
 
-### Response Formats
+### 响应格式
 
-**DECOMPOSE Mode**: Returns QA item IDs and instructions for verification.
+**DECOMPOSE 模式**：返回 QA 条目 ID 及验证指令。
 
 ```
 DECOMPOSE COMPLETE
@@ -58,7 +58,7 @@ Items created: 7
 NEXT: Invoke verifiers for each item.
 ```
 
-**VERIFY Mode**: Returns PASS/FAIL verdict.
+**VERIFY 模式**：返回 PASS/FAIL 裁定。
 
 ```
 VERIFICATION COMPLETE
@@ -69,7 +69,7 @@ Items: 7 total, 7 PASS, 0 FAIL
 NEXT: Continue to next phase.
 ```
 
-or
+或
 
 ```
 VERIFICATION COMPLETE
@@ -83,7 +83,7 @@ Failed items:
 NEXT: Invoke fixer with failed items.
 ```
 
-**FIX_GUIDANCE Mode**: Returns specific instructions for fixing failures.
+**FIX_GUIDANCE 模式**：为失败条目返回具体修复指令。
 
 ```
 FIX GUIDANCE
@@ -100,15 +100,15 @@ Scope: file:planner/qa/verify.py:45-52
 Fix: Remove conflict markers (<<<<<<, ======, >>>>>>) and resolve merge conflicts.
 ```
 
-### Three Modes
+### 三种模式
 
-**DECOMPOSE**: Break artifact into verifiable QA items. Sub-agent reads artifact, identifies quality dimensions, emits items with id/scope/check/status/finding fields. Items start with status=TODO.
+**DECOMPOSE**：将制品拆分为可验证的 QA 条目。子 agent 读取制品，识别质量维度，输出含 id/scope/check/status/finding 字段的条目。条目初始状态为 TODO。
 
-**VERIFY**: Execute verification for each item. Macro items (scope=`*`) run sequentially, micro items (scope=specific path) run in parallel. Each verifier updates item status to PASS/FAIL with finding explanation.
+**VERIFY**：为每个条目执行验证。宏条目（scope=`*`）顺序运行，微条目（scope=具体路径）并行运行。每个验证者将条目状态更新为 PASS/FAIL，并附上 finding 说明。
 
-**FIX_GUIDANCE**: Generate specific fix instructions for failed items. Sub-agent reads failed items and produces actionable instructions for each failure.
+**FIX_GUIDANCE**：为失败条目生成具体修复指令。子 agent 读取失败条目，为每个失败生成可操作的指令。
 
-### State File Schema (qr-{phase}.json)
+### 状态文件 Schema（qr-{phase}.json）
 
 ```json
 {
@@ -140,139 +140,139 @@ Fix: Remove conflict markers (<<<<<<, ======, >>>>>>) and resolve merge conflict
 }
 ```
 
-**schema_version**: Version identifier for qr-{phase}.json format (currently "1.0").
+**schema_version**：qr-{phase}.json 格式的版本标识符（当前为 "1.0"）。
 
-**phase**: Verification phase -- one of `plan-structure`, `plan-code`, `plan-docs`, `impl-code`, `impl-docs`.
+**phase**：验证阶段——取值之一：`plan-structure`、`plan-code`、`plan-docs`、`impl-code`、`impl-docs`。
 
-**items**: Array of QA items with exactly 5 fields each:
+**items**：QA 条目数组，每条目恰好 5 个字段：
 
-- **id**: Correlation key for parallel dispatch (pattern: `{phase}-{seq:03d}`)
-- **scope**: Content target AND parallelization hint (`*` for macro, specific path for micro)
-- **check**: Freeform verification instruction
-- **status**: One of TODO/PASS/FAIL
-- **finding**: Explanation when not PASS (null for TODO/PASS)
+- **id**：并行派发的关联键（格式：`{phase}-{seq:03d}`）
+- **scope**：内容目标，也是并行化提示（`*` 为宏，具体路径为微）
+- **check**：自由格式的验证指令
+- **status**：TODO/PASS/FAIL 之一
+- **finding**：非 PASS 时的说明（TODO/PASS 时为 null）
 
-### Main Agent Flow (Dumb Router)
-
-```
-User request
-     |
-     v
-Step 1: plan-init
-Create state directory
-     |
-     v
-Step 2: plan-structure-execute
-Main agent dispatches planner sub-agent
-     |
-     v
-Step 3: plan-structure-qr
-Main agent invokes QA decompose
-     |
-     v
-Decompose sub-agent returns: "Items created: 7"
-     |
-     v
-Main agent reads response, sees "NEXT: Invoke verifiers"
-     |
-     v
-Main agent invokes verify (macro items sequential, micro parallel)
-     |
-     v
-Verify sub-agent returns: "Status: FAIL, 2 failed items"
-     |
-     v
-Step 4: plan-structure-qr-gate
-Main agent reads response, sees "NEXT: Invoke fixer"
-     |
-     v
-Step 2 (with --qr-fail): plan-structure-execute
-Main agent invokes fixer
-     |
-     v
-Fixer returns: "Fixes applied"
-     |
-     v
-Main agent loops back to Step 3: plan-structure-qr
-```
-
-No status checking, no JSON parsing. Main agent reads text and follows instructions.
-
-### Executor Flow (Just-In-Time Prompting)
+### 主 agent 流程（哑路由器）
 
 ```
-Executor invoked by main agent
+用户请求
      |
      v
-Read qr-{phase}.json from STATE_DIR
+步骤 1: plan-init
+创建状态目录
      |
      v
-Compute status overview (3 PASS, 2 FAIL)
+步骤 2: plan-structure-execute
+主 agent 派发 planner 子 agent
      |
      v
-Generate prompts with failure details:
-  - "Item plan-002 failed: Acceptance criteria missing"
-  - "Item plan-005 failed: Diff has conflict markers"
+步骤 3: plan-structure-qr
+主 agent 调用 QA decompose
      |
      v
-Execute fixes
+Decompose 子 agent 返回：「Items created: 7」
      |
      v
-Update qr-{phase}.json with new statuses
+主 agent 读取响应，看到「NEXT: Invoke verifiers」
      |
      v
-Return response: "Status: PASS, all items fixed"
+主 agent 调用 verify（宏条目顺序，微条目并行）
+     |
+     v
+Verify 子 agent 返回：「Status: FAIL, 2 failed items」
+     |
+     v
+步骤 4: plan-structure-qr-gate
+主 agent 读取响应，看到「NEXT: Invoke fixer」
+     |
+     v
+步骤 2（带 --qr-fail）: plan-structure-execute
+主 agent 调用修复者
+     |
+     v
+修复者返回：「Fixes applied」
+     |
+     v
+主 agent 回到步骤 3: plan-structure-qr
 ```
 
-Status overview computed on-demand. Not stored in qr-{phase}.json. Main agent never sees it.
+无状态检查，无 JSON 解析。主 agent 读取文本并遵循指令。
 
-### Why JSON
+### 执行者流程（即时 prompt）
 
-**Consistency**: JSON is universal. Every language, every tool. YAML requires pyyaml dependency and has indentation gotchas.
+```
+执行者被主 agent 调用
+     |
+     v
+从 STATE_DIR 读取 qr-{phase}.json
+     |
+     v
+计算状态概览（3 PASS，2 FAIL）
+     |
+     v
+生成含失败详情的 prompt：
+  - 「Item plan-002 failed: Acceptance criteria missing」
+  - 「Item plan-005 failed: Diff has conflict markers」
+     |
+     v
+执行修复
+     |
+     v
+用新状态更新 qr-{phase}.json
+     |
+     v
+返回响应：「Status: PASS, all items fixed」
+```
 
-**Avoid pyyaml dependency**: One less package to install, one less version conflict risk.
+状态概览按需计算，不存入 qr-{phase}.json，主 agent 从不看到。
 
-**Simplicity**: JSON schema is unambiguous. YAML has multiple syntaxes for the same structure (flow vs block, quoted vs unquoted).
+### 为何用 JSON
 
-**Tooling**: Every editor has JSON validation built-in. JSON Schema validators are ubiquitous.
+**一致性**：JSON 是通用格式。每种语言、每种工具都支持。YAML 需要 pyyaml 依赖，且有缩进陷阱。
 
-**LLM-friendly**: Modern LLMs handle JSON natively. ChatML and Claude both have JSON mode. No escaping issues for simple structures like QA items.
+**避免 pyyaml 依赖**：少一个需要安装的包，少一个版本冲突风险。
 
-## QR Iteration Blocking
+**简洁性**：JSON schema 无歧义。YAML 对同一结构有多种语法（流式 vs 块状、带引号 vs 不带引号）。
 
-Severity thresholds vary by iteration depth to prevent infinite retry loops:
+**工具支持**：每个编辑器都内置 JSON 验证。JSON Schema 验证器随处可用。
 
-| Iteration | Block Severities      | Rationale                                |
+**LLM 友好**：现代 LLM 原生处理 JSON。ChatML 和 Claude 都有 JSON 模式。简单结构如 QA 条目不存在转义问题。
+
+## QR 迭代阻塞
+
+严重性阈值随迭代深度变化，以防止无限重试循环：
+
+| 迭代次数  | 阻塞严重性      | 理由                                |
 | --------- | --------------------- | ---------------------------------------- |
-| 1-2       | All (MUST/SHOULD/MAY) | High failure rate, force immediate fixes |
-| 3-4       | MUST/SHOULD           | Address nuanced issues                   |
-| 5+        | MUST only             | Prevent infinite retry loops             |
+| 1–2       | 全部（MUST/SHOULD/MAY） | 失败率高，强制立即修复 |
+| 3–4       | MUST/SHOULD           | 处理细微问题                   |
+| 5+        | 仅 MUST             | 防止无限重试循环             |
 
-## LoopState Tracking
+## LoopState 追踪
 
-QR gates use LoopState enum to track iteration progression:
+QR gate 使用 LoopState 枚举追踪迭代进度：
 
-- **INITIAL**: First review attempt
-- **RETRY**: Fixing issues from previous iteration
-- **COMPLETE**: Passed review
+- **INITIAL**：首次审查尝试
+- **RETRY**：修复上一次迭代的问题
+- **COMPLETE**：通过审查
 
-State transitions:
+状态转换：
 
 ```
-INITIAL -> (QRStatus.PASS) -> COMPLETE [terminal]
+INITIAL -> (QRStatus.PASS) -> COMPLETE [终止]
 INITIAL -> (QRStatus.NEEDS_CHANGES) -> RETRY -> (iteration++) -> RETRY -> ...
 ```
 
-## Integration with QA Workflow
+## 与 QA 工作流的集成
 
-QR gates invoke QA decomposition before performing reviews:
+QR gate 在执行审查前调用 QA 拆解：
 
-1. QR gate triggered (e.g., plan_completeness)
-2. Invoke qa/decompose.py to generate verification items
-3. Spawn verifiers (parallel for micro, sequential for macro)
-4. Aggregate results into qr-{phase}.json
-5. Route on aggregation result:
-   - PASS: proceed to next workflow step
-   - FAIL: invoke fixer, loop back to verification
+1. 触发 QR gate（如 plan_completeness）
+2. 调用 qa/decompose.py 生成验证条目
+3. 派发验证者（微条目并行，宏条目顺序）
+4. 将结果汇总到 qr-{phase}.json
+5. 根据汇总结果路由：
+   - PASS：继续下一工作流步骤
+   - FAIL：调用修复者，回到验证
 
-This integration provides structured, parallelizable verification with explicit failure tracking and automated retry logic.
+此集成提供了结构化、可并行的验证，具有显式失败追踪和自动重试逻辑。

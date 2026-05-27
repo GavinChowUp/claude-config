@@ -2,32 +2,32 @@
 
 # Documentation & Tests
 
-Evaluate whether code is properly documented and tested.
+评估代码是否有完善的文档和测试。
 
-**The core question**: Is this documented and tested? Documentation that contradicts code is worse than no documentation. Tests that don't communicate behavior fail as documentation. Schema drift causes runtime errors. Generated code without provenance documentation misleads maintainers.
+**核心问题**：这是否有文档和测试？与代码矛盾的文档比没有文档更糟糕。不传达行为的测试作为文档是失败的。Schema 漂移会导致运行时错误。没有来源文档的生成代码会误导维护者。
 
-**What to look for**:
+**关注点**：
 
-- Documentation contradicting actual code
-- Tests with uninformative names
-- Missing provenance for generated/vendored code in CLAUDE.md
-- Schema-code mismatches (fields in code missing from schema, or vice versa)
+- 与实际代码矛盾的文档
+- 测试名称不提供信息
+- CLAUDE.md 中缺少生成/vendor 代码的来源说明
+- Schema 与代码不匹配（代码中有字段但 schema 没有，反之亦然）
 
-**The threshold**: Flag only demonstrable incorrectness, not incompleteness. Stale docs cause hallucinations; missing docs just mean less context. Flag tests that give no behavioral information. Flag generated/vendored code without CLAUDE.md documentation. Flag schema drift only when provable mismatch exists.
+**门槛**：仅标记可证明的错误，而非不完整。过时文档会导致幻觉；缺失文档只是上下文减少。标记不提供行为信息的测试。标记没有 CLAUDE.md 文档的生成/vendor 代码。仅在可证明存在不匹配时才标记 schema 漂移。
 
 <design-mode>
-Not applicable -- this group requires actual code to evaluate.
+不适用——此组需要实际代码才能评估。
 </design-mode>
 
 <code-mode>
-When evaluating actual code (Diff Review, Codebase Review, Refactor):
+评估实际代码时（Diff Review、Codebase Review、Refactor）：
 
-- Does documentation contradict the code?
-- Do test names communicate behavior?
-- Is generated/vendored code documented in CLAUDE.md?
-- Do schema definitions match code usage?
+- 文档是否与代码矛盾？
+- 测试名称是否传达了行为？
+- 生成/vendor 代码是否在 CLAUDE.md 中有文档？
+- Schema 定义是否与代码用法一致？
 
-Evidence format: Quote code/docs with file:line showing the issue.
+证据格式：引用代码/文档（含 file:line），指出问题所在。
 </code-mode>
 
 ---
@@ -35,152 +35,152 @@ Evidence format: Quote code/docs with file:line showing the issue.
 ## 1. Documentation Staleness
 
 <principle>
-Documentation that contradicts code is worse than no documentation. Stale docs mislead readers and cause bugs.
+与代码矛盾的文档比没有文档更糟糕。过时的文档会误导读者并导致 bug。
 </principle>
 
-Detect: Does the documentation contradict the code? Are there claims in docs that the code structurally violates?
+Detect: 文档是否与代码矛盾？文档中是否有代码在结构上违反的断言？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-Docstrings with parameter names, @param, @return, TODO, FIXME
+模式指示词（起点，非定论）：
+含参数名的 docstring，@param，@return，TODO，FIXME
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Active contradictions
 
-- Parameter name in docstring not in function signature
-- Docstring type conflicts with type annotation (when annotation exists)
-- Any documentation making claims the code structurally contradicts
+- docstring 中的参数名不在函数签名中
+- docstring 类型与类型注解冲突（当注解存在时）
+- 任何与代码在结构上矛盾的断言文档
 
 [medium] Stale claims
 
-- Docstring describes return value that code never returns
-- Comment contains strong claim ("always", "never", "must") AND code structurally contradicts it
+- docstring 描述代码从未返回的值
+- 注释包含强断言（「always」、「never」、「must」）且代码在结构上违反
 
 [low] Orphaned references
 
-- TODO/FIXME referencing completed or removed work
+- TODO/FIXME 引用了已完成或已删除的工作
   </violations>
 
 <exceptions>
-Incomplete documentation. Missing docs. Outdated style in docs.
+不完整的文档。缺失的文档。文档中的过时风格。
 </exceptions>
 
 <threshold>
-Flag only when documentation is demonstrably incorrect, not merely incomplete. Incorrect documentation causes hallucinations.
+仅当文档可证明是错误的时标记，而非仅仅不完整。错误的文档会导致幻觉。
 </threshold>
 
 ## 2. Test Quality as Documentation
 
 <principle>
-Tests document expected behavior. When test names don't communicate what behavior they verify, they fail as documentation.
+测试记录预期行为。当测试名称不传达它们所验证的行为时，它们作为文档是失败的。
 </principle>
 
-Detect: Do tests communicate expected behavior? Can I understand what's being tested from the test name alone?
+Detect: 测试是否传达了预期行为？我能仅凭测试名称理解在测试什么吗？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
+模式指示词（起点，非定论）：
 `test_works`, `test_ok`, `test_success`, `test_case_`, `test_1`, `assert True`
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Uninformative tests
 
-- Test name matches low-information pattern (e.g., test_works, test_ok, test_success, test_case_1)
-- Test contains 0 assertions
-- Any test where the name gives no behavioral information
+- 测试名称符合低信息量模式（如 test_works, test_ok, test_success, test_case_1）
+- 测试包含 0 个断言
+- 任何名称不提供行为信息的测试
 
 [medium] Weak naming
 
-- Test name shorter than 3 tokens (excluding test\_ prefix)
-- Test name describes implementation, not behavior
+- 测试名称少于 3 个词（不含 test\_ 前缀）
+- 测试名称描述实现而非行为
 
 [low] Test smells
 
-- Test only asserts True, None, or trivial values
-- Multiple similar test functions with minor input variations (use parameterized/table-driven)
+- 测试只断言 True、None 或琐碎值
+- 多个仅有细微输入差异的相似测试函数（使用参数化/表格驱动）
   </violations>
 
 <exceptions>
-Tests referencing ticket numbers (e.g., TEST-1234, JIRA-567) for traceability. Smoke tests named test_works.
+引用工单号的测试（如 TEST-1234, JIRA-567）用于可追溯性。名为 test_works 的冒烟测试。
 </exceptions>
 
 <threshold>
-Flag when test name gives no behavioral information AND is not a ticket/regression reference.
+当测试名称不提供行为信息**且**不是工单/回归引用时标记。
 </threshold>
 
 ## 3. Generated and Vendored Code Awareness
 
 <principle>
-Non-maintainable code (generated, vendored) must be clearly marked. Without provenance documentation, maintainers may try to modify code that should be regenerated.
+不可维护的代码（生成的、vendor 的）必须明确标记。若无来源文档，维护者可能会尝试修改本应重新生成的代码。
 </principle>
 
-Detect: Is non-maintainable code clearly marked in CLAUDE.md? Can a maintainer tell which code is generated or vendored?
+Detect: 不可维护的代码是否在 CLAUDE.md 中明确标记？维护者能否判断哪些代码是生成的或 vendor 的？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
+模式指示词（起点，非定论）：
 `_generated`, `_pb`, `.pb.go`, `vendor/`, `third_party/`, `node_modules/`
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Missing provenance
 
-- Generated files missing regeneration command in CLAUDE.md
-- Vendored directories missing upstream source in CLAUDE.md
-- Any generated/vendored code without documentation of origin
+- 生成文件在 CLAUDE.md 中缺少重新生成命令
+- vendor 目录在 CLAUDE.md 中缺少上游来源
+- 任何没有来源文档的生成/vendor 代码
 
 [medium] Unclear ownership
 
-- External libraries copied into repo without provenance documentation
+- 复制到 repo 中的外部库缺少来源文档
   </violations>
 
 <exceptions>
-Generated files with regeneration command documented. Vendored code with clear upstream reference.
+有重新生成命令文档的生成文件。有明确上游引用的 vendor 代码。
 </exceptions>
 
 <threshold>
-Flag when file/directory matches generation patterns (e.g., *.pb.go, *_generated.*, vendor/, third_party/) AND CLAUDE.md lacks corresponding entry explaining provenance.
+当文件/目录符合生成模式（如 *.pb.go, *_generated.*, vendor/, third_party/）**且** CLAUDE.md 中缺少相应的来源说明时标记。
 </threshold>
 
 ## 4. Schema-Code Coherence
 
 <principle>
-Schema and code must stay synchronized. Fields referenced in code but absent from schema (or vice versa) indicate drift that causes runtime errors.
+Schema 和代码必须保持同步。代码中引用但 schema 中没有的字段（反之亦然）表示会导致运行时错误的漂移。
 </principle>
 
-Detect: Does code reference schema fields that don't exist? Are there schema fields unused in any code path?
+Detect: 代码是否引用了不存在的 schema 字段？是否有任何代码路径都未使用的 schema 字段？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-Schema file extensions (.proto, .graphql, .json schema), field access patterns
+模式指示词（起点，非定论）：
+Schema 文件扩展名（.proto, .graphql, .json schema），字段访问模式
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Schema drift
 
-- Code references field not in schema definition
-- Schema field unused in any code path (dead field)
-- Any mismatch between schema definition and code usage
+- 代码引用 schema 定义中不存在的字段
+- 任何代码路径都未使用的 schema 字段（死字段）
+- Schema 定义与代码用法之间的任何不匹配
 
 [medium] Type drift
 
-- Type mismatch between schema and code representation
+- Schema 与代码表示之间的类型不匹配
   </violations>
 
 <exceptions>
-Intentional divergence documented with :SCHEMA: marker. Fields used only in specific deployment configs.
+用 :SCHEMA: 标记记录的有意偏差。仅在特定部署配置中使用的字段。
 </exceptions>
 
 <threshold>
-Flag when field name in code has 0 matches in corresponding schema file, or schema field has 0 references in codebase.
+当代码中的字段名在对应 schema 文件中 0 匹配，或 schema 字段在代码库中 0 引用时标记。
 </threshold>
 
-Intent marker: Use `:SCHEMA:` to suppress for intentional divergence (e.g., `:SCHEMA: field 'legacy_id' unused; migration pending`).
+Intent marker：使用 `:SCHEMA:` 来抑制有意偏差的检查（如 `:SCHEMA: field 'legacy_id' unused; migration pending`）。

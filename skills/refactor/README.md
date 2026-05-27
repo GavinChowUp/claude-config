@@ -1,177 +1,155 @@
 # Refactor
 
-LLM-generated code accumulates technical debt faster than hand-written code. The
-LLM does not see duplication across files. It does not notice god functions
-growing. It cannot detect that three modules implement the same validation logic
-differently.
+LLM 生成的代码积累技术债的速度比手写代码更快。LLM 看不到跨文件的重复代码，注意不到不断膨胀的上帝函数，也无法检测到三个模块以不同方式实现了相同的验证逻辑。
 
-This skill catches what the LLM misses. It explores multiple smell categories in
-parallel, validates findings against evidence, and outputs prioritized work
-items.
+本 skill 捕捉 LLM 所遗漏的问题。它并行探索多个代码坏味道类别，验证发现结果是否有证据支撑，并输出排过优先级的工作项。
 
-## Workflow
+## 工作流
 
 ```
-refactor.py                          explore.py (x10 parallel)
+refactor.py                          explore.py (x10 并行)
 ===========                          =========================
 
-Step 1: Dispatch -----------------> Step 1: Domain Context
-        (launch 10 explore agents)  Step 2: Principle + Violations
-                                    Step 3: Pattern Generation
-                                    Step 4: Search
-                                    Step 5: Synthesis
-                                           |
+步骤 1：派发 -----------------> 步骤 1：领域上下文
+        （启动 10 个探索 agent）  步骤 2：原则 + 违规
+                                  步骤 3：模式生成
+                                  步骤 4：搜索
+                                  步骤 5：综合
+                                         |
         <------------------------------<---+
-        (collect smell_reports)
+        （收集 smell_reports）
 
-Step 2: Triage
-        (structure findings with IDs)
+步骤 2：分流
+        （用 ID 结构化整理发现）
 
-Step 3: Cluster
-        (group by shared root cause)
+步骤 3：聚类
+        （按共同根因分组）
 
-Step 4: Contextualize
-        (extract user intent, prioritize)
+步骤 4：情境化
+        （提取用户意图，排定优先级）
 
-Step 5: Synthesize
-        (generate work items)
+步骤 5：综合
+        （生成工作项）
 ```
 
-| Phase         | Question                 | Output                     |
-| ------------- | ------------------------ | -------------------------- |
-| Dispatch      | What smells exist?       | Parallel smell_reports     |
-| Triage        | What did we find?        | Structured smells with IDs |
-| Cluster       | Which share root causes? | Grouped issues             |
-| Contextualize | What does the user want? | Prioritized issues         |
-| Synthesize    | What should be done?     | Actionable work items      |
+| 阶段           | 核心问题                 | 产出                     |
+| -------------- | ------------------------ | ------------------------ |
+| 派发           | 存在哪些代码坏味道？     | 并行 smell_report        |
+| 分流           | 我们发现了什么？         | 带 ID 的结构化坏味道     |
+| 聚类           | 哪些共享根因？           | 分组的问题               |
+| 情境化         | 用户想要什么？           | 排过优先级的问题         |
+| 综合           | 应该做什么？             | 可操作的工作项           |
 
-## Design Decisions
+## 设计决策
 
-### 1. Five-Step Explore Workflow
+### 1. 五步探索工作流
 
-The original 2-step explore workflow conflated multiple cognitive tasks in a
-single step. LLMs perform better when each cognitive task gets focused attention.
-
-```
-Step 1: Domain Context    - Understand the project before analyzing it
-Step 2: Principle Extract - Understand the smell before hunting for it
-Step 3: Pattern Generate  - Translate abstract hints to project-specific patterns
-Step 4: Search            - Execute with generated patterns
-Step 5: Synthesis         - Format findings
-```
-
-### 2. Domain Context Per-Category (Not Lifted to Parent)
-
-Each explore agent does its own domain context analysis, rather than refactor.py
-doing it once and passing to all agents.
-
-Rationale: Different smell categories need different domain context aspects. A
-"naming precision" category cares about naming conventions; a "module structure"
-category cares about import patterns. The 30-second overhead per agent is
-acceptable for category-specific context.
-
-Rejected alternative: Lift domain context to refactor.py Step 1. Rejected
-because it assumes all categories need identical context.
-
-### 3. Violation Patterns Before Grep Patterns (Separate Steps)
-
-Pattern generation is split into two steps: first violation patterns (Step 2),
-then grep patterns (Step 3).
-
-Rationale: Analogical prompting works better in phases. The model first
-understands WHAT to look for conceptually (violation patterns matching the
-principle), then translates to HOW to search operationally (grep-able patterns).
+原始的两步探索工作流将多个认知任务混在一个步骤里。LLM 在每个认知任务专注处理时表现更好。
 
 ```
-Step 2: "What does 'vague naming' look like in a Python/Django project?"
-        -> "Service classes with generic names, Blueprint handlers called 'do_thing'"
-
-Step 3: "How do I grep for those?"
-        -> "class.*Service:", "def handle_", "Blueprint.*utils"
+步骤 1：领域上下文    - 分析项目之前先理解它
+步骤 2：原则提取      - 先理解坏味道，再去寻找它
+步骤 3：模式生成      - 将抽象提示翻译为项目特定的模式
+步骤 4：搜索          - 使用生成的模式执行
+步骤 5：综合          - 格式化发现结果
 ```
 
-### 4. Grep-Hints as Exemplars Requiring Translation
+### 2. 每个类别独立进行领域上下文（不提升到父级）
 
-The markdown files contain generic patterns like `Manager, Handler, Utils` from
-language-agnostic examples. Using these literally in a Go codebase would miss
-`Store, Controller` patterns.
+每个探索 agent 自行进行领域上下文分析，而非由 refactor.py 统一完成后传递给所有 agent。
 
-Solution: Treat grep-hints as abstract exemplars that must be translated to
-project-specific equivalents based on domain context.
+理由：不同的坏味道类别需要不同方面的领域上下文。「命名精确性」类别关注命名规范；「模块结构」类别关注导入模式。每个 agent 30 秒的额外开销是可接受的，换取类别特定的上下文。
 
-### 5. Self-Generated Examples in Synthesis
+被拒绝的方案：将领域上下文提升到 refactor.py 步骤 1 统一处理。被拒绝的原因是该方案假设所有类别需要相同的上下文。
 
-The synthesis step requires the model to generate a project-specific example
-work item before producing the full list. This calibrates output specificity to
-the actual project rather than assuming a particular language/framework.
+### 3. 违规模式先于 Grep 模式（分开两步）
 
-### 6. "Illustrative, Not Exhaustive" Framing
+模式生成分为两步：先是违规模式（步骤 2），再是 grep 模式（步骤 3）。
 
-LLMs tend to interpret lists as complete. Without explicit framing, the model
-searches only for listed patterns and misses analogous violations.
+理由：类比 prompting 分阶段工作更好。模型先从概念上理解「要找什么」（匹配原则的违规模式），然后再转化为「如何搜索」（可 grep 的模式）。
 
-Mechanisms used:
+```
+步骤 2：「在 Python/Django 项目中，'命名模糊'是什么样子的？」
+        -> 「名称通用的 Service 类、叫做 'do_thing' 的 Blueprint 处理器」
 
-- "Illustrative patterns (not exhaustive -- similar violations exist)"
-- "e.g.," prefix on examples
-- Open-ended escape hatches: "Any X that causes Y"
-- DOMAIN TRANSLATION instruction to translate abstract to project-specific
+步骤 3：「如何 grep 找到它们？」
+        -> 「class.*Service:」、「def handle_」、「Blueprint.*utils」
+```
 
-## Code Quality Categories
+### 4. Grep 提示作为需要翻译的范例
 
-Categories are defined in `conventions/code-quality/` and organized by cognitive
-mode:
+Markdown 文件包含来自语言无关示例的通用模式，如 `Manager, Handler, Utils`。在 Go 代码库中直接使用这些模式会遗漏 `Store, Controller` 之类的模式。
 
-| File                               | Scope                      | Cognitive Mode  |
+解决方案：将 grep 提示视为抽象范例，必须根据领域上下文翻译为项目特定的等价模式。
+
+### 5. 综合步骤中的自生成示例
+
+综合步骤要求模型在生成完整列表之前先生成一个项目特定的工作项示例。这将输出的具体程度校准到实际项目，而非假设特定语言/框架。
+
+### 6. 「说明性，而非穷举性」框架
+
+LLM 倾向于把列表理解为完整的。没有明确框架时，模型只搜索列出的模式，遗漏类似的违规。
+
+使用的机制：
+
+- 「说明性模式（非穷举——类似违规也存在）」
+- 示例前缀「e.g.,」
+- 开放性出口：「任何导致 Y 的 X」
+- 「领域翻译」指令，将抽象翻译为项目特定
+
+## 代码质量类别
+
+类别定义在 `conventions/code-quality/` 中，按认知模式组织：
+
+| 文件                               | 范围                       | 认知模式        |
 | ---------------------------------- | -------------------------- | --------------- |
-| `01-naming-and-types.md`           | Names, types, interfaces   | Local           |
-| `02-structure-and-composition.md`  | Functions, control flow    | Local           |
-| `03-patterns-and-idioms.md`        | Language idioms, patterns  | Local           |
-| `04-repetition-and-consistency.md` | Duplication, uniformity    | Cross-Reference |
-| `05-documentation-and-tests.md`    | Comments, tests, examples  | Local           |
-| `06-module-and-dependencies.md`    | Module structure, imports  | Local           |
-| `07-cross-file-consistency.md`     | Shared concerns, contracts | Cross-Reference |
-| `08-codebase-patterns.md`          | Architecture, system view  | System          |
+| `01-naming-and-types.md`           | 名称、类型、接口           | 局部            |
+| `02-structure-and-composition.md`  | 函数、控制流               | 局部            |
+| `03-patterns-and-idioms.md`        | 语言习惯用法、模式         | 局部            |
+| `04-repetition-and-consistency.md` | 重复、一致性               | 交叉引用        |
+| `05-documentation-and-tests.md`    | 注释、测试、示例           | 局部            |
+| `06-module-and-dependencies.md`    | 模块结构、导入             | 局部            |
+| `07-cross-file-consistency.md`     | 共享关注点、契约           | 交叉引用        |
+| `08-codebase-patterns.md`          | 架构、系统视角             | 系统            |
 
-Each file contains numbered categories (`## N. Title`) with:
+每个文件包含编号类别（`## N. 标题`），各含：
 
-- `<principle>`: The core rule
-- `<grep-hints>`: Abstract search patterns (exemplars, not exhaustive)
-- `<violations>`: Illustrative patterns with severity
-- `<exceptions>`: When not to flag
-- `<threshold>`: When to flag
+- `<principle>`：核心规则
+- `<grep-hints>`：抽象搜索模式（范例，非穷举）
+- `<violations>`：带严重性的说明性违规模式
+- `<exceptions>`：何时不标记
+- `<threshold>`：何时标记
 
-The parser extracts categories by line range. Content within categories is
-free-form -- the parser passes raw text, the LLM interprets structure.
+解析器按行范围提取类别。类别内的内容是自由格式——解析器传递原始文本，LLM 解读结构。
 
-## Philosophy
+## 哲学
 
-Proposals pass validation against four principles:
+建议在验证时遵循四个原则：
 
-| Principle      | Test                                              |
-| -------------- | ------------------------------------------------- |
-| COMPOSABILITY  | Can this piece combine cleanly with others?       |
-| PRECISION      | Does the name create a new semantic level?        |
-| NO SPECULATION | Have I seen this pattern 3+ times?                |
-| SIMPLICITY     | Is this the simplest thing that removes friction? |
+| 原则            | 检验                                              |
+| --------------- | ------------------------------------------------- |
+| 可组合性        | 这个部分能与其他部分干净地组合吗？               |
+| 精确性          | 这个名称创造了一个新的语义层次吗？               |
+| 无推测          | 我看到这个模式出现了 3 次以上吗？               |
+| 简洁性          | 这是消除摩擦的最简单方案吗？                     |
 
-Proposals that predict futures or abstract from single instances get killed.
+预测未来或从单个实例进行抽象的建议会被直接否定。
 
-## Usage
-
-```
-Use your refactor skill on src/services/
-```
-
-With focus area:
+## 使用方法
 
 ```
-Use your refactor skill on src/ -- focus on shared abstractions
+对 src/services/ 使用你的 refactor skill
 ```
 
-## What It Does NOT Do
+带聚焦方向：
 
-- Generate refactored code (recommendations only)
-- Run linters or static analysis
-- Apply style fixes
-- Propose changes beyond what evidence supports
+```
+对 src/ 使用你的 refactor skill —— 专注于共享抽象
+```
+
+## 不做的事
+
+- 生成重构后的代码（仅提供建议）
+- 运行 linter 或静态分析
+- 应用风格修复
+- 提出超出证据支撑范围的改动建议

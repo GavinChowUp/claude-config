@@ -1,1232 +1,1105 @@
-# Sampling and Aggregation Techniques
+# 采样与聚合技术
 
-## Overview
+## 概述
 
-Sampling and aggregation techniques improve LLM accuracy by generating multiple
-reasoning paths or outputs and combining them through voting, ranking, or
-synthesis. Use these techniques when: (1) a single model output is unreliable or
-inconsistent, (2) the task admits multiple valid solution paths, (3) you need
-higher confidence in answers, or (4) the problem requires exploration of
-alternatives. These methods trade increased compute cost for improved accuracy
-and are most valuable for complex reasoning tasks where correct solutions
-converge despite diverse reasoning paths.
+采样与聚合技术通过生成多个推理路径或输出，并通过投票、排名或综合的方式加以整合，从而提升 LLM 的准确率。在以下情况使用这些技术：（1）单次模型输出不可靠或不一致；（2）任务允许多种有效解题路径；（3）需要对答案有更高置信度；（4）问题需要探索多种可能性。这些方法以更高的计算成本换取更高的准确率，在正确解法能在多样化推理路径中收敛的复杂推理任务上最有价值。
 
-**Key insight:** Output-space sampling is the critical component for ensemble
-performance—varying the input/prompt provides marginal additional benefit
-compared to sampling diverse outputs. The mechanism: output sampling
-marginalizes over latent reasoning paths, while input variation (prompt
-rephrasing, example reordering) merely shifts the starting distribution without
-expanding the reasoning path space proportionally. Experiments show
-prompt-order and input-rationale ensembles underperform output sampling
-regardless of how inputs vary. This means temperature-based sampling alone
-captures most ensemble gains; prompt variation adds smaller incremental value.
+**核心洞见：** 输出空间采样是集成性能的关键组件——相比之下，改变输入/prompt 提供的额外收益有限。机制在于：输出采样对隐含推理路径进行边际化，而输入变化（prompt 改写、示例重排）仅改变起始分布，并不等比例地扩展推理路径空间。实验显示，无论输入如何变化，基于 prompt 顺序和输入推理的集成都不如输出采样。这意味着基于温度的采样本身就能捕获大部分集成收益；prompt 变化带来的增量价值较小。
 
 ---
 
-## Techniques
+## 技术
 
-### Self-Consistency
+### 自洽性（Self-Consistency）
 
-**Mechanism:** Sample multiple diverse reasoning paths via temperature-based
-decoding, then select the most consistent final answer by majority vote.
+**机制：** 通过温度采样生成多条多样化推理路径，然后通过多数投票选出最一致的最终答案。
 
-**Triggers:**
+**触发条件：**
 
-- Complex reasoning admits multiple valid solution paths
-- Arithmetic or mathematical problem solving
-- Tasks where correct reasoning converges to same answer
-- Model reasoning is partially reliable but inconsistent
-- Answer must be from fixed answer set or easily parseable
+- 复杂推理允许多种有效解题路径
+- 算术或数学问题求解
+- 正确推理收敛到同一答案的任务
+- 模型推理部分可靠但不一致
+- 答案必须来自固定答案集或易于解析
 
-**The process:**
+**流程：**
 
 ```
-1. Sample k reasoning paths at temperature > 0 (typically 5-40 paths)
-2. Extract final answer from each path
-3. Select answer with highest vote count
+1. 以温度 > 0 采样 k 条推理路径（通常 5-40 条）
+2. 从每条路径中提取最终答案
+3. 选择得票最多的答案
 ```
 
-**Why this works:** Correct solutions are attractors—multiple valid reasoning
-paths converge to the same answer, while errors scatter randomly. Sampling
-marginalizes over the latent reasoning path variable.
+**为何有效：** 正确解法是吸引子——多条有效推理路径收敛到同一答案，而错误则随机散布。采样对潜在推理路径变量进行边际化。
 
-**CORRECT:**
+**正确做法：**
 ```
-[Sample 40 CoT outputs at temp=0.7 for "If John has 3 apples and buys 2 more..."]
-Answers: 5, 5, 5, 6, 5, 5, 4, 5, 5, 5... → Select "5" (majority)
+[以 temp=0.7 对「若 John 有 3 个苹果又买了 2 个...」采样 40 次 CoT 输出]
+答案：5, 5, 5, 6, 5, 5, 4, 5, 5, 5... → 选择「5」（多数）
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Use greedy decoding (temp=0) and take single answer]
-Answer: 6 → No opportunity to correct via aggregation
+[使用贪婪解码（temp=0）取单一答案]
+答案：6 → 无聚合纠错机会
 ```
 
-Greedy decoding commits to a single reasoning path that may contain errors.
-Self-consistency's value comes from path diversity.
+贪婪解码只承诺一条可能含有错误的推理路径。自洽性的价值来自路径多样性。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 5-40x tokens (recommended 5-40 paths)
-- API calls: k independent sampling calls
-- Requirements: Few-shot CoT examples, temperature-based sampling enabled
-- Gains: Substantial improvements on math word problems, commonsense reasoning
+- Token 开销：5-40 倍 token（推荐 5-40 条路径）
+- API 调用：k 次独立采样调用
+- 要求：少样本 CoT 示例，支持温度采样
+- 收益：在数学文字题和常识推理上有实质性提升
 
 ---
 
-#### Universal Self-Consistency (USC)
+#### 通用自洽性（USC）
 
-**Mechanism:** Extends self-consistency to free-form outputs by using the LLM
-itself to select the most consistent response among candidates, rather than
-exact-match voting.
+**机制：** 将自洽性扩展到自由形式输出，通过 LLM 本身从候选中选出最一致的响应，而非精确匹配投票。
 
-**Triggers:**
+**触发条件：**
 
-- Free-form generation (summarization, open-ended QA)
-- Answer extraction via exact match is not feasible
-- Output formats vary across samples (different phrasing, structure)
-- Code generation without access to execution results
+- 自由形式生成（摘要、开放式问答）
+- 通过精确匹配提取答案不可行
+- 不同样本的输出格式各异（措辞、结构不同）
+- 无法执行代码来获取结果的代码生成
 
-**The process:**
+**流程：**
 
 ```
-1. Sample k responses at temperature > 0
-2. Concatenate all responses into a single prompt
-3. Ask LLM: "Select the most consistent response among these candidates"
-4. Return the selected response
+1. 以温度 > 0 采样 k 个响应
+2. 将所有响应拼接到单个 prompt 中
+3. 询问 LLM：「从这些候选中选出最一致的响应」
+4. 返回被选响应
 ```
 
-**Why this works:** Assessing consistency among candidates is easier than
-judging answer correctness. The LLM can recognize when multiple responses
-converge on the same semantic content even with different surface forms.
+**为何有效：** 评估候选间的一致性比判断答案是否正确更容易。LLM 能识别多个响应何时在语义上收敛，即使表面形式不同。
 
-**CORRECT:**
+**正确做法：**
 ```
-Question: "What are the main causes of the French Revolution?"
+问题：「法国大革命的主要成因是什么？」
 
-Sample 1: "Economic crisis, social inequality, and weak monarchy..."
-Sample 2: "Financial troubles, class tensions, and ineffective king..."
-Sample 3: "Debt problems, unfair taxation, and royal incompetence..."
+样本 1：「经济危机、社会不平等和软弱的君主制...」
+样本 2：「财政困难、阶级紧张和无效的国王...」
+样本 3：「债务问题、不公平的税收和王室的无能...」
 
-USC prompt: "Given these 3 responses, select the most consistent one."
-→ LLM selects based on semantic overlap of key themes
+USC prompt：「给定这 3 个响应，选出最一致的。」
+→ LLM 基于关键主题的语义重叠进行选择
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Attempt exact-match voting on free-form responses]
-Sample 1: "Economic crisis..." → unique string
-Sample 2: "Financial troubles..." → unique string
-Sample 3: "Debt problems..." → unique string
-→ All answers get 1 vote each; no majority emerges
+[对自由形式响应尝试精确匹配投票]
+样本 1：「经济危机...」→ 独特字符串
+样本 2：「财政困难...」→ 独特字符串
+样本 3：「债务问题...」→ 独特字符串
+→ 所有答案各得 1 票；无多数出现
 ```
 
-Standard self-consistency fails on free-form outputs because no two responses
-match exactly, even when they're semantically equivalent.
+标准自洽性对自由形式输出失效，因为即使语义等价，也没有两个响应完全匹配。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: k samples + 1 selection call (selection prompt can be long)
-- Limitation: Number of samples bounded by context length
-- Gains: Enables consistency-based selection for summarization, open-ended QA,
-  code generation without execution
+- Token 开销：k 个样本 + 1 次选择调用（选择 prompt 可能较长）
+- 限制：样本数量受上下文长度约束
+- 收益：对摘要、开放式问答、无执行环境的代码生成支持基于一致性的选择
 
-**Stacking note:** USC replaces the voting step in self-consistency; combine
-with any technique that generates multiple outputs needing aggregation.
+**组合说明：** USC 替换自洽性中的投票步骤；可与任何需要聚合多个输出的技术结合。
 
 ---
 
-### Mixture of Reasoning Experts (MoRE)
+### 推理专家混合（MoRE）
 
-**Mechanism:** Create specialized expert prompts for different reasoning types
-(factual, math, multihop, commonsense), run all experts on each question, then
-select the best answer based on inter-expert agreement.
+**机制：** 为不同推理类型（事实、数学、多跳、常识）创建专业化专家 prompt，对每个问题运行所有专家，然后基于专家间一致性选出最佳答案。
 
-**Triggers:**
+**触发条件：**
 
-- Unknown question type requiring generalization across reasoning domains
-- Mixed-domain QA where single prompting strategy underperforms
-- Need both accuracy and calibrated confidence for selective answering
-- Interpretable routing decisions valuable for human verification
+- 问题类型未知，需要跨推理领域泛化
+- 混合领域问答中单一 prompting 策略表现不佳
+- 需要同时保证准确率和校准置信度，用于选择性回答
+- 可解释的路由决策对人工验证有价值
 
-**The process:**
+**流程：**
 
 ```
-1. Create specialized prompts:
-   - Factual: retrieval-augmented (append relevant passages)
-   - Multihop: chain-of-thought with decomposition
-   - Math: chain-of-thought with calculation steps
-   - Commonsense: generated knowledge prompting
+1. 创建专业化 prompt：
+   - 事实型：检索增强（追加相关段落）
+   - 多跳型：带分解步骤的链式推理
+   - 数学型：带计算步骤的链式推理
+   - 常识型：生成知识 prompting
 
-2. Run all experts on the question
+2. 对问题运行所有专家
 
-3. Select answer based on:
-   - Inter-expert agreement (how many experts converge)
-   - Answer characteristics (length, overlap with question)
-   - Expert-question type matching signals
+3. 基于以下内容选择答案：
+   - 专家间一致性（多少专家收敛）
+   - 答案特征（长度、与问题的重叠）
+   - 专家-问题类型匹配信号
 
-4. Optionally abstain if confidence below threshold
+4. 可选：若置信度低于阈值则拒绝回答
 ```
 
-**Why this works:** Specialized prompts excel at their target reasoning type but
-fail on others. Agreement among differently-specialized experts provides a
-strong correctness signal—if multiple reasoning approaches converge on the same
-answer, confidence increases substantially.
+**为何有效：** 专业化 prompt 在其目标推理类型上表现优秀，但在其他类型上失效。不同专业化专家之间的一致性提供了强有力的正确性信号——若多种推理方式收敛到同一答案，置信度会大幅提升。
 
-**Critical insight:** Inter-expert agreement is more informative than individual
-confidence scores. Without agreement features, calibration degrades below simple
-probability-based baselines.
+**关键洞见：** 专家间一致性比单个置信度分数更具信息量。没有一致性特征，校准会低于简单的基于概率的基线。
 
-**CORRECT:**
+**正确做法：**
 ```
-Question: "How many planets are closer to the Sun than Earth?"
+问题：「距太阳比地球更近的行星有几颗？」
 
-Factual Expert: "Mercury and Venus. Answer: 2"
-Math Expert: "Earth is 3rd planet. 3-1=2. Answer: 2"
-Multihop Expert: "Mercury is 1st, Venus is 2nd, Earth is 3rd. Answer: 2"
-Commonsense Expert: "Mercury and Venus are inner planets. Answer: 2"
+事实型专家：「水星和金星。答案：2」
+数学型专家：「地球是第 3 行星。3-1=2。答案：2」
+多跳型专家：「水星第 1，金星第 2，地球第 3。答案：2」
+常识型专家：「水星和金星是内行星。答案：2」
 
-→ All 4 experts agree → High confidence → Select "2"
+→ 4 个专家全部一致 → 高置信度 → 选择「2」
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Use single specialized prompt for all questions]
+[对所有问题使用单一专业化 prompt]
 
-Math prompt on factual question: "Who wrote Hamlet?"
-→ CoT reasoning inappropriate for retrieval task
-→ Performance degrades significantly
+数学 prompt 处理事实问题：「Hamlet 是谁写的？」
+→ CoT 推理不适合检索任务
+→ 性能显著下降
 ```
 
-Single specialized prompts sacrifice generalizability for targeted performance.
+单一专业化 prompt 以牺牲通用性换取针对性性能。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 4x baseline (run all four experts)
-- Can reduce to question-only routing when compute-limited (weaker but faster)
-- Requirements: Specialized prompts per reasoning type, selection mechanism
-- Gains: Substantially outperforms any single expert on mixed-domain QA;
-  improves human calibration when expert predictions are shown
+- Token 开销：基线的 4 倍（运行四个专家）
+- 计算受限时可简化为仅基于问题的路由（效果稍弱但更快）
+- 要求：每种推理类型的专业化 prompt，选择机制
+- 收益：在混合领域问答上大幅超越任何单一专家；展示专家预测时可改善人工校准
 
-**Stacking note:** Each expert can internally use self-consistency. MoRE
-provides cross-expert diversity while SC provides within-expert diversity.
+**组合说明：** 每个专家内部可使用自洽性。MoRE 提供跨专家多样性，SC 提供专家内多样性。
 
 ---
 
-### Tree of Thoughts (ToT)
+### 思维树（ToT）
 
-**Mechanism:** Explores multiple reasoning paths via tree search with LM-based
-thought generation and self-evaluation; supports BFS/DFS with backtracking.
+**机制：** 通过支持 BFS/DFS 和回溯的树搜索，结合基于 LM 的思维生成和自我评估，探索多条推理路径。
 
-**Triggers:**
+**触发条件：**
 
-- Task requires exploration of multiple solution paths
-- Initial decisions are pivotal and hard to reverse
-- Task requires strategic lookahead or backtracking
-- Left-to-right decoding fails frequently at early steps
-- Creative tasks requiring high-level planning before execution
+- 任务需要探索多种解题路径
+- 初始决策关键且难以逆转
+- 任务需要策略性前瞻或回溯
+- 从左到右解码在早期步骤频繁失败
+- 创意任务需要在执行前进行高层次规划
 
-**The process:**
+**流程：**
 
 ```
-1. Decompose problem into thought steps
-2. Generate k candidate thoughts at each step
-3. Evaluate each thought's promise using LLM self-evaluation
-4. Search (BFS keeps top-b; DFS explores until pruning)
-5. Backtrack when paths are evaluated as unpromising
+1. 将问题分解为思维步骤
+2. 在每步生成 k 个候选思维
+3. 使用 LLM 自我评估评估每个思维的前景
+4. 搜索（BFS 保留前 b 个；DFS 探索直至剪枝）
+5. 当路径被评估为没有希望时回溯
 ```
 
-**Why this works:** Left-to-right decoding commits to early decisions that may
-be suboptimal. Tree search allows exploration of alternatives and recovery from
-mistakes via backtracking.
+**为何有效：** 从左到右解码会承诺可能不优的早期决策。树搜索允许探索替代方案，并通过回溯从错误中恢复。
 
-**CORRECT:**
+**正确做法：**
 ```
-Task: Game of 24 (combine 4 numbers to make 24)
-Numbers: 4, 5, 6, 10
+任务：24 点游戏（用 4 个数字组成 24）
+数字：4, 5, 6, 10
 
-Step 1 candidates: "5+6=11", "4+5=9", "10-4=6"
-Evaluate each → "5+6=11" looks promising
-Step 2 from "5+6=11": "11+10=21", "11*4=44"...
-Backtrack if stuck → try "10-4=6" path instead
+步骤 1 候选：「5+6=11」、「4+5=9」、「10-4=6」
+评估每个 → 「5+6=11」看起来有希望
+从「5+6=11」继续：「11+10=21」、「11*4=44」...
+若陷入困境则回溯 → 改试「10-4=6」路径
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Greedy CoT without backtracking]
-"First, 4+5=9. Then 9+6=15. Then 15+10=25. That's not 24..."
-→ Committed to suboptimal first step, cannot recover
+[没有回溯的贪婪 CoT]
+「首先，4+5=9。然后 9+6=15。再 15+10=25。那不是 24...」
+→ 承诺了不优的第一步，无法恢复
 ```
 
-Without backtracking, early mistakes propagate through the entire solution.
+没有回溯，早期错误会贯穿整个解题过程。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 5-100x tokens vs CoT (depends on branching factor and depth)
-- API calls: Adaptive (BFS keeps top-b states per step; DFS explores until
-  pruning)
-- Requirements: Few-shot examples for thought generation, search algorithm,
-  state evaluation prompts
-- Gains: Dramatically outperforms CoT on tasks requiring search and
-  backtracking (puzzles, planning, creative writing)
+- Token 开销：与 CoT 相比 5-100 倍 token（取决于分支因子和深度）
+- API 调用：自适应（BFS 每步保留前 b 个状态；DFS 探索直至剪枝）
+- 要求：思维生成的少样本示例、搜索算法、状态评估 prompt
+- 收益：在需要搜索和回溯的任务上大幅超越 CoT（谜题、规划、创意写作）
 
 ---
 
-### Diversity of Thought (Div-Se / IDiv-Se)
+### 思维多样性（Div-Se / IDiv-Se）
 
-**Mechanism:** Solicit LLM to generate multiple high-level reasoning approaches,
-augment few-shot examples per approach, ensemble across diverse prompts via
-majority vote.
+**机制：** 引导 LLM 生成多种高层次推理方法，为每种方法增强少样本示例，通过多数投票集成多样化 prompt 的结果。
 
-**Triggers:**
+**触发条件：**
 
-- Complex multi-step reasoning requiring diverse solution strategies
-- Math problems solvable via multiple approaches (algebra, visualization,
-  elimination)
-- Problems where token-level diversity fails to ensure methodological diversity
-- Tasks where baseline CoT and self-consistency plateau
+- 需要多样化解题策略的复杂多步骤推理
+- 可通过多种方法求解的数学问题（代数、可视化、消去法）
+- Token 级别的多样性无法确保方法论上的多样性
+- 基础 CoT 和自洽性已达到瓶颈的任务
 
-**The process:**
+**流程：**
 
 ```
-Div-Se (separate calls):
-1. Ask LLM to list k distinct solving approaches for the problem type
-2. Create k prompts, each with examples demonstrating one approach
-3. Run each prompt separately, collect answers
-4. Majority vote across all answers
+Div-Se（独立调用）：
+1. 让 LLM 列出针对该问题类型的 k 种不同解题方法
+2. 创建 k 个 prompt，每个包含演示一种方法的示例
+3. 分别运行每个 prompt，收集答案
+4. 所有答案多数投票
 
-IDiv-Se (single call):
-1. Instruct LLM to solve using multiple approaches in one response
-2. Extract answer from each approach
-3. Majority vote within the single response
+IDiv-Se（单次调用）：
+1. 在单次响应中指示 LLM 使用多种方法求解
+2. 从每种方法中提取答案
+3. 在单次响应内多数投票
 ```
 
-**Why this works:** Temperature-based sampling varies token choices but not
-reasoning methodology. Explicit approach variation ensures genuinely different
-problem-solving strategies, catching errors that single-approach sampling
-misses.
+**为何有效：** 温度采样改变 token 选择，但不改变推理方法论。显式的方法变化确保了真正不同的解题策略，能捕捉单一方法采样所遗漏的错误。
 
-**CORRECT:**
+**正确做法：**
 ```
-Problem: "A store has a 20% off sale. If an item costs $80 after discount..."
+问题：「商店打 8 折。若一件商品折后价 80 美元...」
 
-Approach 1 (Algebra): Let x = original price. 0.8x = 80, so x = 100
-Approach 2 (Reverse percentage): 80 ÷ 0.8 = 100
-Approach 3 (Proportion): 80/x = 80/100, so x = 100
+方法 1（代数）：设 x = 原价。0.8x = 80，所以 x = 100
+方法 2（逆向百分比）：80 ÷ 0.8 = 100
+方法 3（比例）：80/x = 80/100，所以 x = 100
 
-→ All approaches converge on $100
+→ 三种方法都收敛到 100 美元
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Sample same algebraic approach 3 times at high temperature]
-Sample 1: "0.8x = 80, x = 100"
-Sample 2: "0.8x = 80, x = 100"
-Sample 3: "0.8x = 80, x = 10" (arithmetic error)
+[以高温度采样同一代数方法 3 次]
+样本 1：「0.8x = 80, x = 100」
+样本 2：「0.8x = 80, x = 100」
+样本 3：「0.8x = 80, x = 10」（算术错误）
 
-→ Same methodology; no methodological diversity to catch the error pattern
+→ 相同方法论；没有方法论多样性来捕捉错误模式
 ```
 
-Token-level diversity doesn't prevent systematic errors in a single approach.
+Token 级别的多样性无法防止单一方法中的系统性错误。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: Div-Se: 3-5x tokens (k separate calls); IDiv-Se: 1.5-2x tokens
-  (single call)
-- API calls: Div-Se: k calls (k=3 or 5); IDiv-Se: 1 call
-- Requirements: LLM feedback for approach generation, few-shot example
-  augmentation
-- Gains: Strong improvements on math and planning tasks, especially where
-  self-consistency plateaus
+- Token 开销：Div-Se：3-5 倍 token（k 次独立调用）；IDiv-Se：1.5-2 倍 token（单次调用）
+- API 调用：Div-Se：k 次调用（k=3 或 5）；IDiv-Se：1 次调用
+- 要求：LLM 反馈用于方法生成，少样本示例增强
+- 收益：在数学和规划任务上强劲改善，尤其在自洽性达到瓶颈时
 
 ---
 
-### Multi-Chain Reasoning (MCR)
+### 多链推理（MCR）
 
-**Mechanism:** LLM meta-reasons over multiple CoT chains to combine facts and
-generate unified explanation rather than simple majority voting.
+**机制：** LLM 对多条 CoT 链进行元推理，组合事实并生成统一解释，而非简单多数投票。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-hop questions requiring multiple reasoning steps
-- Questions where individual CoT chains contain partial but incomplete
-  information
-- Tasks requiring fact composition across multiple reasoning paths
-- Problems where majority voting fails due to large output space
+- 需要多个推理步骤的多跳问题
+- 各 CoT 链包含部分但不完整信息的问题
+- 需要跨多条推理路径组合事实的任务
+- 由于答案空间大，多数投票失效的问题
 
-**The process:**
+**流程：**
 
 ```
-1. Generate 1 greedy + 4 sampled CoT chains
-2. Extract facts and reasoning from each chain
-3. Feed all chains to meta-reasoner
-4. Meta-reasoner synthesizes facts across chains into unified answer
+1. 生成 1 条贪婪 + 4 条采样 CoT 链
+2. 从每条链中提取事实和推理
+3. 将所有链输入元推理器
+4. 元推理器综合各链事实，生成统一答案
 ```
 
-**Why this works:** Individual chains may each capture different relevant facts.
-Voting discards this complementary information. Meta-reasoning preserves and
-combines partial insights from multiple chains.
+**为何有效：** 各条链可能各自捕获不同的相关事实。投票会丢弃这些互补信息。元推理保留并整合了来自多条链的部分洞见。
 
-**CORRECT:**
+**正确做法：**
 ```
-Question: "What award did the director of Jaws win for Schindler's List?"
+问题：「《大白鲨》的导演凭借《辛德勒的名单》获得了什么奖项？」
 
-Chain 1: "Jaws was directed by Steven Spielberg..."
-Chain 2: "Schindler's List won Best Picture and Best Director..."
-Chain 3: "Spielberg directed both films..."
+链 1：「《大白鲨》由史蒂文·斯皮尔伯格执导...」
+链 2：「《辛德勒的名单》获得最佳影片和最佳导演奖...」
+链 3：「斯皮尔伯格执导了两部影片...」
 
-Meta-reasoner: Combines Chain 1 (Spielberg directed Jaws) + Chain 2 (awards) + Chain 3 (same director)
-→ "Steven Spielberg won Best Director for Schindler's List"
+元推理器：结合链 1（斯皮尔伯格执导《大白鲨》）+ 链 2（奖项）+ 链 3（同一导演）
+→ 「史蒂文·斯皮尔伯格凭借《辛德勒的名单》获得最佳导演奖」
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Majority vote on multi-hop with large answer space]
-Chain 1: "Best Director"
-Chain 2: "Academy Award"
-Chain 3: "Oscar for Best Picture"
+[在答案空间大的多跳问题上多数投票]
+链 1：「最佳导演」
+链 2：「学院奖」
+链 3：「最佳影片奥斯卡」
 
-→ No majority; voting fails to synthesize partial correct information
+→ 无多数；投票无法综合部分正确信息
 ```
 
-Voting treats chains as independent votes rather than complementary evidence.
+投票将各链视为独立投票而非互补证据。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 5x tokens (1 greedy + 4 sampled chains + meta-reasoner)
-- API calls: 6 total calls (5 decomposition chains + 1 meta-reasoner)
-- Requirements: Few-shot examples for decomposition and meta-reasoner, retrieval
-  system
-- Gains: Consistent improvements over self-consistency on multi-hop QA
+- Token 开销：5 倍 token（1 条贪婪 + 4 条采样 + 元推理器）
+- API 调用：共 6 次（5 次分解链 + 1 次元推理器）
+- 要求：分解和元推理器的少样本示例，检索系统
+- 收益：在多跳问答上持续优于自洽性
 
 ---
 
-### Complexity-Based Prompting
+### 基于复杂度的 Prompting
 
-**Mechanism:** Select few-shot examples with more reasoning steps and vote among
-complex generated chains over simple ones.
+**机制：** 选择包含更多推理步骤的少样本示例，并在复杂生成链中投票而非简单链。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step reasoning problems with intermediate steps
-- Math word problems requiring sequential calculations
-- Problems where reasoning complexity varies significantly
-- When avoiding spurious reasoning shortcuts is critical
+- 具有中间步骤的多步骤推理问题
+- 需要顺序计算的数学文字题
+- 推理复杂度差异显著的问题
+- 避免虚假推理捷径至关重要时
 
-**The process:**
+**流程：**
 
 ```
-1. Annotate few-shot examples with detailed reasoning chains (~9 steps vs ~3)
-2. Sample multiple reasoning chains from model
-3. Count reasoning steps in each chain
-4. Vote only among the top-K most complex chains
+1. 用详细推理链（约 9 步 vs 约 3 步）标注少样本示例
+2. 从模型采样多条推理链
+3. 计算每条链的推理步骤数
+4. 仅在前 K 条最复杂的链中投票
 ```
 
-**Why this works:** Simple chains often take shortcuts that happen to reach
-correct answers on easy examples but fail on harder problems. Complex chains
-that show full work are more likely to generalize correctly.
+**为何有效：** 简单的链常常走捷径，在简单示例上碰巧得到正确答案，但在较难问题上失败。展示完整工作的复杂链更可能正确泛化。
 
-**CORRECT:**
+**正确做法：**
 ```
-Problem: "John has 3 times as many apples as Mary. Mary has 4 apples..."
+问题：「John 的苹果是 Mary 的 3 倍。Mary 有 4 个苹果...」
 
-Complex chain (preferred):
-"Mary has 4 apples. John has 3 times Mary's amount. 3 × 4 = 12. John has 12."
+复杂链（首选）：
+「Mary 有 4 个苹果。John 有 Mary 的 3 倍。3 × 4 = 12。John 有 12 个。」
 
-Simple chain (filtered out):
-"3 × 4 = 12"
+简单链（过滤掉）：
+「3 × 4 = 12」
 
-→ Vote among chains showing full reasoning
+→ 在展示完整推理的链中投票
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Vote equally among all chains regardless of complexity]
-Chain 1 (complex): "Mary=4, John=3×4=12" ✓
-Chain 2 (simple): "3×4=12" ✓
-Chain 3 (simple, wrong): "3+4=7" ✗
+[不考虑复杂度，对所有链等权重投票]
+链 1（复杂）：「Mary=4, John=3×4=12」✓
+链 2（简单）：「3×4=12」✓
+链 3（简单，错误）：「3+4=7」✗
 
-→ Simple chains may get correct answer by coincidence on easy problems
-   but fail systematically on harder ones
+→ 简单链可能在简单问题上碰巧正确
+   但在较难问题上系统性失败
 ```
 
-Equal weighting allows shortcut chains to dilute the vote.
+等权重允许走捷径的链稀释投票。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 3-4x tokens (complex prompts ~9 steps vs simple ~3 steps)
-- API calls: 50 samples for voting, select top K=30-40 complex chains
-- Requirements: Annotated reasoning chains for 8 few-shot examples, large model
-  (>100B parameters)
-- Gains: Consistent improvements on multi-step math problems
+- Token 开销：3-4 倍 token（复杂 prompt 约 9 步 vs 简单约 3 步）
+- API 调用：50 次采样投票，选取前 K=30-40 条复杂链
+- 要求：8 个少样本示例的标注推理链，大型模型（>100B 参数）
+- 收益：在多步骤数学问题上持续改善
 
 ---
 
-### Boosted Prompt Ensembles
+### 提升式 Prompt 集成
 
-**Mechanism:** Iteratively construct few-shot prompts by selecting hard examples
-where current ensemble shows disagreement.
+**机制：** 通过选择当前集成存在分歧的困难示例，迭代构建少样本 prompt。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step reasoning with current prompt showing high variance
-- Small labeled dataset available (50-300 samples) for train-time boosting
-- Initial prompt suboptimal or distribution shift between train and test
-- Problems where single prompt fails systematically on specific subtypes
+- 当前 prompt 在多步骤推理上方差较高
+- 有少量标注数据集（50-300 个样本）可用于训练时提升
+- 初始 prompt 不优或训练/测试间存在分布偏移
+- 单一 prompt 在特定子类型上系统性失败
 
-**The process:**
+**流程：**
 
 ```
-1. Start with initial prompt
-2. Evaluate on training set
-3. Select examples where ensemble disagrees (hard examples)
-4. Add hard examples to create new prompt
-5. Repeat, building ensemble of prompts
-6. At inference, vote across all prompts
+1. 从初始 prompt 开始
+2. 在训练集上评估
+3. 选择集成存在分歧的示例（困难示例）
+4. 将困难示例添加以创建新 prompt
+5. 重复，构建 prompt 集成
+6. 推理时在所有 prompt 上投票
 ```
 
-**Why this works:** Boosting focuses on examples the current ensemble gets
-wrong, creating prompts that specialize in different failure modes. The ensemble
-covers more of the problem space than any single prompt.
+**为何有效：** 提升聚焦于当前集成答错的示例，创建专注于不同失败模式的 prompt。集成覆盖了比任何单一 prompt 更大的问题空间。
 
-**CORRECT:**
+**正确做法：**
 ```
-Round 1: Initial prompt fails on fraction problems
-Round 2: Add fraction examples → new prompt handles fractions
-Round 3: Ensemble still fails on unit conversion
-Round 4: Add unit conversion examples → new prompt handles units
+第 1 轮：初始 prompt 在分数问题上失败
+第 2 轮：添加分数示例 → 新 prompt 处理分数
+第 3 轮：集成在单位换算上仍然失败
+第 4 轮：添加单位换算示例 → 新 prompt 处理单位
 
-Final ensemble: Vote across all specialized prompts
+最终集成：在所有专业化 prompt 上投票
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Random selection of few-shot examples]
-→ May repeatedly sample similar examples
-→ No systematic coverage of failure modes
+[随机选择少样本示例]
+→ 可能反复采样相似示例
+→ 没有系统性覆盖失败模式
 ```
 
-Random selection doesn't target the specific weaknesses of current prompts.
+随机选择不针对当前 prompt 的具体弱点。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: n × m tokens (e.g., 10 prompts × 10 samples = 100x baseline)
-- API calls: n × m calls per test question
-- Requirements: Small training set, chain-of-thought generation,
-  self-consistency sampling
-- Gains: Outperforms self-consistency on math reasoning
+- Token 开销：n × m token（如 10 个 prompt × 10 个样本 = 基线的 100 倍）
+- API 调用：每个测试问题需 n × m 次调用
+- 要求：小型训练集、链式推理生成、自洽性采样
+- 收益：在数学推理上优于自洽性
 
 ---
 
-### Multi-Perspective Self-Consistency (MPSC)
+### 多视角自洽性（MPSC）
 
-**Mechanism:** Generate solutions, specifications, and test cases, then rank by
-consistency using 3-partite graph optimization.
+**机制：** 生成解法、规范和测试用例，然后通过三部分图优化按一致性排名。
 
-**Triggers:**
+**触发条件：**
 
-- Code generation tasks where single-attempt accuracy is insufficient
-- Programming problems requiring multiple verification perspectives
-- Tasks with executable test cases and verifiable specifications
-- Scenarios where inter-consistency between code artifacts can be measured
+- 代码生成任务中单次准确率不足
+- 需要多视角验证的编程问题
+- 有可执行测试用例和可验证规范的任务
+- 可以测量代码产物间一致性的场景
 
-**The process:**
+**流程：**
 
 ```
-1. Generate multiple solutions (code implementations)
-2. Generate multiple specifications (docstrings, type signatures)
-3. Generate multiple test cases
-4. Build 3-partite graph: solution ↔ spec ↔ tests
-5. Score solutions by consistency across all three perspectives
-6. Select highest-consistency solution
+1. 生成多个解法（代码实现）
+2. 生成多个规范（文档字符串、类型签名）
+3. 生成多个测试用例
+4. 构建三部分图：解法 ↔ 规范 ↔ 测试
+5. 按跨三个视角的一致性对解法打分
+6. 选择一致性最高的解法
 ```
 
-**Why this works:** A correct solution should be consistent with good
-specifications and pass valid test cases. Cross-perspective consistency filters
-out solutions that only appear correct from one viewpoint.
+**为何有效：** 正确的解法应该与良好的规范一致，并通过有效的测试用例。跨视角一致性过滤掉了只从单一视角看起来正确的解法。
 
-**CORRECT:**
+**正确做法：**
 ```
-Problem: "Write a function to find the second largest number"
+问题：「写一个找第二大数的函数」
 
-Solution A: def f(arr): return sorted(arr)[-2]
-Spec A: "Returns second largest element"
-Tests: [1,2,3]→2, [5,5,3]→5
+解法 A：def f(arr): return sorted(arr)[-2]
+规范 A：「返回第二大的元素」
+测试：[1,2,3]→2, [5,5,3]→5
 
-→ Check: Does Solution A match Spec A? Pass tests?
-→ Solutions consistent across all three perspectives rank higher
+→ 检查：解法 A 是否与规范 A 匹配？是否通过测试？
+→ 跨三个视角一致的解法排名更高
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Rank solutions by code probability only]
-Solution A: High probability but buggy edge case handling
-Solution B: Lower probability but handles edge cases
+[仅按代码概率排名解法]
+解法 A：高概率但边界情况处理有 bug
+解法 B：低概率但处理了边界情况
 
-→ Probability alone doesn't capture correctness
+→ 仅靠概率无法捕获正确性
 ```
 
-Single-perspective ranking misses consistency signals from specifications and
-tests.
+单一视角排名遗漏了来自规范和测试的一致性信号。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: ~3.5x tokens (200 solutions + 50 specs + 100 test cases)
-- API calls: 350 independent calls per problem
-- Requirements: Code execution environment, few-shot examples for each
-  perspective
-- Gains: Substantial improvements on code generation benchmarks
+- Token 开销：约 3.5 倍 token（200 个解法 + 50 个规范 + 100 个测试用例）
+- API 调用：每个问题 350 次独立调用
+- 要求：代码执行环境，每个视角的少样本示例
+- 收益：在代码生成基准上有实质性改善
 
 ---
 
-### PREFER (Prompt Ensemble Learning via Feedback-Reflect-Refine)
+### PREFER（基于反馈-反思-精炼的 Prompt 集成学习）
 
-**Mechanism:** Iteratively generates diverse prompts via feedback on errors,
-reflection, and refinement, then ensembles with adaptive weights.
+**机制：** 通过对错误进行反馈、反思和精炼，迭代生成多样化 prompt，然后用自适应权重集成。
 
-**Triggers:**
+**触发条件：**
 
-- Task requires high accuracy and stability across diverse inputs
-- Single prompts show high variance or hallucination issues
-- Hard examples exist that individual prompts fail to solve
-- Manual prompt engineering is too costly or suboptimal
+- 任务需要在多样化输入上的高准确率和稳定性
+- 单一 prompt 方差大或存在幻觉问题
+- 存在个别 prompt 无法解决的困难示例
+- 手动 prompt 工程成本过高或效果不够优化
 
-**The process:**
+**流程：**
 
 ```
-1. Start with initial prompt
-2. Evaluate on training examples
-3. For errors: LLM reflects on why prompt failed
-4. LLM refines prompt based on reflection
-5. Repeat for k iterations
-6. Ensemble all prompts with learned weights
+1. 从初始 prompt 开始
+2. 在训练示例上评估
+3. 对于错误：LLM 反思 prompt 失败的原因
+4. LLM 基于反思精炼 prompt
+5. 重复 k 次迭代
+6. 用学习到的权重集成所有 prompt
 ```
 
-**Why this works:** Error-driven refinement creates prompts specialized for
-different failure modes. The reflection step provides signal about what's
-missing in current prompts.
+**为何有效：** 错误驱动的精炼创建了专注于不同失败模式的 prompt。反思步骤为当前 prompt 缺少什么提供信号。
 
-**CORRECT:**
+**正确做法：**
 ```
-Initial prompt: "Solve the math problem step by step"
-Error: Fails on problems requiring unit conversion
-Reflection: "Prompt doesn't emphasize checking units"
-Refined: "Solve step by step. Pay attention to unit conversions."
+初始 prompt：「按步骤解题」
+错误：在需要单位换算的问题上失败
+反思：「prompt 没有强调检查单位」
+精炼：「按步骤解题。注意单位换算。」
 
-→ Each refinement addresses specific failure mode
+→ 每次精炼针对特定失败模式
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Generate random prompt variations without error feedback]
-Variation 1: "Solve carefully"
-Variation 2: "Think step by step"
-Variation 3: "Be precise"
+[不基于错误反馈随机生成 prompt 变体]
+变体 1：「仔细解题」
+变体 2：「逐步思考」
+变体 3：「要精确」
 
-→ No targeted improvement; variations don't address actual failures
+→ 没有针对性的改进；变体不针对实际失败
 ```
 
-Random variation doesn't systematically address weaknesses.
+随机变化不系统性地解决弱点。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: k iterations with k prompts: k × (2-5 iterations) × 2x tokens
-- API calls: 2k calls for training, k calls for inference
-- Requirements: Training dataset for error feedback, multiple boosting
-  iterations
-- Gains: Outperforms single prompts significantly; outperforms other automated
-  prompt optimization methods
+- Token 开销：k 次迭代带 k 个 prompt：k × (2-5 次迭代) × 2 倍 token
+- API 调用：训练时 2k 次，推理时 k 次
+- 要求：用于错误反馈的训练数据集，多次提升迭代
+- 收益：显著优于单一 prompt；优于其他自动化 prompt 优化方法
 
 ---
 
-### Refined Answer Distributions (RAD)
+### 精炼答案分布（RAD）
 
-**Mechanism:** Iteratively refine answer distributions by marginalizing over
-previous answers, weighting refinements by estimated probability of each answer.
+**机制：** 通过对之前答案进行边际化，并按每个答案的估计概率加权精炼，迭代精炼答案分布。
 
-**Triggers:**
+**触发条件：**
 
-- Reasoning tasks where self-consistency plateaus after few samples
-- Problems where providing hints helps LLMs verify/refine answers
-- Multi-step reasoning requiring answer distribution refinement
-- Tasks where probability flow into correct answer exceeds flow out
+- 少量采样后自洽性达到平台期的推理任务
+- 提供提示能帮助 LLM 验证/精炼答案的问题
+- 需要答案分布精炼的多步骤推理
+- 流向正确答案的概率超过流出的任务
 
-**The process:**
+**流程：**
 
 ```
-1. Initial sampling: Generate B1 answers (e.g., 5)
-2. For each unique answer, generate B2 refinement samples conditioned on that answer
-3. Weight refinements by original answer probability
-4. Repeat for 2-3 iterations with increasing sample sizes
-5. Select answer with highest refined probability
+1. 初始采样：生成 B1 个答案（如 5 个）
+2. 对每个唯一答案，生成以该答案为条件的 B2 个精炼样本
+3. 按原始答案概率加权精炼
+4. 对 2-3 次迭代重复，逐渐增大样本量
+5. 选择精炼概率最高的答案
 ```
 
-**Why this works:** Self-conditioning on candidate answers acts as a
-verification step. Correct answers survive refinement while incorrect answers
-"flow" toward correct ones when re-examined.
+**为何有效：** 以候选答案为条件的自我条件化作为验证步骤。正确答案在精炼中得以保留，而错误答案在重新检查时「流向」正确答案。
 
-**CORRECT:**
+**正确做法：**
 ```
-Iteration 1: Answers = {42: 60%, 44: 30%, 40: 10%}
-Iteration 2: Condition on each, re-sample
-  - Given "42 might be right": 80% confirm 42
-  - Given "44 might be right": 60% switch to 42
-  - Given "40 might be right": 70% switch to 42
-Refined: {42: 78%, 44: 15%, 40: 7%}
+迭代 1：答案 = {42: 60%, 44: 30%, 40: 10%}
+迭代 2：以每个答案为条件，重新采样
+  - 以「42 可能正确」为条件：80% 确认 42
+  - 以「44 可能正确」为条件：60% 切换到 42
+  - 以「40 可能正确」为条件：70% 切换到 42
+精炼后：{42: 78%, 44: 15%, 40: 7%}
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Simple self-consistency without refinement]
-Answers = {42: 60%, 44: 30%, 40: 10%}
-→ Select 42, but confidence is limited by initial sampling
-→ No verification step to strengthen or correct
+[没有精炼的简单自洽性]
+答案 = {42: 60%, 44: 30%, 40: 10%}
+→ 选择 42，但置信度受限于初始采样
+→ 没有验证步骤来加强或修正
 ```
 
-Standard SC doesn't leverage the verification signal from conditional
-re-sampling.
+标准自洽性没有利用条件重采样的验证信号。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 2-3x tokens compared to CoT+SC
-- API calls: 40 total samples across 2-3 iterations (e.g., B1=5, B2=15, B3=20)
-- Requirements: Problem amenable to self-verification, structured iteration
-  budget
-- Gains: Outperforms self-consistency especially when SC plateaus
+- Token 开销：与 CoT+SC 相比约 2-3 倍
+- API 调用：2-3 次迭代共 40 次采样（如 B1=5, B2=15, B3=20）
+- 要求：问题适合自我验证，结构化迭代预算
+- 收益：在自洽性达到平台期时表现尤为突出
 
 ---
 
-### Dipper (Diversity in Prompts for Producing Ensembles)
+### Dipper（用于产生集成的 Prompt 多样性）
 
-**Mechanism:** Optimizes a diverse set of prompts using embedding-based
-diversity objectives, then ensembles outputs via majority voting.
+**机制：** 使用基于嵌入的多样性目标优化一组多样化 prompt，然后通过多数投票集成输出。
 
-**Triggers:**
+**触发条件：**
 
-- Small models need to match large model performance
-- Zero-shot setting where few-shot examples unavailable
-- Need performance boost without model training or fine-tuning
-- Want systematic prompt diversity beyond manual variation
+- 小型模型需要匹配大型模型性能
+- 无法获取少样本示例的零样本场景
+- 需要在不训练或微调模型的情况下提升性能
+- 希望超越手动变化实现系统化 prompt 多样性
 
-**The process:**
+**流程：**
 
 ```
-1. Generate candidate prompt variations
-2. Embed prompts using sentence embeddings
-3. Select prompts maximizing pairwise diversity
-4. Run all selected prompts in parallel
-5. Majority vote across outputs
+1. 生成候选 prompt 变体
+2. 使用句子嵌入对 prompt 进行编码
+3. 选择最大化成对多样性的 prompt
+4. 并行运行所有选定的 prompt
+5. 对输出进行多数投票
 ```
 
-**Why this works:** Embedding-based selection ensures prompts are semantically
-diverse, not just lexically different. Diverse prompts induce different
-reasoning patterns, improving ensemble coverage.
+**为何有效：** 基于嵌入的选择确保 prompt 在语义上多样化，而不仅仅是词汇上不同。多样化的 prompt 引发不同的推理模式，改善集成覆盖范围。
 
-**CORRECT:**
+**正确做法：**
 ```
-Diversity-optimized prompts:
-P1: "Solve this step by step"
-P2: "Think like a math teacher explaining to a student"
-P3: "Break the problem into smaller parts"
+多样性优化的 prompt：
+P1：「按步骤解题」
+P2：「像数学老师向学生解释一样思考」
+P3：「将问题拆解为更小的部分」
 
-→ Embeddings show these are semantically distinct
-→ Each may succeed where others fail
+→ 嵌入显示这些在语义上是不同的
+→ 每个可能在其他失败的地方成功
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Lexically different but semantically similar prompts]
-P1: "Solve step by step"
-P2: "Solve it step by step"
-P3: "Step by step, solve this"
+[词汇不同但语义相似的 prompt]
+P1：「按步骤解题」
+P2：「逐步解题」
+P3：「一步一步，解这道题」
 
-→ Nearly identical embeddings; no real diversity
-→ Ensemble gains minimal
+→ 嵌入几乎相同；没有真正的多样性
+→ 集成收益极小
 ```
 
-Lexical variation without semantic diversity doesn't improve coverage.
+没有语义多样性的词汇变化不能改善覆盖范围。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: n times base cost where n is ensemble size (3-9 typical)
-- API calls: n parallel calls per query
-- Requirements: Parallel batch inference, prompt generation, sentence embedding
-  for diversity optimization
-- Gains: Ensemble of smaller models can match or exceed single larger model
-  performance
+- Token 开销：基础成本的 n 倍，n 为集成大小（通常 3-9）
+- API 调用：每次查询 n 次并行调用
+- 要求：并行批量推理，prompt 生成，用于多样性优化的句子嵌入
+- 收益：较小模型的集成可以匹配甚至超越单个较大模型的性能
 
 ---
 
 ### Self-ICL
 
-**Mechanism:** LLM generates pseudo-inputs and pseudo-labels from test query,
-then uses them as ICL demonstrations for zero-shot scenarios.
+**机制：** LLM 从测试查询生成伪输入和伪标签，然后将其用作零样本场景的上下文学习演示。
 
-**Triggers:**
+**触发条件：**
 
-- No access to training dataset or demonstration pool
-- End-user query without example corpus
-- Zero-shot setting where few-shot would help
-- Challenging unexpected tasks without existing demonstrations
+- 无法访问训练数据集或演示池
+- 没有示例库的终端用户查询
+- 少样本会有帮助的零样本场景
+- 没有现有演示的挑战性意外任务
 
-**The process:**
+**流程：**
 
 ```
-1. Given test query, ask LLM to generate k similar questions
-2. For each generated question, ask LLM to provide answer
-3. Use generated (question, answer) pairs as few-shot demonstrations
-4. Solve original query with synthetic demonstrations in context
+1. 给定测试查询，让 LLM 生成 k 个相似问题
+2. 对每个生成的问题，让 LLM 提供答案
+3. 使用生成的（问题，答案）对作为少样本演示
+4. 使用上下文中的合成演示解决原始查询
 ```
 
-**Why this works:** LLMs can generate plausible examples for most task types.
-These synthetic demonstrations provide the formatting and reasoning patterns
-that few-shot learning requires, even without real examples.
+**为何有效：** LLM 可以为大多数任务类型生成合理的示例。这些合成演示提供了少样本学习所需的格式和推理模式，即使没有真实示例。
 
-**CORRECT:**
+**正确做法：**
 ```
-Test query: "What is the capital of Kazakhstan?"
+测试查询：「哈萨克斯坦的首都是哪里？」
 
-Step 1 - Generate similar questions:
-  "What is the capital of France?"
-  "What is the capital of Japan?"
+步骤 1 - 生成相似问题：
+  「法国的首都是哪里？」
+  「日本的首都是哪里？」
 
-Step 2 - Generate answers:
-  "France → Paris"
-  "Japan → Tokyo"
+步骤 2 - 生成答案：
+  「法国 → 巴黎」
+  「日本 → 东京」
 
-Step 3 - Use as demonstrations:
-  "Q: What is the capital of France? A: Paris
-   Q: What is the capital of Japan? A: Tokyo
-   Q: What is the capital of Kazakhstan? A: [generate]"
+步骤 3 - 作为演示使用：
+  「Q: 法国的首都是哪里？ A: 巴黎
+   Q: 日本的首都是哪里？ A: 东京
+   Q: 哈萨克斯坦的首都是哪里？ A: [生成]」
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Zero-shot without demonstrations]
-"What is the capital of Kazakhstan?"
-→ May produce wrong format or hallucinated answer
-→ No examples to anchor response format
+[无演示的零样本]
+「哈萨克斯坦的首都是哪里？」
+→ 可能产生错误格式或幻觉答案
+→ 没有示例锚定响应格式
 ```
 
-Zero-shot lacks the formatting guidance that demonstrations provide.
+零样本缺少演示所提供的格式指导。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 3-5x tokens
-- API calls: k+2 calls (1 for pseudo-inputs, k for pseudo-labels, 1 for final)
-- Requirements: Instruction-following model, zero-shot capability essential
-- Gains: Comparable to real 3-shot ICL in many settings
+- Token 开销：3-5 倍
+- API 调用：k+2 次（1 次伪输入，k 次伪标签，1 次最终）
+- 要求：遵循指令的模型，零样本能力是关键
+- 收益：在许多场景下可与真实 3-shot 上下文学习媲美
 
 ---
 
-### Jekyll & Hyde (Persona-Neutral Ensemble)
+### Jekyll & Hyde（人设-中立集成）
 
-**Mechanism:** Ensemble role-playing and neutral perspectives, selecting better
-solution via LLM evaluator with position bias mitigation.
+**机制：** 集成角色扮演和中立视角，通过带位置偏差缓解的 LLM 评估器选择更好的解法。
 
-**Triggers:**
+**触发条件：**
 
-- Role-playing prompts may introduce bias for the given question
-- Uncertain whether persona assignment will help or hurt performance
-- Task requires balancing domain expertise with general reasoning
-- Need robustness against persona-induced confusion
+- 角色扮演 prompt 可能对特定问题引入偏差
+- 不确定人设指定是否会提升还是损害性能
+- 任务需要在领域专业知识和通用推理之间取得平衡
+- 需要对人设引发的混淆具有鲁棒性
 
-**The process:**
+**流程：**
 
 ```
-1. Generate domain-relevant persona (e.g., "expert mathematician")
-2. Solve problem with persona ("Jekyll" - role-playing)
-3. Solve problem without persona ("Hyde" - neutral)
-4. LLM evaluator compares both solutions
-5. Position-swap verification to mitigate position bias
-6. Select winner or flag for review if inconsistent
+1. 生成相关领域人设（如「数学专家」）
+2. 使用人设解题（「Jekyll」——角色扮演）
+3. 不使用人设解题（「Hyde」——中立）
+4. LLM 评估器对比两种解法
+5. 位置互换验证以缓解位置偏差
+6. 选择胜者，若不一致则标记为待审查
 ```
 
-**Why this works:** Personas can help (domain expertise) or hurt (false
-confidence, irrelevant context). Ensembling both perspectives with neutral
-evaluation captures benefits while hedging against persona-induced errors.
+**为何有效：** 人设可以帮助（领域专业知识）也可以妨碍（错误置信度、无关上下文）。集成两种视角并进行中立评估，既能获得收益又能规避人设引发的错误。
 
-**CORRECT:**
+**正确做法：**
 ```
-Problem: "Calculate compound interest..."
+问题：「计算复利...」
 
-Jekyll (Accountant persona): "As an accountant, I'll use A = P(1+r)^t..."
-Hyde (Neutral): "To solve this: A = P(1+r)^t..."
+Jekyll（会计师人设）：「作为会计师，我将使用 A = P(1+r)^t...」
+Hyde（中立）：「求解此题：A = P(1+r)^t...」
 
-Evaluator: Both agree on formula and answer
-→ High confidence in shared answer
+评估器：两者都同意公式和答案
+→ 对共同答案高度置信
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Always use persona without fallback]
-Problem: "What's 2+2?"
-Persona (Expert Physicist): "As a physicist, I must consider relativistic effects..."
-→ Persona adds irrelevant complexity to simple problem
+[不加备选始终使用人设]
+问题：「2+2 等于多少？」
+人设（物理学专家）：「作为物理学家，我必须考虑相对论效应...」
+→ 人设为简单问题增加了不必要的复杂性
 ```
 
-Blind persona application can introduce confusion on simple tasks.
+盲目应用人设可能在简单任务上引入混淆。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 3-5x tokens (persona generator + dual solvers + evaluator)
-- API calls: 3.81 avg calls (1 persona gen + 2 solvers + 1.81 evaluator)
-- Requirements: LLM for persona generation, LLM for evaluation, consistency
-  verification
-- Gains: Consistent improvement over best single-perspective baseline
+- Token 开销：3-5 倍（人设生成器 + 双解法器 + 评估器）
+- API 调用：平均 3.81 次（1 次人设生成 + 2 次解法 + 1.81 次评估器）
+- 要求：LLM 用于人设生成和评估，一致性验证
+- 收益：持续优于最佳单视角基线
 
 ---
 
-### Ordered Prompts (Entropy-Based Selection)
+### 有序 Prompt（基于熵的选择）
 
-**Mechanism:** Rank few-shot example orderings using entropy metrics on
-model-generated probing set to select performant permutations.
+**机制：** 使用模型生成的探测集上的熵指标对少样本示例顺序排名，以选出表现良好的排列。
 
-**Triggers:**
+**触发条件：**
 
-- Few-shot in-context learning with 3-8 examples where order matters
-- High variance observed across different example orderings
-- No labeled development set available for permutation selection
-- True few-shot setting where additional annotated data is unavailable
+- 3-8 个示例的少样本上下文学习，顺序影响显著
+- 在不同示例顺序下观察到高方差
+- 没有可用于排列选择的标注开发集
+- 无法获取额外标注数据的真正少样本场景
 
-**The process:**
+**流程：**
 
 ```
-1. Generate all permutations of few-shot examples (n! for n examples)
-2. For each permutation, generate probing outputs on unlabeled questions
-3. Compute entropy of output distribution for each permutation
-4. Select permutation with lowest entropy (most consistent outputs)
-5. Use selected ordering for inference
+1. 生成少样本示例的所有排列（n 个示例有 n! 种）
+2. 对每种排列，在无标注问题上生成探测输出
+3. 计算每种排列的输出分布熵
+4. 选择熵最低的排列（输出最一致）
+5. 使用选定的顺序进行推理
 ```
 
-**Why this works:** Lower entropy indicates the model is more confident and
-consistent. Permutations that produce scattered, high-entropy outputs are likely
-confusing the model.
+**为何有效：** 较低的熵表明模型更有把握和一致性。产生分散、高熵输出的排列可能在混淆模型。
 
-**CORRECT:**
+**正确做法：**
 ```
-Examples: A, B, C (3-shot)
-Permutations: ABC, ACB, BAC, BCA, CAB, CBA
+示例：A、B、C（3-shot）
+排列：ABC、ACB、BAC、BCA、CAB、CBA
 
-Test on probing set:
-  ABC → Entropy 0.3 (consistent predictions)
-  BAC → Entropy 0.8 (scattered predictions)
+在探测集上测试：
+  ABC → 熵 0.3（一致预测）
+  BAC → 熵 0.8（分散预测）
   ...
 
-Select ABC for deployment
+选择 ABC 用于部署
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Use arbitrary example ordering]
-Random order: CAB
-→ May happen to be worst permutation
-→ High variance from ordering sensitivity goes unaddressed
+[使用任意示例顺序]
+随机顺序：CAB
+→ 可能碰巧是最差的排列
+→ 顺序敏感性的高方差问题未被解决
 ```
 
-Arbitrary ordering gambles on getting lucky with permutation.
+任意顺序是在碰运气。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: n! permutations for probing (24x for 4-shot)
-- API calls: n! calls for probing generation + n! calls for evaluation
-- Requirements: Few-shot examples, generative model for probing set
-- Gains: Substantial average improvement by reducing permutation variance
+- Token 开销：探测时 n! 种排列（4-shot 为 24 倍）
+- API 调用：n! 次探测生成 + n! 次评估
+- 要求：少样本示例，用于探测集的生成模型
+- 收益：通过减少排列方差，平均有实质性改善
 
 ---
 
-### PEDAL (Diverse Exemplars with Greedy Decoding)
+### PEDAL（带贪婪解码的多样化示例）
 
-**Mechanism:** Generate multiple greedy outputs using diverse exemplar sets,
-then aggregate with LLM-based selection.
+**机制：** 使用多样化示例集生成多个贪婪输出，然后用基于 LLM 的选择进行聚合。
 
-**Triggers:**
+**触发条件：**
 
-- Need better accuracy than greedy decoding with lower cost than
-  self-consistency
-- Math word problems or multiple-choice reasoning tasks
-- Tasks where diverse exemplars can induce output variation
-- Cost-sensitive deployments where output token count matters
+- 需要比贪婪解码更好的准确率，但成本低于自洽性
+- 数学文字题或多项选择推理任务
+- 多样化示例能引发输出变化的任务
+- 输出 token 数量重要的成本敏感部署
 
-**The process:**
+**流程：**
 
 ```
-1. Create k diverse exemplar sets (different few-shot examples)
-2. Run greedy decoding (temp=0) with each exemplar set
-3. Collect k deterministic outputs
-4. Use LLM (or USC) to select best answer among the k outputs
+1. 创建 k 个多样化示例集（不同的少样本示例）
+2. 对每个示例集使用贪婪解码（temp=0）
+3. 收集 k 个确定性输出
+4. 使用 LLM（或 USC）从 k 个输出中选出最佳答案
 ```
 
-**Why this works:** Greedy decoding is deterministic, so diversity must come
-from input variation. Different exemplar sets prime different reasoning
-patterns, achieving diversity without the token cost of temperature sampling.
+**为何有效：** 贪婪解码是确定性的，因此多样性必须来自输入变化。不同的示例集激活不同的推理模式，在不增加温度采样 token 成本的情况下实现多样性。
 
-**CORRECT:**
+**正确做法：**
 ```
-Exemplar Set 1: Easy arithmetic examples → Greedy output A
-Exemplar Set 2: Word problem examples → Greedy output B
-Exemplar Set 3: Multi-step examples → Greedy output C
+示例集 1：简单算术示例 → 贪婪输出 A
+示例集 2：文字题示例 → 贪婪输出 B
+示例集 3：多步骤示例 → 贪婪输出 C
 
-LLM selector: "Which of A, B, C is most likely correct?"
-→ Select best with minimal output tokens
+LLM 选择器：「A、B、C 中哪个最可能正确？」
+→ 以最少的输出 token 选出最佳答案
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Self-consistency with high temperature]
-40 samples at temp=0.7 → 40 long reasoning chains
-→ High output token cost
-→ PEDAL achieves similar gains with ~60-80% fewer output tokens
+[高温度自洽性]
+以 temp=0.7 采样 40 次 → 40 条长推理链
+→ 高输出 token 成本
+→ PEDAL 以约少 60-80% 的输出 token 达到类似收益
 ```
 
-Temperature sampling multiplies output tokens; PEDAL uses input diversity
-instead.
+温度采样使输出 token 倍增；PEDAL 改用输入多样性。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 1.5x input tokens, 0.4x output tokens vs Self-Consistency
-- API calls: k+1 calls (k diverse prompts + 1 aggregation)
-- Requirements: Few-shot examples, k diverse exemplar sets (typically 3-4)
-- Gains: Accuracy improvement over greedy with substantially fewer output tokens
+- Token 开销：相比自洽性，输入 token 约 1.5 倍，输出 token 约 0.4 倍
+- API 调用：k+1 次（k 次多样化 prompt + 1 次聚合）
+- 要求：少样本示例，k 个多样化示例集（通常 3-4 个）
+- 收益：在大幅减少输出 token 的同时，准确率优于贪婪解码
 
 ---
 
-### Synthetic Prompting
+### 合成 Prompting
 
-**Mechanism:** LLM generates additional demonstrations via backward question
-synthesis and forward reasoning refinement from seed examples.
+**机制：** LLM 通过反向问题合成和正向推理精炼从种子示例生成额外的演示。
 
-**Triggers:**
+**触发条件：**
 
-- Only 2-4 seed examples available for complex reasoning tasks
-- Need diverse demonstrations but manual annotation is costly
-- Existing demonstrations are too simple for target task complexity
-- Task requires complex multi-step reasoning chains
+- 对复杂推理任务只有 2-4 个种子示例
+- 需要多样化演示但人工标注成本过高
+- 现有演示对目标任务复杂度来说太简单
+- 任务需要复杂的多步骤推理链
 
-**The process:**
+**流程：**
 
 ```
-1. Backward synthesis: Generate questions that would lead to seed answers
-2. Forward synthesis: Generate reasoning chains for new questions
-3. Quality filter: Keep chains that reach correct answers
-4. Cluster and select: Diverse subset of synthetic demonstrations
-5. Use synthetic examples as few-shot demonstrations
+1. 反向合成：生成能导出种子答案的问题
+2. 正向合成：为新问题生成推理链
+3. 质量过滤：保留能得到正确答案的链
+4. 聚类和选择：多样化的合成演示子集
+5. 使用合成示例作为少样本演示
 ```
 
-**Why this works:** LLMs can generate plausible reasoning chains, and the
-backward-forward process ensures question-answer coherence. Clustering maintains
-diversity across the synthetic demonstration set.
+**为何有效：** LLM 可以生成合理的推理链，反向-正向过程确保了问题-答案的一致性。聚类在合成演示集中保持多样性。
 
-**CORRECT:**
+**正确做法：**
 ```
-Seed: "Q: 2+3=? A: 5 (because 2+3=5)"
+种子：「Q: 2+3=? A: 5（因为 2+3=5）」
 
-Backward: Generate "Q: What is 4+6?" from similar patterns
-Forward: Generate "A: 10 (because 4+6=10)"
-Filter: Verify 4+6 does equal 10
+反向：从相似模式生成「Q: 4+6 等于多少？」
+正向：生成「A: 10（因为 4+6=10）」
+过滤：验证 4+6 确实等于 10
 
-→ Use as additional demonstration
+→ 作为额外演示使用
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Use only the 2-4 seed examples]
-Limited examples → Limited reasoning pattern coverage
-→ Model may not generalize to harder problems
+[只使用 2-4 个种子示例]
+示例有限 → 推理模式覆盖有限
+→ 模型可能无法泛化到更难的问题
 ```
 
-Few seed examples constrain the diversity of reasoning patterns shown.
+少量种子示例限制了所展示的推理模式的多样性。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 1000x synthesis calls + 3x forward sampling per synthetic
-  example
-- API calls: 1000 backward + 1000 forward calls for synthesis; 1 inference call
-- Requirements: 2-8 seed examples with reasoning chains, clustering for
-  selection
-- Gains: Substantial improvement over using seed examples alone
+- Token 开销：合成阶段 1000 倍以上调用 + 每个合成示例 3 倍正向采样
+- API 调用：合成时 1000 次反向 + 1000 次正向；推理时 1 次
+- 要求：2-8 个带推理链的种子示例，用于选择的聚类
+- 收益：相比仅使用种子示例有实质性改善
 
 ---
 
-### Reprompting (Gibbs Sampling)
+### Reprompting（吉布斯采样）
 
-**Mechanism:** Iteratively samples and evolves CoT recipes through Gibbs
-sampling with rejection to optimize few-shot prompts.
+**机制：** 通过带拒绝的吉布斯采样迭代地采样和演化 CoT 配方，以优化少样本 prompt。
 
-**Triggers:**
+**触发条件：**
 
-- Human-written CoT prompts unavailable or require costly engineering
-- Need to optimize CoT prompts for specific model without human intervention
-- Tasks requiring multi-step reasoning where initial zero-shot solutions vary
-- Fair comparison needed across different LLMs with model-specific prompts
+- 没有人工编写的 CoT prompt 或编写成本过高
+- 需要在没有人工干预的情况下为特定模型优化 CoT prompt
+- 需要多步骤推理的任务，初始零样本解法差异较大
+- 需要在不同 LLM 之间进行公平比较，且需要模型特定的 prompt
 
-**The process:**
+**流程：**
 
 ```
-1. Initialize with zero-shot CoT solutions as "recipe" candidates
-2. Sample one recipe element (example) to replace
-3. Generate new candidate for that position
-4. Accept/reject based on validation accuracy (Gibbs sampling)
-5. Repeat for many iterations
-6. Final recipe: optimized few-shot prompt
+1. 用零样本 CoT 解法作为「配方」候选初始化
+2. 采样一个配方元素（示例）进行替换
+3. 为该位置生成新候选
+4. 基于验证准确率接受/拒绝（吉布斯采样）
+5. 重复多次迭代
+6. 最终配方：优化后的少样本 prompt
 ```
 
-**Why this works:** Gibbs sampling explores the space of possible demonstration
-sets while maintaining coherence. Rejection sampling ensures only improvements
-are kept.
+**为何有效：** 吉布斯采样在保持连贯性的同时探索可能演示集的空间。拒绝采样确保只保留改进。
 
-**CORRECT:**
+**正确做法：**
 ```
-Initial recipe: [ZeroShot_Ex1, ZeroShot_Ex2, ZeroShot_Ex3]
-Iteration 1: Replace Ex2 with new candidate → Accuracy improved → Accept
-Iteration 2: Replace Ex1 with new candidate → Accuracy dropped → Reject
+初始配方：[零样本示例1, 零样本示例2, 零样本示例3]
+迭代 1：替换示例2 → 准确率提升 → 接受
+迭代 2：替换示例1 → 准确率下降 → 拒绝
 ...
-Final: Optimized prompt outperforms human-written CoT
+最终：优化后的 prompt 优于人工编写的 CoT
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Use human-written CoT prompts without optimization]
-Human prompt: Generic examples from original paper
-→ May not match target model's strengths
-→ May not cover target task distribution
+[使用未优化的人工编写 CoT prompt]
+人工 prompt：来自原始论文的通用示例
+→ 可能不匹配目标模型的优势
+→ 可能不覆盖目标任务分布
 ```
 
-Generic prompts aren't optimized for specific model-task combinations.
+通用 prompt 没有针对特定模型-任务组合优化。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: 10000x+ tokens during training phase
-- API calls: Up to 20000 iterative sampling calls
-- Requirements: Training question-answer pairs, iterative sampling budget
-- Gains: Substantially outperforms human-written CoT and other automated prompt
-  methods
+- Token 开销：训练阶段 10000 倍以上 token
+- API 调用：最多 20000 次迭代采样调用
+- 要求：训练问答对，迭代采样预算
+- 收益：大幅优于人工编写的 CoT 和其他自动化 prompt 方法
 
 ---
 
-### Fairness-guided Few-shot Prompting
+### 公平引导的少样本 Prompting
 
-**Mechanism:** Select few-shot examples that minimize predictive bias by
-maximizing entropy on content-free inputs.
+**机制：** 通过最大化无内容输入上的熵来选择能最小化预测偏差的少样本示例。
 
-**Triggers:**
+**触发条件：**
 
-- Few-shot prompting shows high variance across example selections
-- Performance is sensitive to demonstration order
-- Need to select optimal demonstrations without labeled dev set
-- Classification tasks where bias can be measured
+- 少样本 prompting 在不同示例选择下方差较高
+- 性能对演示顺序敏感
+- 需要在没有标注开发集的情况下选择最优演示
+- 可以测量偏差的分类任务
 
-**The process:**
+**流程：**
 
 ```
-1. Create content-free test inputs (e.g., "N/A", empty strings)
-2. For each candidate demonstration set:
-   a. Run model on content-free inputs
-   b. Compute entropy of output distribution
-3. Select demonstration set with highest entropy on content-free inputs
-4. Use selected demonstrations for inference
+1. 创建无内容测试输入（如「N/A」、空字符串）
+2. 对每组候选演示：
+   a. 在无内容输入上运行模型
+   b. 计算输出分布的熵
+3. 选择无内容输入上熵最高的演示集
+4. 使用选定的演示进行推理
 ```
 
-**Why this works:** High entropy on content-free inputs means the model isn't
-biased toward any particular output. Biased prompts would produce low entropy
-(strong preference for certain outputs even without meaningful input).
+**为何有效：** 无内容输入上的高熵意味着模型不偏向任何特定输出。有偏差的 prompt 会产生低熵（即使没有有意义的输入也强烈偏向某些输出）。
 
-**CORRECT:**
+**正确做法：**
 ```
-Demo Set A → On "N/A" input: P(Yes)=0.5, P(No)=0.5 → High entropy
-Demo Set B → On "N/A" input: P(Yes)=0.9, P(No)=0.1 → Low entropy (biased)
+演示集 A → 「N/A」输入：P(是)=0.5, P(否)=0.5 → 高熵
+演示集 B → 「N/A」输入：P(是)=0.9, P(否)=0.1 → 低熵（有偏）
 
-Select Demo Set A (unbiased)
+选择演示集 A（无偏）
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-[Select demonstrations by surface similarity to test query]
-High similarity demos may share spurious features
-→ Model learns shortcuts, not generalizable patterns
+[通过与测试查询的表面相似度选择演示]
+高相似度演示可能共享虚假特征
+→ 模型学到捷径而非可泛化模式
 ```
 
-Similarity-based selection can amplify biases rather than reduce them.
+基于相似度的选择可能放大而非减少偏差。
 
-**Tradeoffs:**
+**权衡：**
 
-- Token overhead: Standard few-shot tokens (no overhead at inference)
-- API calls: O(N) for T-fair, O(N²) for G-fair during search phase; 1 at
-  inference
-- Requirements: Pool of candidate demonstrations, content-free input
-  construction
-- Gains: Substantial improvement over random selection on classification tasks
+- Token 开销：推理时标准少样本 token（推理时无额外开销）
+- API 调用：搜索阶段 T-fair 为 O(N)，G-fair 为 O(N²)；推理时 1 次
+- 要求：候选演示池，无内容输入构建
+- 收益：在分类任务上相比随机选择有实质性改善
 
 ---
 
-## Decision Guidance
+## 决策指引
 
-| Scenario                              | Recommended Technique          | Reason                                 |
-| ------------------------------------- | ------------------------------ | -------------------------------------- |
-| Math/arithmetic with fixed answers    | Self-Consistency               | Simple, effective, well-understood     |
-| Free-form generation (summaries, QA)  | Universal Self-Consistency     | Extends SC beyond exact-match voting   |
-| Multi-hop QA with partial info        | Multi-Chain Reasoning          | Synthesizes across incomplete chains   |
-| Unknown question type                 | MoRE                           | Generalizes across reasoning domains   |
-| Creative/planning requiring lookahead | Tree of Thoughts               | Enables backtracking and exploration   |
-| Method diversity more than token div  | Diversity of Thought           | Explicitly varies reasoning approaches |
-| Code generation with verification     | Multi-Perspective SC           | Leverages executable test cases        |
-| Zero-shot without examples            | Self-ICL                       | Self-generates demonstrations          |
-| Prompt optimization without training  | Reprompting                    | Automated CoT discovery                |
-| Cost-sensitive deployment             | PEDAL or IDiv-Se               | Lower token overhead than SC           |
-| Persona uncertainty                   | Jekyll & Hyde                  | Mitigates persona-induced bias         |
-| Few-shot order sensitivity            | Ordered Prompts or Fairness-FP | Reduces permutation variance           |
-| Self-consistency plateau              | Refined Answer Distributions   | Iterative distribution refinement      |
-| Small model, need big model perf      | Dipper                         | Ensemble of diverse prompts            |
+| 场景 | 推荐技术 | 原因 |
+| ------------------------------------ | ------------------------------ | --------------------------------------- |
+| 有固定答案的数学/算术 | 自洽性 | 简单、有效、经过充分验证 |
+| 自由形式生成（摘要、问答） | 通用自洽性 | 将 SC 扩展到精确匹配投票之外 |
+| 有部分信息的多跳问答 | 多链推理 | 跨不完整链综合信息 |
+| 未知问题类型 | MoRE | 跨推理领域泛化 |
+| 需要前瞻的创意/规划 | 思维树 | 支持回溯和探索 |
+| 方法多样性比 token 多样性更重要 | 思维多样性 | 显式变化推理方法 |
+| 有验证的代码生成 | 多视角自洽性 | 利用可执行测试用例 |
+| 无示例的零样本 | Self-ICL | 自动生成演示 |
+| 无训练的 prompt 优化 | Reprompting | 自动化 CoT 发现 |
+| 成本敏感部署 | PEDAL 或 IDiv-Se | 比 SC token 开销更低 |
+| 人设不确定性 | Jekyll & Hyde | 缓解人设引发的偏差 |
+| 少样本顺序敏感 | 有序 Prompt 或公平引导 FP | 减少排列方差 |
+| 自洽性达到平台期 | 精炼答案分布 | 迭代分布精炼 |
+| 小模型需要大模型性能 | Dipper | 多样化 prompt 集成 |
 
 ---
 
-## Composability Notes
+## 可组合性说明
 
-**Preparation technique:** Before applying sampling methods, demonstration
-quality can be optimized by uncertainty-based selection: sample k answers per
-candidate question, compute disagreement or entropy, and annotate the most
-uncertain questions as demonstrations. This identifies questions where the
-model needs guidance most, improving the base demonstrations that sampling
-techniques operate over.
+**准备技术：** 在应用采样方法之前，可以通过基于不确定性的选择来优化演示质量：对每个候选问题采样 k 个答案，计算分歧或熵，并将最不确定的问题标注为演示。这能识别出模型最需要指导的问题，改善采样技术所操作的基础演示。
 
-**Foundation techniques:**
+**基础技术：**
 
-- Self-Consistency builds on Chain-of-Thought and is composed into most other
-  techniques
-- Tree of Thoughts extends both CoT and Self-Consistency with search
-- Universal Self-Consistency replaces voting step; compatible with any
-  multi-sample technique
+- 自洽性建立在链式推理的基础上，并被组合进大多数其他技术
+- 思维树扩展了 CoT 和自洽性，增加了搜索
+- 通用自洽性替换投票步骤；与任意多样本技术兼容
 
-**Technique combinations:**
+**技术组合：**
 
-- Diversity of Thought + Self-Consistency: Use diverse approaches with sampling
-  within each
-- Tree of Thoughts + PREFER: Iteratively refine thought generation prompts
-- Multi-Chain Reasoning + Complexity-Based: Prioritize complex chains in
-  meta-reasoning
-- Self-ICL + Self-Consistency: Sample multiple pseudo-demonstrations, then vote
-- MoRE + Self-Consistency: Each expert can use SC internally for within-expert
-  diversity
-- USC + PEDAL: Use USC as the selection mechanism for PEDAL's diverse outputs
+- 思维多样性 + 自洽性：在每种方法内使用多样化方法加采样
+- 思维树 + PREFER：迭代精炼思维生成 prompt
+- 多链推理 + 基于复杂度：在元推理中优先考虑复杂链
+- Self-ICL + 自洽性：采样多个伪演示，然后投票
+- MoRE + 自洽性：每个专家可在内部使用 SC 实现专家内多样性
+- USC + PEDAL：使用 USC 作为 PEDAL 多样化输出的选择机制
 
-**Aggregation methods:**
+**聚合方法：**
 
-- Voting: Self-Consistency, Diversity of Thought, Dipper, Complexity-Based
-- LLM Selection: Universal Self-Consistency, PEDAL, Jekyll & Hyde
-- Ranking: Ordered Prompts, Multi-Perspective SC
-- Synthesis: Multi-Chain Reasoning, PREFER, RAD
-- Expert Agreement: MoRE (inter-expert consistency)
-- Search: Tree of Thoughts
+- 投票：自洽性、思维多样性、Dipper、基于复杂度
+- LLM 选择：通用自洽性、PEDAL、Jekyll & Hyde
+- 排名：有序 Prompt、多视角自洽性
+- 综合：多链推理、PREFER、RAD
+- 专家一致性：MoRE（专家间一致性）
+- 搜索：思维树
 
-**Anti-patterns:**
+**反模式：**
 
-- Avoid combining techniques with conflicting context strategies (isolated vs
-  accumulated)
-- Memory-requiring techniques (ToT, Boosted Ensembles, Reprompting) have higher
-  state management overhead
-- Most techniques require few-shot examples; Self-ICL, Dipper, and USC work
-  zero-shot
-- Don't use MoRE when question type is known—use the appropriate specialized
-  expert directly
-- Don't apply USC to tasks where exact-match voting works—it adds unnecessary
-  overhead
+- 避免将上下文策略冲突的技术组合（隔离 vs 积累）
+- 需要内存的技术（ToT、提升式集成、Reprompting）有更高的状态管理开销
+- 大多数技术需要少样本示例；Self-ICL、Dipper 和 USC 可在零样本下工作
+- 当问题类型已知时不要使用 MoRE——直接使用合适的专业专家
+- 对精确匹配投票有效的任务不要应用 USC——会增加不必要的开销

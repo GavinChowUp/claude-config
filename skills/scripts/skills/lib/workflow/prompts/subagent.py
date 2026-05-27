@@ -99,6 +99,7 @@ PROMPT CONSTRUCTION RULES:
   - The MANDATORY INVOKE BLOCK must appear VERBATIM in each prompt
   - DO NOT reduce it to just "Working directory: X / Command: Y"
   - The subagent needs "FIRST ACTION REQUIRED" to execute the command
+  - REQUIRE the agent to produce its final output in Simplified Chinese (简体中文); keep code, commands, and technical identifiers in English
 
 {instruction_section}AGENTS:
 {agents_section}
@@ -128,6 +129,7 @@ PROMPT CONSTRUCTION RULES:
   - The MANDATORY INVOKE BLOCK must appear VERBATIM in each prompt
   - DO NOT reduce it to just "Working directory: X / Command: Y"
   - The subagent needs "FIRST ACTION REQUIRED" to execute the command
+  - REQUIRE the agent to produce its final output in Simplified Chinese (简体中文); keep code, commands, and technical identifiers in English
 
 {instruction_section}{shared_context_section}AGENTS:
 {agents_section}

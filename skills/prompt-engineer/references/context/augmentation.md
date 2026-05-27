@@ -1,728 +1,650 @@
-# Context Augmentation: Research-Backed Techniques
+# 上下文增强：基于研究的技术
 
-Context augmentation addresses the problem of missing or insufficient information
-in prompts. When models lack the knowledge or examples needed to reason
-correctly, augmentation techniques retrieve, generate, or select additional
-context to bridge the gap.
+上下文增强解决 prompt 中信息缺失或不足的问题。当模型缺乏正确推理所需的知识或示例时，增强技术通过检索、生成或筛选来补充额外的上下文，弥合差距。
 
-**Meta-principle**: The right examples teach the model what to do; the wrong
-examples (or random examples) teach nothing -- or worse, mislead. Selection
-strategy matters more than selection quantity.
+**元原则**：正确的示例告诉模型该做什么；错误的示例（或随机示例）什么都教不了——甚至可能误导模型。选择策略比选择数量更重要。
 
-**Prerequisite**: Basic understanding of in-context learning (few-shot prompting).
+**前提知识**：需要基本了解上下文学习（少样本 prompting）。
 
 ---
 
-## Technique Selection Guide
+## 技术选择指南
 
-| Domain | Technique | Trigger Condition | Stacks With | Conflicts With | Cost/Tradeoff |
-|--------|-----------|-------------------|-------------|----------------|---------------|
-| Example Retrieval | KATE | Few-shot variance, similar examples exist | Generated Knowledge, Cover-LS | - | O(n) index storage |
-| Example Retrieval | UDR | Multi-task deployment, avoid per-task training | KATE patterns | Per-task retrievers | One-time training cost |
-| Knowledge Generation | Generated Knowledge | Missing commonsense, no knowledge base | KATE, fine-tuning | - | M×(knowledge+question) tokens |
-| Example Selection | Cover-LS | Compositional generalization, structured output | KATE (as retriever) | Pure similarity retrieval | Auxiliary model required |
-| Example Selection | LENS | Need stable demos across inputs, high variance | - | Per-input retrieval | Upfront search cost |
-| Example Selection | USP | No labeled data, only unlabeled queries | - | Labeled example methods | Multiple decoding passes |
-
----
-
-## Quick Reference: Key Principles
-
-1. **KATE for Similarity Retrieval** -- When test inputs have semantically similar training examples, retrieve nearest neighbors to reduce few-shot variance
-
-2. **UDR for Multi-Task Deployment** -- A single retriever trained on LM feedback generalizes across 30+ task types without per-task training
-
-3. **Generated Knowledge for Missing Facts** -- When the model lacks domain knowledge, generate background knowledge and prepend to questions
-
-4. **Cover-LS for Compositional Generalization** -- Select demonstrations that collectively cover output structures, not just input similarity
-
-5. **Cover-Utt as Simpler Fallback** -- When structure prediction fails, cover input words instead of output structures
-
-6. **LENS for Task-Level Selection** -- Find fixed "support examples" that work across all test inputs, not per-input retrieval
-
-7. **USP for Zero-Shot Settings** -- Use model's own confident predictions as pseudo-demonstrations when no labels exist
-
-8. **Encoder Choice Matters for KATE** -- Base encoders use Euclidean distance; fine-tuned encoders (NLI, STS) use cosine similarity
-
-9. **Training-Time Noise Prevents Over-Copying** -- When fine-tuning with demonstrations, use simpler/noisier demos at train time than test time
-
-10. **Quality Over Quantity** -- Few well-selected examples often outperform many random examples
+| 领域 | 技术 | 触发条件 | 可与...组合 | 与...冲突 | 成本/权衡 |
+|------|------|----------|-------------|-----------|-----------|
+| 示例检索 | KATE | 少样本结果不稳定，存在相似示例 | Generated Knowledge、Cover-LS | - | O(n) 索引存储 |
+| 示例检索 | UDR | 多任务部署，避免逐任务训练 | KATE 的模式 | 逐任务检索器 | 一次性训练成本 |
+| 知识生成 | Generated Knowledge | 缺失常识，无知识库 | KATE、微调 | - | M×（知识+问题）token |
+| 示例筛选 | Cover-LS | 组合泛化，结构化输出 | KATE（作为检索器） | 纯相似度检索 | 需要辅助模型 |
+| 示例筛选 | LENS | 需要跨输入稳定演示，高方差 | - | 逐输入检索（背离目的） | 前期搜索成本 |
+| 示例筛选 | USP | 无标注数据，仅有无标注查询 | - | 标注示例方法 | 多次解码 |
 
 ---
 
-## KATE: Similarity-Based Example Selection
+## 快速参考：核心原则
 
-Retrieve in-context examples semantically similar to the test input using
-k-nearest neighbors in embedding space.
+1. **KATE 用于相似度检索** —— 当测试输入有语义上相似的训练示例时，检索最近邻以降低少样本方差
 
-**When to use:**
+2. **UDR 用于多任务部署** —— 基于 LM 反馈训练的单一检索器可在 30+ 种任务类型上泛化，无需逐任务训练
 
-- Few-shot performance varies wildly across runs
-- Random example selection produces inconsistent results
-- Test inputs have semantically similar examples in the training pool
+3. **Generated Knowledge 用于补充缺失事实** —— 当模型缺乏领域知识时，生成背景知识并置于问题前
 
-**The process:**
+4. **Cover-LS 用于组合泛化** —— 选择能整体覆盖输出结构的演示，而非仅追求输入相似度
 
-```
-1. Encode all training examples using sentence encoder
-2. At inference, encode test input with same encoder
-3. Retrieve k nearest neighbors from training set
-4. Concatenate retrieved examples as demonstrations
-5. Append test input and generate
-```
+5. **Cover-Utt 作为更简单的备选** —— 当结构预测失败时，覆盖输入词语而非输出结构
 
-**Why this works**: Semantically similar examples provide more relevant
-context than random samples. The model sees input-output patterns that
-closely match the test case, reducing the inferential leap required.
-Similar examples also tend to share vocabulary and structure, making
-pattern transfer more direct.
+6. **LENS 用于任务级筛选** —— 找到对所有测试输入都有效的固定「支撑示例」，而非逐输入检索
 
-**Implementation details:**
+7. **USP 用于零样本场景** —— 当没有标注数据时，用模型自己的高置信度预测作为伪演示
 
-- Base encoder (RoBERTa-large): Use Euclidean distance for retrieval
-- Fine-tuned encoders (KATE_nli, KATE_nli+sts-b): Use cosine similarity
-- Fine-tuning on task-related data (NLI, STS, or the task itself) improves retrieval quality
-- Ordering is data-dependent: default places closest example last (nearest test input), but some datasets benefit from reverse order
+8. **KATE 的编码器选择很重要** —— 基础编码器使用欧氏距离；微调编码器（NLI、STS）使用余弦相似度
 
-**Critical insight**: Performance improves as the training set available for
-retrieval grows larger. More candidates means higher probability of finding
-truly relevant examples.
+9. **训练时加入噪声防止过度复制** —— 在带演示的微调过程中，训练时使用比测试时更简单/更嘈杂的演示
 
-**CORRECT:**
-```
-# Sentiment analysis with KATE
-Training pool: 10,000 labeled reviews
-Test input: "The cinematography was breathtaking but the plot dragged."
-
-Retrieved (k=3, by similarity):
-1. "Beautiful visuals couldn't save the weak storyline." -> Negative
-2. "Stunning camera work, disappointing narrative." -> Negative
-3. "Gorgeous shots throughout, though pacing suffered." -> Mixed
-
-# Model sees structurally similar "visual praise + narrative criticism" pattern
-```
-
-**INCORRECT:**
-```
-# Random selection ignores input structure
-Test input: "The cinematography was breathtaking but the plot dragged."
-
-Random examples:
-1. "Best comedy I've seen all year!" -> Positive
-2. "Waste of money, don't bother." -> Negative
-3. "The sequel improves on everything." -> Positive
-
-# No structural similarity to test input's "X was good but Y was bad" pattern
-```
-
-Random selection provides no signal about how to handle mixed-sentiment
-inputs with contrasting clauses.
-
-**Tradeoffs:**
-
-- Token overhead: k examples × average example length
-- Requires embedding index over training set (O(n) storage)
-- Fine-tuned encoders improve results but add training cost
-- Fails when no similar examples exist (compositional splits)
+10. **质量优于数量** —— 少量精心筛选的示例通常优于大量随机示例
 
 ---
 
-### UDR: Unified Demonstration Retriever
+## KATE：基于相似度的示例筛选
 
-A single multi-task model trained to retrieve demonstrations across 30+ task
-types. Uses LM feedback to learn what makes demonstrations helpful, then
-generalizes across tasks without per-task training.
+在嵌入空间中使用 k 近邻检索与测试输入语义相似的上下文示例。
 
-**When to use:**
+**使用场景：**
 
-- Deploying demonstration retrieval across many tasks
-- Want to avoid training separate retrievers per task
-- Need zero-shot transfer to new/unseen tasks
-- Storage/deployment cost of multiple retrievers is prohibitive
+- 少样本性能在不同运行间差异较大
+- 随机示例选择结果不稳定
+- 测试输入在训练池中有语义相似的示例
 
-**The process:**
+**流程：**
 
 ```
-1. Training (one-time):
-   a. For each task, retrieve candidates from training set
-   b. Score candidates by LM's conditional probability on ground truth
-   c. Rank candidates using scores
-   d. Train bi-encoder with list-wise ranking loss
-   e. Iterate: use trained retriever to mine better candidates
-
-2. Inference:
-   a. Encode test input with task instruction prefix
-   b. Retrieve nearest demonstrations from task's training set
-   c. Concatenate and generate
+1. 使用句子编码器对所有训练示例编码
+2. 推理时，用同一编码器对测试输入编码
+3. 从训练集中检索 k 个最近邻
+4. 将检索到的示例拼接为演示
+5. 追加测试输入并生成
 ```
 
-**Why this works**: Different tasks share common patterns of what makes
-demonstrations helpful -- examples that increase LM's probability of
-generating correct outputs. By training on LM feedback across many tasks,
-the retriever learns these cross-task patterns. The task instruction prefix
-enables task-specific features without separate models.
+**为何有效**：语义相似的示例提供了比随机样本更相关的上下文。模型看到与测试用例高度匹配的输入-输出模式，减少了推理所需的跨度。相似示例往往共享词汇和结构，使模式迁移更直接。
 
-**Implementation details:**
+**实现细节：**
 
-- Architecture: Bi-encoder with two BERT-base encoders (query and demonstration)
-- Loss: LambdaRank-inspired list-wise ranking loss + in-batch negative loss
-- Task instruction: Prepend task description (e.g., "Summarize the text") to both query and candidates
-- Iterative mining: 3 iterations of candidate refinement using the retriever itself
-- Task balancing: Multinomial sampling with α=0.5 prevents high-resource task dominance
+- 基础编码器（RoBERTa-large）：使用欧氏距离检索
+- 微调编码器（KATE_nli、KATE_nli+sts-b）：使用余弦相似度
+- 在与任务相关的数据（NLI、STS 或任务本身）上微调可提升检索质量
+- 顺序依赖数据：默认将最近示例排在最后（最接近测试输入），但某些数据集受益于反序排列
 
-**Critical insight**: Retrieval quality transfers across inference LMs of
-vastly different sizes (1.3B to 175B parameters). Train once, deploy anywhere.
+**关键洞见**：随着可检索训练集的增大，性能不断提升。候选更多意味着找到真正相关示例的概率更高。
 
-**CORRECT:**
+**正确做法：**
 ```
-# Multi-task deployment with UDR
-Tasks: sentiment analysis, summarization, QA, NLI
+# 使用 KATE 的情感分析
+训练池：10,000 条标注评论
+测试输入：「The cinematography was breathtaking but the plot dragged.」
 
-Single UDR model retrieves demonstrations for all tasks
-Each task uses its own instruction prefix:
-- "Classify the sentiment:"
-- "Summarize the text:"
-- "Answer the question:"
-- "Determine entailment:"
+检索结果（k=3，按相似度）：
+1. 「Beautiful visuals couldn't save the weak storyline.」-> 负面
+2. 「Stunning camera work, disappointing narrative.」-> 负面
+3. 「Gorgeous shots throughout, though pacing suffered.」-> 混合
 
-# One model, one index per task, unified retrieval logic
+# 模型看到结构相似的「视觉赞美 + 叙事批评」模式
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Separate retrievers per task
-Tasks: sentiment analysis, summarization, QA, NLI
+# 随机选择忽略输入结构
+测试输入：「The cinematography was breathtaking but the plot dragged.」
 
-Train KATE_sentiment, KATE_summarization, KATE_qa, KATE_nli
-Maintain 4 separate models
-4x storage, 4x deployment complexity
-Each requires task-specific training data and tuning
+随机示例：
+1. 「Best comedy I've seen all year!」-> 正面
+2. 「Waste of money, don't bother.」-> 负面
+3. 「The sequel improves on everything.」-> 正面
 
-# Scales poorly with task count
+# 与测试输入的「X 很好但 Y 很差」模式毫无结构上的相似性
 ```
 
-Separate retrievers multiply storage and maintenance burden linearly with
-task count.
+随机选择无法提供关于如何处理含有对比从句的混合情感输入的任何信号。
 
-**Tradeoffs:**
+**权衡：**
 
-- Training cost: Requires LM scoring across all tasks (one-time)
-- Slightly lower than task-specific retriever on individual tasks
-- Strong zero-shot transfer to unseen tasks
-- Works across inference LMs of different sizes
+- token 开销：k 个示例 × 平均示例长度
+- 需要训练集的嵌入索引（O(n) 存储）
+- 微调编码器提升效果但增加训练成本
+- 在组合分布上（compositional splits）失效（若不存在相似示例）
 
 ---
 
-## Generated Knowledge Prompting
+### UDR：统一演示检索器
 
-Generate background knowledge from a language model, then prepend it to the
-question before inference. The knowledge transforms implicit reasoning into
-explicit deduction.
+单一多任务模型，在 30+ 种任务类型上检索演示。基于 LM 反馈学习什么样的演示最有用，然后无需逐任务训练即可跨任务泛化。
 
-**When to use:**
+**使用场景：**
 
-- Model lacks domain knowledge for commonsense reasoning
-- No appropriate knowledge base exists for retrieval
-- Questions require implicit world knowledge
+- 在多个任务上部署演示检索
+- 希望避免为每个任务单独训练检索器
+- 需要零样本迁移到新的/未见过的任务
+- 维护多个检索器的存储/部署成本过高
 
-**The process:**
+**流程：**
 
 ```
-1. Write 5 question-knowledge demonstration pairs
-   (Question + helpful knowledge, NOT question + answer)
+1. 训练（一次性）：
+   a. 对每个任务，从训练集检索候选示例
+   b. 通过 LM 对真实答案的条件概率对候选打分
+   c. 用分数对候选排名
+   d. 用列表级排名损失训练双编码器
+   e. 迭代：用训练好的检索器挖掘更好的候选
 
-2. For new question:
-   a. Prompt knowledge generator with demos + question
-   b. Sample M=20 knowledge statements (nucleus p=0.5)
-
-3. For each knowledge statement:
-   a. Prepend to original question
-   b. Query inference model
-   c. Record answer confidence
-
-4. Select answer with highest confidence across all attempts
+2. 推理：
+   a. 用任务指令前缀对测试输入编码
+   b. 从任务训练集检索最近演示
+   c. 拼接并生成
 ```
 
-**Why this works**: The model may "know" relevant facts but fail to retrieve
-them when answering directly. Generated knowledge makes implicit knowledge
-explicit, transforming commonsense reasoning into supported deduction. The
-knowledge statement provides the missing premise that connects question to
-answer.
+**为何有效**：不同任务共享一种通用模式——什么样的演示能帮助 LM 提升生成正确输出的概率。通过在多任务的 LM 反馈上训练，检索器学到了这些跨任务模式。任务指令前缀使其能捕获特定任务的特征而无需单独建模。
 
-**Critical insight**: A model can benefit from knowledge it generates itself.
-Self-amplification works because generation and inference are separate
-processes -- the knowledge statement provides scaffolding that the inference
-pass can leverage.
+**实现细节：**
 
-**CORRECT:**
+- 架构：双编码器，两个 BERT-base 编码器（查询端和演示端）
+- 损失：受 LambdaRank 启发的列表级排名损失 + 批内负样本损失
+- 任务指令：在查询和候选前追加任务描述（如「Summarize the text」）
+- 迭代挖掘：用检索器本身进行 3 轮候选精炼
+- 任务均衡：用 α=0.5 的多项式采样防止高资源任务主导
+
+**关键洞见**：检索质量可迁移到大小差异悬殊的推理 LM（1.3B 到 175B 参数）。一次训练，随处部署。
+
+**正确做法：**
 ```
-# Knowledge demonstration (teaches format, not answer)
-Question: "How many wings does a penguin have?"
-Knowledge: "Birds have two wings. Penguins are a type of bird."
+# 使用 UDR 的多任务部署
+任务：情感分析、摘要生成、问答、自然语言推断
 
-# NOT this (gives away answer):
-Question: "How many wings does a penguin have?"
-Knowledge: "Penguins have two wings."
-```
+单一 UDR 模型为所有任务检索演示
+每个任务使用自己的指令前缀：
+- 「Classify the sentiment:」
+- 「Summarize the text:」
+- 「Answer the question:」
+- 「Determine entailment:」
 
-**INCORRECT:**
-```
-# Demonstrations that directly answer
-Question: "How many wings does a penguin have?"
-Knowledge: "Penguins have two wings."
-
-Question: "What color is grass?"
-Knowledge: "Grass is green."
-
-# Model learns to generate direct answers, not supporting knowledge
-# Defeats the purpose of separating knowledge from inference
+# 一个模型，每个任务一个索引，统一检索逻辑
 ```
 
-Demonstrations should show helpful background knowledge, not restatements
-of the answer. The goal is to teach the model to generate premises, not
-conclusions.
+**错误做法：**
+```
+# 为每个任务单独训练检索器
+任务：情感分析、摘要生成、问答、自然语言推断
 
-**Tradeoffs:**
+训练 KATE_sentiment、KATE_summarization、KATE_qa、KATE_nli
+维护 4 个单独的模型
+4 倍存储，4 倍部署复杂度
+每个都需要特定任务的训练数据和调优
 
-- Token overhead: M statements × (knowledge length + question length) per inference
-- API cost: Separate generation call + M inference calls
-- Quality degrades with smaller knowledge generators (needs 6.7B+ parameters)
-- Knowledge can be wrong -- evaluation found ~17% non-factual statements
-- Self-amplification: Works even when generator = inference model
+# 随任务数量线性增长，扩展性差
+```
+
+单独的检索器随任务数量线性增加存储和维护负担。
+
+**权衡：**
+
+- 训练成本：需要跨所有任务进行 LM 打分（一次性）
+- 在单个任务上略逊于专任检索器
+- 对未见过的任务具有很强的零样本迁移能力
+- 在不同大小的推理 LM 上均有效
 
 ---
 
-## Diverse Demonstrations (Cover-LS)
+## Generated Knowledge Prompting（生成知识 Prompting）
 
-Select demonstrations that collectively cover the structural elements (local
-structures) needed in the output, rather than maximizing similarity to input.
+从语言模型生成背景知识，然后在推理前将其置于问题前。知识将隐式推理转化为显式推导。
 
-**When to use:**
+**使用场景：**
 
-- Compositional generalization: test outputs combine structures not seen together in training
-- Similarity-based retrieval returns repetitive, structurally-similar examples
-- Structured output tasks (semantic parsing, code generation)
+- 模型缺乏常识推理所需的领域知识
+- 没有可供检索的适当知识库
+- 问题需要隐式的世界知识
 
-**The process:**
+**流程：**
 
 ```
-1. Train auxiliary model to predict output structures from input
-2. For test input, generate beam of candidate outputs
-3. Extract local structures (sub-trees) from all candidates
-4. Sort structures by size (largest first)
-5. For each structure:
-   a. Find training example containing that structure
-   b. Add to demonstration set
-   c. Mark all structures in that example as covered
-6. Continue until k demonstrations selected
+1. 编写 5 个问题-知识演示对
+   （问题 + 有用的知识，而非问题 + 答案）
+
+2. 对新问题：
+   a. 用演示 + 问题提示知识生成器
+   b. 采样 M=20 条知识陈述（核采样 p=0.5）
+
+3. 对每条知识陈述：
+   a. 置于原始问题前
+   b. 查询推理模型
+   c. 记录答案置信度
+
+4. 选择所有尝试中置信度最高的答案
 ```
 
-**Why this works**: Compositional generalization requires combining known
-structures in new ways. If demonstrations only show structures similar to
-each other, the model has no template for novel combinations. Covering
-diverse structures provides the building blocks; the model learns to
-compose them. Local structures (sub-trees of the output program) are the
-atomic units of composition.
+**为何有效**：模型可能「知道」相关事实，但在直接回答时无法检索到。生成的知识使隐式知识显式化，将常识推理转化为有支撑的推导。知识陈述提供了连接问题与答案的缺失前提。
 
-**Local structure definition**: Given an output program parsed as a tree,
-local structures are connected sub-graphs including parent-child edges and
-sibling edges (between consecutive arguments). This captures both
-hierarchical and sequential relationships.
+**关键洞见**：模型可以从自己生成的知识中受益。自我放大之所以有效，是因为生成和推理是独立的过程——知识陈述为推理步骤提供了脚手架。
 
-**Implementation details:**
-
-- Auxiliary model: T5 fine-tuned to predict anonymized programs
-- Beam size B: Use multiple beam candidates to increase structure coverage
-- Retriever: BM25 or SBERT to select among examples containing target structure
-- Diversity: Remove examples with same template after selection
-
-**Critical insight -- over-copying prevention**: When fine-tuning with
-demonstrations, the model learns to copy from similar demonstrations rather
-than compose. Mitigation: at training time, use only size-1 local structures
-(individual symbols) and random retrieval. At test time, use full Cover-LS.
-This asymmetry forces the model to learn composition, not copying.
-
-**CORRECT:**
+**正确做法：**
 ```
-# Semantic parsing with structure coverage
-Test: "Find meetings with my team and David's reportees"
-Predicted structures: [CreateEvent, AttendeeList, FindReports, ...]
+# 知识演示（教授格式，而非答案）
+问题：「How many wings does a penguin have?」
+知识：「Birds have two wings. Penguins are a type of bird.」
 
-Demonstration 1: covers [CreateEvent, AttendeeList]
-"Set up a meeting with Alice and Bob"
-
-Demonstration 2: covers [FindReports]
-"Who reports to Sarah?"
-
-Demonstration 3: covers [Constraint, RecipientWithNameLike]
-"Find emails from people named Chen"
-
-# Each demo contributes different structures; together they cover the output
+# 而非这种方式（直接给出答案）：
+问题：「How many wings does a penguin have?」
+知识：「Penguins have two wings.」
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Similarity-based retrieval (KATE)
-Test: "Find meetings with my team and David's reportees"
+# 直接回答的演示
+问题：「How many wings does a penguin have?」
+知识：「Penguins have two wings.」
 
-Demo 1: "Find meetings with my team" -> similar but missing FindReports
-Demo 2: "Find meetings with the sales team" -> nearly identical structure
-Demo 3: "Show meetings with my direct reports" -> still missing FindReports
+问题：「What color is grass?」
+知识：「Grass is green.」
 
-# All demos have similar structure; none covers FindReports
-# Model has no template for the novel structure combination
+# 模型学会生成直接答案而非支撑知识
+# 这违背了将知识与推理分离的目的
 ```
 
-Similarity retrieval finds examples that look like the input but may all
-share the same structural gaps.
+演示应展示有用的背景知识，而非重述答案。目标是教会模型生成前提，而非结论。
 
-**Cover-Utt fallback**: When structure prediction fails (auxiliary model
-produces no correct structures), cover input words instead of output
-structures. Less effective but requires no auxiliary model.
+**权衡：**
 
-**Tradeoffs:**
-
-- Complexity: Requires auxiliary model for structure prediction
-- Token overhead: Similar to KATE (k demonstrations)
-- Fails when auxiliary model cannot predict any correct structures
-- Demo efficiency: 4 Cover-LS demonstrations can match 24 similarity-based
+- token 开销：每次推理需要 M 条陈述 × （知识长度 + 问题长度）
+- API 成本：单独的生成调用 + M 次推理调用
+- 较小的知识生成器（需要 6.7B+ 参数）质量下降
+- 知识可能是错误的——评估发现约 17% 的陈述不符合事实
+- 自我放大：即使生成器 = 推理模型也有效
 
 ---
 
-## LENS: Support Example Selection
+## 多样化演示（Cover-LS）
 
-Select task-representative "support examples" via a two-stage filter-then-search
-process. Unlike KATE (which retrieves test-specific examples), LENS finds
-examples that characterize the task itself and work across all test inputs.
+选择能整体覆盖输出所需结构元素（局部结构）的演示，而非最大化与输入的相似度。
 
-**When to use:**
+**使用场景：**
 
-- Need stable, reusable demonstrations across many test inputs
-- Task-level example selection preferred over test-specific retrieval
-- Previous coreset selection methods (gradient-based) underperform for ICL
-- Random example selection causes high variance
+- 组合泛化：测试输出组合了训练中未共现过的结构
+- 基于相似度的检索返回结构重复的示例
+- 结构化输出任务（语义解析、代码生成）
 
-**The process:**
+**流程：**
 
 ```
-Stage 1: Filter (reduce candidates)
-  1. For each training example e, compute InfoScore:
-     I(e) = Σ c(e, e') for all e' in score set
-     where c(e, e') = p(y'|x,y,x') - p(y'|x')
-  2. Progressive filtering: iteratively expand score set, filter low-scoring
-  3. Retain top m candidates (typically 500)
-
-Stage 2: Search (find best permutation)
-  1. Initialize beam of k example permutations
-  2. For each iteration:
-     a. Substitute: replace random example with diverse high-InfoScore candidate
-     b. Shuffle: try different orderings
-     c. Evaluate on validation set
-     d. Keep top-B permutations
-  3. Return best permutation as support examples
+1. 训练辅助模型，从输入预测输出结构
+2. 对测试输入，生成候选输出的 beam
+3. 从所有候选中提取局部结构（子树）
+4. 按大小排序（最大优先）
+5. 对每个结构：
+   a. 找到包含该结构的训练示例
+   b. 加入演示集
+   c. 将该示例中的所有结构标记为「已覆盖」
+6. 继续直至选出 k 个演示
 ```
 
-**Why this works**: InfoScore measures how much an example helps the model
-predict correctly on other examples. High-InfoScore examples carry more
-task signal. The diversity term prevents selecting redundant examples that
-provide overlapping information. The result is a compact set that
-characterizes the task.
+**为何有效**：组合泛化需要以新方式组合已知结构。如果演示只展示彼此相似的结构，模型就没有新颖组合的模板。覆盖多样化结构提供了构建块；模型学会组合它们。局部结构（输出程序的子树）是组合的原子单元。
 
-**InfoScore formula**: c(e, e') = p_G(y'|x,y,x') - p_G(y'|x')
+**局部结构定义**：给定解析为树的输出程序，局部结构是包含父子边和兄弟边（相邻参数之间）的连通子图，同时捕获层次和顺序关系。
 
-This is the probability gain from conditioning on example e when predicting
-e'. Positive values mean e helps; the sum over all e' measures e's overall
-contribution to the task.
+**实现细节：**
 
-**Progressive filtering**: Computing InfoScore over the full training set
-is O(n²). Progressive filtering achieves O(n log n) by iteratively expanding
-the score set while shrinking candidates -- promising examples get more
-computation, poor examples are filtered early.
+- 辅助模型：微调 T5，预测匿名化程序
+- Beam 大小 B：使用多个 beam 候选以增加结构覆盖率
+- 检索器：BM25 或 SBERT，在包含目标结构的示例中进行选择
+- 多样性：选择后去除具有相同模板的示例
 
-**Critical insight**: Support examples are significantly less sensitive to
-ordering than randomly selected examples. Random examples can swing from
-near-random to near-optimal with different orderings; support examples
-remain stable.
+**关键洞见——防止过度复制**：在带演示的微调中，模型学会从相似演示中复制而非组合。缓解方法：训练时仅使用大小为 1 的局部结构（单个符号）和随机检索；测试时使用完整的 Cover-LS。这种不对称性迫使模型学会组合，而非复制。
 
-**CORRECT:**
+**正确做法：**
 ```
-# Task-level support examples for sentiment analysis
-LENS selection (one-time):
-  Filter: 67,000 training examples -> 500 candidates
-  Search: Find 8-example permutation maximizing validation accuracy
+# 带结构覆盖的语义解析
+测试：「Find meetings with my team and David's reportees」
+预测结构：[CreateEvent, AttendeeList, FindReports, ...]
 
-Support examples (fixed, reused):
-1. "Absolutely loved it, best film of the year!" -> Positive
-2. "Waste of time, don't bother." -> Negative
-3. "It was okay, nothing special." -> Neutral
-... (5 more)
+演示 1：覆盖 [CreateEvent, AttendeeList]
+「Set up a meeting with Alice and Bob」
 
-# Same 8 examples used for ALL test inputs
-# No per-input retrieval at inference time
+演示 2：覆盖 [FindReports]
+「Who reports to Sarah?」
+
+演示 3：覆盖 [Constraint, RecipientWithNameLike]
+「Find emails from people named Chen」
+
+# 每个演示贡献不同的结构；合在一起覆盖了输出所需的结构
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Using LENS examples but re-retrieving per input
-Test input 1: retrieve similar examples from LENS candidates
-Test input 2: retrieve different similar examples
+# 基于相似度的检索（KATE）
+测试：「Find meetings with my team and David's reportees」
 
-# Defeats the purpose -- LENS finds task-representative examples
-# that work universally, not input-specific examples
+演示 1：「Find meetings with my team」-> 相似但缺少 FindReports
+演示 2：「Find meetings with the sales team」-> 结构几乎相同
+演示 3：「Show meetings with my direct reports」-> 仍缺少 FindReports
+
+# 所有演示结构相似；没有一个覆盖 FindReports
+# 模型没有新颖结构组合的模板
 ```
 
-LENS examples are designed to characterize the task, not match specific
-inputs. Per-input retrieval undermines the stability benefit.
+相似度检索找到的示例看起来像输入，但可能在结构上存在相同的缺口。
 
-**Tradeoffs:**
+**Cover-Utt 备选方案**：当结构预测失败时（辅助模型无法预测任何正确结构），改为覆盖输入词语而非输出结构。效果较差，但无需辅助模型。
 
-- Requires validation set for search stage (small sample suffices)
-- Higher upfront cost than KATE, but amortized over many test inputs
-- Support examples transfer well across LMs of different sizes
-- Ground truth labels matter for support examples (unlike random examples)
+**权衡：**
+
+- 复杂度：需要辅助模型进行结构预测
+- token 开销：与 KATE 类似（k 个演示）
+- 辅助模型无法预测任何正确结构时失效
+- 演示效率：4 个 Cover-LS 演示可匹配 24 个基于相似度的演示
 
 ---
 
-## USP: Zero-Shot Pseudo-Demonstrations
+## LENS：支撑示例筛选
 
-When no labeled examples exist, use the model's own confident predictions as
-pseudo-demonstrations. Select high-confidence model outputs from unlabeled
-data to construct ICL examples without any ground truth labels.
+通过两阶段的「过滤-搜索」流程选择任务代表性「支撑示例」。与 KATE（检索特定测试输入的示例）不同，LENS 找到能表征任务本身并对所有测试输入都有效的示例。
 
-**When to use:**
+**使用场景：**
 
-- No labeled training examples available for the task
-- Transductive zero-shot setting with unlabeled test queries
-- Novel tasks revealed only at test time
-- Obtaining even a few labels requires significant human effort
+- 需要跨多个测试输入稳定可复用的演示
+- 倾向于任务级示例筛选而非特定测试输入检索
+- 之前的核心集筛选方法（基于梯度的）在上下文学习中表现不佳
+- 随机示例选择导致高方差
 
-**The process:**
+**流程：**
 
 ```
-1. Categorize task type:
-   - CLS: known small label space (classification)
-   - SFG: many possible responses, few correct (short-form generation)
-   - LFG: many plausible responses, longer outputs (long-form generation)
+阶段 1：过滤（减少候选数量）
+  1. 对每个训练示例 e，计算 InfoScore：
+     I(e) = Σ c(e, e')（对评分集中所有 e'求和）
+     其中 c(e, e') = p(y'|x,y,x') - p(y'|x')
+  2. 渐进式过滤：迭代扩展评分集，过滤低分示例
+  3. 保留前 m 个候选（通常为 500 个）
 
-2. Stage 1 -- Score unlabeled samples:
-   CLS: Query once, use negative entropy of logits
-        F_CLS = Σ p(c|x) log p(c|x) over classes c
+阶段 2：搜索（找到最佳排列）
+  1. 初始化 k 个示例排列的 beam
+  2. 每次迭代：
+     a. 替换：用多样化高 InfoScore 候选替换随机示例
+     b. 重排：尝试不同顺序
+     c. 在验证集上评估
+     d. 保留前 B 个排列
+  3. 返回最佳排列作为支撑示例
+```
 
-   SFG: Query M times with temperature, use normalized entropy
+**为何有效**：InfoScore 衡量一个示例在预测其他示例时对模型的帮助程度。高 InfoScore 的示例携带更多任务信号。多样性项防止选择提供重叠信息的冗余示例，结果是一个紧凑的集合，能表征整个任务。
+
+**InfoScore 公式**：c(e, e') = p_G(y'|x,y,x') - p_G(y'|x')
+
+这是在预测 e' 时以 e 为条件的概率增益。正值表示 e 有帮助；对所有 e' 求和衡量 e 对任务的总体贡献。
+
+**渐进式过滤**：对整个训练集计算 InfoScore 的复杂度为 O(n²)。渐进式过滤通过迭代扩展评分集同时缩小候选范围，实现 O(n log n)——有潜力的示例获得更多计算，差的示例被早期过滤。
+
+**关键洞见**：支撑示例对顺序的敏感性显著低于随机选择的示例。随机示例可能因顺序不同而在接近随机到接近最优之间大幅波动；支撑示例则保持稳定。
+
+**正确做法：**
+```
+# 情感分析的任务级支撑示例
+LENS 筛选（一次性）：
+  过滤：67,000 条训练示例 -> 500 个候选
+  搜索：找到能最大化验证准确率的 8 个示例排列
+
+支撑示例（固定，可复用）：
+1. 「Absolutely loved it, best film of the year!」-> 正面
+2. 「Waste of time, don't bother.」-> 负面
+3. 「It was okay, nothing special.」-> 中性
+... （另外 5 条）
+
+# 相同的 8 个示例用于所有测试输入
+# 推理时无需逐输入检索
+```
+
+**错误做法：**
+```
+# 使用 LENS 示例但按输入重新检索
+测试输入 1：从 LENS 候选中检索相似示例
+测试输入 2：检索不同的相似示例
+
+# 这违背了目的——LENS 找到的是对所有输入普遍有效
+# 的任务代表性示例，而非特定输入的示例
+```
+
+LENS 示例是为表征任务而设计的，而非匹配特定输入。逐输入检索会破坏其稳定性优势。
+
+**权衡：**
+
+- 搜索阶段需要验证集（小样本即可）
+- 前期成本高于 KATE，但摊薄到多个测试输入后更经济
+- 支撑示例可在不同大小的 LM 之间迁移
+- 对支撑示例来说，真实标签很重要（不像随机示例那样无关紧要）
+
+---
+
+## USP：零样本伪演示
+
+当没有标注示例时，使用模型自身高置信度的预测作为伪演示。从无标注数据中选择高置信度的模型输出来构建上下文学习示例，无需任何真实标签。
+
+**使用场景：**
+
+- 任务没有标注训练示例
+- 转导零样本场景，仅有无标注测试查询
+- 仅在测试时才知道新任务类型
+- 获取哪怕少量标签都需要付出大量人工代价
+
+**流程：**
+
+```
+1. 对任务类型分类：
+   - CLS：已知的小标签空间（分类）
+   - SFG：可能答案很多，正确答案少（短文本生成）
+   - LFG：合理答案很多，输出较长（长文本生成）
+
+2. 阶段 1——对无标注样本打分：
+   CLS：查询一次，使用 logit 的负熵
+        F_CLS = Σ p(c|x) log p(c|x)（对类别 c 求和）
+
+   SFG：带温度查询 M 次，使用归一化熵
         F_SFG = -[Σ freq(answer) log freq(answer)] / log M
 
-   LFG: Query M times, use average pairwise ROUGE
+   LFG：查询 M 次，使用平均成对 ROUGE
         F_LFG = (2/M(M-1)) Σ ROUGE(response_i, response_j)
-        Filter outliers: remove if score > Q3 + 1.5×IQR
+        过滤离群值：若分数 > Q3 + 1.5×IQR 则移除
 
-3. Stage 2 -- Select pseudo-demonstrations:
-   - Rank by confidence score
-   - Select K candidates with diversity penalty
-   - For CLS: ensure K/|C| examples per class for balance
-   - Prepend to test queries (greedy decoding)
+3. 阶段 2——选择伪演示：
+   - 按置信度分数排名
+   - 选择 K 个带多样性惩罚的候选
+   - 对 CLS：每类确保 K/|C| 个示例以保持平衡
+   - 置于测试查询前（贪婪解码）
 ```
 
-**Why this works**: Confident predictions are more likely to be correct.
-By selecting high-confidence outputs as pseudo-demonstrations, USP creates
-a self-consistent set of examples that guide the model toward similar
-confident behavior on test inputs. The model essentially teaches itself
-the task format and expected outputs.
+**为何有效**：高置信度的预测更可能是正确的。通过选择高置信度输出作为伪演示，USP 创建了一个自洽的示例集，引导模型在测试输入上产生类似的高置信度行为。模型在本质上是在自我教导任务格式和预期输出。
 
-**Implementation details:**
+**实现细节：**
 
-- Unlabeled sample requirement: 64 samples typically sufficient
-- CLS class balancing: Generate K/|C| pseudo-demos per class to prevent bias toward confident classes
-- LFG outlier filtering: Extremely high confidence often indicates task misunderstanding (e.g., generating text completion instead of summary); filter using IQR
-- Greedy decoding in Stage 2: Temperature=0 for final predictions
+- 无标注样本需求：通常 64 个样本即可
+- CLS 类别均衡：每类生成 K/|C| 个伪演示，防止对高置信度类别产生偏差
+- LFG 离群值过滤：极高置信度往往表明模型误解了任务（如生成文本补全而非摘要）；使用 IQR 过滤
+- 阶段 2 的贪婪解码：温度=0，用于最终预测
 
-**Critical insight**: Average Stage 1 confidence predicts improvement magnitude.
-High average confidence means the model is already certain -- less room for
-USP to help. Low average confidence indicates uncertainty where pseudo-demos
-provide more value.
+**关键洞见**：阶段 1 的平均置信度预测了改善幅度。平均置信度高意味着模型已经很确定——USP 的提升空间有限。平均置信度低表明存在不确定性，伪演示能提供更大的价值。
 
-**CORRECT:**
+**正确做法：**
 ```
-# Zero-shot classification with USP
-Task: Sentiment (Positive/Negative/Neutral)
-Unlabeled queries: 64 samples
+# 使用 USP 的零样本分类
+任务：情感（正面/负面/中性）
+无标注查询：64 个样本
 
-Stage 1 scores (negative entropy):
-  "Great product!" -> 0.92 (confident Positive)
-  "Terrible service" -> 0.88 (confident Negative)
-  "It arrived on time" -> 0.31 (uncertain)
+阶段 1 分数（负熵）：
+  「Great product!」-> 0.92（高置信度，正面）
+  「Terrible service」-> 0.88（高置信度，负面）
+  「It arrived on time」-> 0.31（不确定）
 
-Selected pseudo-demos (top by confidence, class-balanced):
-  2 Positive, 2 Negative, 2 Neutral (if K=6)
+选出的伪演示（按置信度排名，类别均衡）：
+  若 K=6：2 个正面、2 个负面、2 个中性
 
-# Model sees confident examples of each class
+# 模型看到每个类别的高置信度示例
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Selecting pseudo-demos by confidence only (no class balance)
-Top 6 by confidence:
-  "Great product!" -> Positive
-  "Amazing quality!" -> Positive
-  "Best purchase ever!" -> Positive
-  "Love it!" -> Positive
-  "Excellent value!" -> Positive
-  "Terrible service" -> Negative
+# 仅按置信度选择伪演示（无类别均衡）
+前 6 名按置信度：
+  「Great product!」-> 正面
+  「Amazing quality!」-> 正面
+  「Best purchase ever!」-> 正面
+  「Love it!」-> 正面
+  「Excellent value!」-> 正面
+  「Terrible service」-> 负面
 
-# 5 Positive, 1 Negative, 0 Neutral
-# Model biased toward Positive predictions
+# 5 个正面，1 个负面，0 个中性
+# 模型偏向于预测正面
 ```
 
-Without class balancing, confident classes dominate pseudo-demos and bias
-subsequent predictions.
+不进行类别均衡，高置信度类别会主导伪演示并导致后续预测偏差。
 
-**Tradeoffs:**
+**权衡：**
 
-- Only requires 64 unlabeled samples
-- CLS selector uses logits (single query); SFG/LFG require M decoding passes
-- Larger/better-calibrated models yield higher quality pseudo-demos
-- Gains larger on generative tasks than classification
+- 仅需 64 个无标注样本
+- CLS 选择器使用 logit（单次查询）；SFG/LFG 需要 M 次解码
+- 更大/更好校准的模型产生质量更高的伪演示
+- 生成式任务的收益大于分类任务
 
 ---
 
-## Selection Decision Tree
+## 筛选决策树
 
 ```
-START: Do you have labeled training examples?
+开始：有标注训练示例吗？
   |
-  NO --> Do you have unlabeled queries?
+  否 --> 有无标注查询吗？
   |        |
-  |        YES --> USP (pseudo-demonstrations)
+  |        是 --> USP（伪演示）
   |        |
-  |        NO --> Do you need world knowledge?
+  |        否 --> 需要世界知识吗？
   |                 |
-  |                 YES --> Generated Knowledge Prompting
+  |                 是 --> Generated Knowledge Prompting
   |                 |
-  |                 NO --> Cannot augment (need some data)
+  |                 否 --> 无法增强（需要一些数据）
   |
-  YES --> Do you need same demos for all inputs?
+  是 --> 所有输入需要相同的演示吗？
            |
-           YES --> LENS (support examples)
+           是 --> LENS（支撑示例）
            |
-           NO --> Deploying across many tasks?
+           否 --> 跨多个任务部署吗？
                    |
-                   YES --> UDR (unified retriever)
+                   是 --> UDR（统一检索器）
                    |
-                   NO --> Does task require novel structure composition?
+                   否 --> 任务需要新颖的结构组合吗？
                            |
-                           YES --> Can you train auxiliary model?
+                           是 --> 能训练辅助模型吗？
                            |        |
-                           |        YES --> Cover-LS
+                           |        是 --> Cover-LS
                            |        |
-                           |        NO --> Cover-Utt or KATE
+                           |        否 --> Cover-Utt 或 KATE
                            |
-                           NO --> KATE (similarity retrieval)
+                           否 --> KATE（相似度检索）
 ```
 
 ---
 
-## Composition Table
+## 组合表
 
-| Technique | Composes Well With | Conflicts With |
-|-----------|-------------------|----------------|
-| KATE | Generated Knowledge, Cover-LS (as retriever) | - |
-| UDR | Same patterns as KATE | Per-task retrievers (redundant) |
-| Generated Knowledge | KATE, fine-tuning | - |
-| Cover-LS | KATE/BM25 (as retriever), fine-tuning | Pure similarity retrieval |
-| LENS | - | Per-input retrieval (defeats purpose) |
-| USP | Can bootstrap LENS | Labeled example methods |
+| 技术 | 可有效组合 | 与...冲突 |
+|------|-----------|---------|
+| KATE | Generated Knowledge、Cover-LS（作为检索器） | - |
+| UDR | 与 KATE 相同的模式 | 逐任务检索器（冗余） |
+| Generated Knowledge | KATE、微调 | - |
+| Cover-LS | KATE/BM25（作为检索器）、微调 | 纯相似度检索 |
+| LENS | - | 逐输入检索（违背目的） |
+| USP | 可引导 LENS | 标注示例方法 |
 
-**Common composition patterns:**
+**常见组合模式：**
 
-1. **KATE + Generated Knowledge**: Prepend generated knowledge, then retrieved examples, then test input
+1. **KATE + Generated Knowledge**：将生成的知识置于前，然后是检索到的示例，最后是测试输入
 
-2. **Cover-LS + KATE**: Use KATE/SBERT as the retriever component within Cover-LS for selecting among structure-matching examples
+2. **Cover-LS + KATE**：在 Cover-LS 中使用 KATE/SBERT 作为检索组件，从匹配结构的示例中选择
 
-3. **USP → LENS**: Start with USP pseudo-demos, collect labels over time, transition to LENS for better quality
+3. **USP → LENS**：从 USP 伪演示开始，随时间积累标签，过渡到 LENS 以获得更好的质量
 
-4. **Cover-LS + Fine-tuning**: Use Cover-LS_1 (symbol coverage only) with random retrieval at training time; full Cover-LS at test time
+4. **Cover-LS + 微调**：训练时使用 Cover-LS_1（仅符号覆盖）和随机检索；测试时使用完整 Cover-LS
 
 ---
 
-## Anti-Patterns
+## 反模式
 
-### The Similar-Examples Trap
+### 相似示例陷阱
 
-**Anti-pattern**: Retrieving examples by similarity alone when the task
-requires compositional generalization.
-
-```
-# PROBLEMATIC
-Task: Semantic parsing with novel structure combinations
-Retrieval: KATE finds 8 most similar examples
-
-Result: All examples share similar structure
-Test case requires novel combination not demonstrated
-Model fails to compose structures it hasn't seen together
-```
-
-Similarity-based retrieval returns structurally redundant examples. For
-compositional tasks, use Cover-LS to ensure structural diversity.
+**反模式**：当任务需要组合泛化时，仅靠相似度检索示例。
 
 ```
-# BETTER
-Task: Semantic parsing with novel structure combinations
-Retrieval: Cover-LS selects examples covering needed structures
+# 有问题的做法
+任务：需要新颖结构组合的语义解析
+检索：KATE 找到 8 个最相似的示例
 
-Result: Examples demonstrate different structures
-Test case can be composed from demonstrated parts
+结果：所有示例共享相似结构
+测试用例需要演示中未见过的新颖组合
+模型无法组合它未曾共同见过的结构
 ```
 
-### The Over-Copying Trap
-
-**Anti-pattern**: Fine-tuning with high-quality demonstrations causes model
-to copy from demos rather than compose.
+基于相似度的检索返回结构上冗余的示例。对于组合任务，使用 Cover-LS 确保结构多样性。
 
 ```
-# PROBLEMATIC
-Training: Use Cover-LS with BM25 retrieval at training time
-          Demonstrations are highly similar to training targets
+# 更好的做法
+任务：需要新颖结构组合的语义解析
+检索：Cover-LS 筛选覆盖所需结构的示例
 
-Result: Model learns to copy large chunks from similar demos
-        Fails when test demos don't contain exact patterns needed
+结果：示例展示不同的结构
+测试用例可以从演示的部分组合而成
 ```
 
-The model over-relies on demonstration similarity because training always
-provided near-perfect matches.
+### 过度复制陷阱
+
+**反模式**：带高质量演示的微调导致模型复制而非组合。
 
 ```
-# BETTER
-Training: Use Cover-LS_1 (symbol-only coverage) with random retrieval
-          Demonstrations are noisier, less similar to targets
+# 有问题的做法
+训练：在训练时使用带 BM25 检索的 Cover-LS
+      演示与训练目标高度相似
 
-Inference: Use full Cover-LS with BM25 retrieval
-
-Result: Model learns to compose from imperfect demos
-        Generalizes better to novel test cases
+结果：模型学会从相似演示中复制大段内容
+      当测试演示不包含所需的精确模式时就失败
 ```
 
-### The Random-Selection Trap
-
-**Anti-pattern**: Using random example selection when systematic selection
-is feasible.
+模型过度依赖演示相似性，因为训练时总是提供几乎完美匹配的内容。
 
 ```
-# PROBLEMATIC
-Task: Classification with 67k training examples
-Selection: Random 8 examples per inference
+# 更好的做法
+训练：使用仅覆盖符号的 Cover-LS_1 和随机检索
+      演示更嘈杂，与目标的相似度更低
 
-Result: High variance across runs
-        Some random sets mislead model
-        Inconsistent production behavior
+推理：使用带 BM25 检索的完整 Cover-LS
+
+结果：模型学会从不完美的演示中组合
+      对新颖测试用例的泛化能力更好
 ```
 
-Random selection provides no guarantee of quality or coverage.
+### 随机选择陷阱
+
+**反模式**：在可以进行系统性筛选时使用随机示例选择。
 
 ```
-# BETTER
-Task: Classification with 67k training examples
-Selection: LENS finds 8 support examples (one-time)
-           OR KATE retrieves per-input (if input-specific matters)
+# 有问题的做法
+任务：含 67k 训练示例的分类
+选择：每次推理随机选 8 个示例
 
-Result: Stable performance
-        Examples selected to maximize task signal
+结果：不同运行之间方差很大
+      某些随机组合会误导模型
+      生产行为不一致
+```
+
+随机选择无法保证质量或覆盖率。
+
+```
+# 更好的做法
+任务：含 67k 训练示例的分类
+选择：LENS 找出 8 个支撑示例（一次性）
+      或 KATE 按输入检索（若输入特异性重要）
+
+结果：性能稳定
+      示例经过筛选以最大化任务信号
 ```

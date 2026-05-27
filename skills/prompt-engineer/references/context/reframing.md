@@ -1,184 +1,184 @@
-# Context Reframing Techniques
+# 上下文重构表述技术
 
-Context reframing restructures how the model perceives and processes input -- changing the frame of reference, perspective, or role through which the task is interpreted. Use these techniques when: (1) the model misinterprets ambiguous questions due to human-LLM frame disparity, (2) the model ignores provided context in favor of memorized facts, (3) you need to elicit implicit chain-of-thought reasoning without explicit CoT prompts, or (4) multiple perspectives would improve answer quality. These techniques operate at the understanding phase before reasoning begins, shaping attention patterns and knowledge retrieval.
-
----
-
-## Rephrase and Respond (RaR)
-
-**Mechanism:** Prompt the LLM to rephrase and expand the question before answering in a single query, aligning human-framed questions with LLM-preferred interpretations.
-
-**Triggers:**
-
-- Questions contain ambiguity that humans do not perceive but LLMs misinterpret
-- Zero-shot setting where prompt quality significantly impacts response
-- Human-LLM frame-of-thought disparity exists (e.g., "even month" interpreted as months with even days)
-- Factual questions with semantic confusion
-
-**Tradeoffs:** ~2x token overhead (rephrased question + answer). Single API call. More advanced models benefit more; weaker models show modest improvement. Less effective on well-designed unambiguous questions. Complementary to CoT -- can be combined.
+上下文重构表述通过改变框架、视角或角色来重新塑造模型对输入的感知和处理方式。在以下情况使用这些技术：（1）由于人类与 LLM 的认知框架差异，模型对模糊问题产生误解；（2）模型忽略所提供的上下文而依赖记忆中的事实；（3）需要在不使用显式 CoT prompt 的情况下引出隐式的链式推理；（4）多视角分析能提升答案质量。这些技术在推理开始前的理解阶段起作用，调整注意力模式和知识检索方向。
 
 ---
 
-## Role-Play Prompting
+## Rephrase and Respond（RaR）
 
-**Mechanism:** Assign LLM an expert role via two-stage dialogue (role-setting prompt + role-feedback response) to trigger implicit chain-of-thought reasoning through persona immersion.
+**机制：** 在单次查询中提示 LLM 先对问题进行改写和扩展再回答，使人类表述的问题与 LLM 偏好的解读方式对齐。
 
-**Triggers:**
+**触发条件：**
 
-- Zero-shot reasoning tasks requiring step-by-step thinking
-- Arithmetic word problems requiring mathematical reasoning
-- Domains where expert knowledge naturally provides reasoning advantage
-- Tasks where explicit CoT trigger ("Let's think step by step") is insufficient
-- Model fails to spontaneously generate CoT
+- 问题包含人类感知不到但 LLM 会误解的歧义（如「even month」被解读为天数为偶数的月份）
+- 零样本场景下 prompt 质量对响应影响显著
+- 存在人类与 LLM 的认知框架差异
+- 语义上易混淆的事实性问题
 
-**Tradeoffs:** Minimal token overhead -- single role-setting + role-feedback prompt prepended. 1 call per question after one-time role construction. Requires manual role selection per task. Performance saturates on simple tasks already near ceiling. Acts as implicit CoT trigger more effective than Zero-Shot-CoT.
+**权衡：** 约 2 倍 token 开销（改写问题 + 答案）。单次 API 调用。更先进的模型收益更大；较弱模型改善有限。对设计良好的无歧义问题效果较差。与 CoT 互补——可结合使用。
+
+---
+
+## 角色扮演 Prompting
+
+**机制：** 通过两阶段对话（角色设置 prompt + 角色反馈响应）为 LLM 指定专家角色，通过人物沉浸触发隐式链式推理。
+
+**触发条件：**
+
+- 需要逐步思考的零样本推理任务
+- 需要数学推理的算术文字题
+- 领域专家知识自然具备推理优势的领域
+- 显式 CoT 触发语（「Let's think step by step」）效果不足
+- 模型无法自发生成 CoT
+
+**权衡：** token 开销极小——仅在前面追加一次角色设置 + 角色反馈 prompt。每个问题仅需 1 次调用（角色构建是一次性的）。需要手动为每个任务选择角色。在简单任务上（已接近性能上限）效果趋于饱和。比零样本 CoT 更有效地作为隐式 CoT 触发器。
 
 ---
 
 ## ExpertPrompting
 
-**Mechanism:** Automatically synthesize detailed expert identity descriptions via ICL (3 instruction-expert exemplar pairs), then condition LLM responses on that specialized background.
+**机制：** 通过上下文学习（3 个指令-专家示例对）自动合成详细的专家身份描述，然后基于该专业背景为 LLM 的响应提供条件。
 
-**Triggers:**
+**触发条件：**
 
-- Instruction requires domain-specific expertise or specialized knowledge
-- Response quality benefits from detailed, comprehensive, professional answers
-- Task spans diverse domains requiring automatic adaptation
-- User expects authoritative, thorough responses rather than generic answers
+- 指令需要特定领域的专业知识或专业知识
+- 详细、全面、专业的答案能提升响应质量
+- 任务跨越多个领域，需要自动适应
+- 用户期望权威、深入的回答而非泛泛而谈
 
-**Tradeoffs:** ~1.3x tokens (answers average 27% longer). 2 API calls per instruction (identity generation + answer). May generate unwanted self-referential statements about the expert identity requiring post-processing removal.
+**权衡：** 约 1.3 倍 token（答案平均增长 27%）。每条指令需 2 次 API 调用（身份生成 + 回答）。可能产生不需要的关于专家身份的自我指涉陈述，需要后处理去除。
 
 ---
 
-## Context-faithful Prompting (Opinion-based)
+## 上下文忠实 Prompting（基于观点）
 
-**Mechanism:** Reframe context as a narrator's opinion ("Bob said...") and questions as opinion-seeking ("in Bob's opinion?"), forcing the model to attend to context over memorized facts.
+**机制：** 将上下文重构为叙述者的观点（「Bob said...」），将问题重构为征询观点（「in Bob's opinion?」），迫使模型关注上下文而非记忆中的事实。
 
-**Triggers:**
+**触发条件：**
 
-- Input contains facts conflicting with model parametric knowledge
-- Knowledge acquisition tasks like MRC or information extraction
-- Need to prevent model from parroting memorized answers
-- Context may be irrelevant and model should abstain from answering
-- Factual accuracy to provided context is critical
+- 输入包含与模型参数知识冲突的事实
+- 机器阅读理解或信息提取等知识获取任务
+- 需要防止模型重复记忆中的答案
+- 上下文可能无关且模型应选择不回答
+- 对所提供上下文的事实准确性至关重要
 
-**Tradeoffs:** 1.2-1.5x tokens for opinion-based reframing. Single call. Optional counterfactual few-shot examples for knowledge conflict scenarios. May underperform on smaller models lacking reading comprehension ability.
+**权衡：** 基于观点的重构约增加 1.2-1.5 倍 token。单次调用。对知识冲突场景可选择添加反事实少样本示例。可能在较小模型（缺乏阅读理解能力）上表现不佳。
 
 ---
 
 ## Step-Back Prompting
 
-**Mechanism:** Ask an abstract "step-back question" first to retrieve high-level concepts and principles, then reason using that abstraction to answer the original detailed question.
+**机制：** 先提出一个抽象的「退一步」问题，检索高层次的概念和原则，再利用这些抽象内容推理回答原始细节问题。
 
-**Triggers:**
+**触发条件：**
 
-- Question contains excessive detail obscuring underlying principles
-- Physics and chemistry reasoning requiring domain concepts or first principles
-- Knowledge-intensive QA with temporal or contextual constraints
-- Multi-hop reasoning where high-level concepts enable better retrieval
+- 问题包含过多细节，遮蔽了底层原则
+- 需要领域概念或第一性原理的物理化学推理
+- 带有时间或语境约束的知识密集型问答
+- 高层概念能改善检索效果的多跳推理
 
-**Tradeoffs:** 2x tokens, 2 API calls (abstraction + reasoning). Requires few-shot examples demonstrating the abstraction step (not zero-shot compatible). For knowledge-intensive QA, RAG is integral — the step-back question identifies what facts to retrieve, not an optional enhancement. Unnecessary for simple factual questions or when question already references first principles directly.
+**权衡：** 2 倍 token，2 次 API 调用（抽象 + 推理）。需要展示抽象步骤的少样本示例（不兼容零样本）。对知识密集型问答，RAG 是不可或缺的部分——退一步问题用于确定需要检索什么，而非可选的增强。对简单事实问题或问题本身已涉及第一性原理时不必要。
 
 ---
 
-## Contrastive Prompting
+## 对比 Prompting
 
-**Mechanism:** Prompt LLM to generate both correct and wrong answers simultaneously, then extract the correct answer by explicit contrast.
+**机制：** 提示 LLM 同时生成正确和错误答案，然后通过显式对比提取正确答案。
 
-**The trigger phrase:**
+**触发短语：**
 
 ```
 Let's give a correct and a wrong answer.
 ```
 
-The process follows 2 steps: (1) Reasoning extraction — the model generates both a correct answer with reasoning and a wrong answer, forcing explicit awareness of potential errors; (2) Answer extraction — a follow-up prompt confirms and extracts the correct answer from the contrastive output.
+流程分两步：（1）推理提取——模型同时生成带推理的正确答案和错误答案，迫使对潜在错误产生显式意识；（2）答案提取——后续 prompt 确认并从对比输出中提取正确答案。
 
-**Triggers:**
+**触发条件：**
 
-- Arithmetic reasoning problems requiring accuracy over step-by-step decomposition
-- Commonsense reasoning tasks requiring awareness of individual knowledge pieces
-- Tasks where LLM needs self-awareness of potential errors
-- Math problems with infinite possible answers where eliminating wrong patterns helps
+- 需要精度而非逐步分解的算术推理问题
+- 需要了解各知识点的常识推理任务
+- LLM 需要具备潜在错误的自我意识的任务
+- 有无限可能答案的数学问题（排除错误模式有帮助）
 
-**Tradeoffs:** 2x tokens, 2 calls (reasoning extraction + answer extraction). Performs worse than CoT on symbolic reasoning with limited action spaces requiring explicit step decomposition. Strong on arithmetic and commonsense.
-
----
-
-## Contrastive In-Context Learning
-
-**Mechanism:** Provide positive and negative example pairs with explicit labels, then elicit reasoning about their differences before generation.
-
-**Why this works:** Models learn primarily from the label space, input distribution, and format shown in demonstrations — ground truth label correctness has only marginal effect on performance. This means negative examples function not by teaching "what not to do" through correct labeling, but by expanding the model's representation of the output space and sharpening attention to distinguishing features. Contrastive pairs leverage this by making the desired distinction explicit.
-
-**Triggers:**
-
-- User preference alignment needed (style, tone, format)
-- Desired output characteristics hard to describe explicitly in instructions
-- Multiple valid outputs exist with preference ordering
-- Need to guide model away from default mechanical style
-- Implicit stylistic constraints (concise vs detailed, formal vs casual)
-
-**Tradeoffs:** 2x tokens (positive + negative examples vs positive only). Single call. Requires paired positive/negative examples. Optional reasoning step increases tokens by ~50-100.
+**权衡：** 2 倍 token，2 次调用（推理提取 + 答案提取）。在需要显式步骤分解的符号推理（答案空间有限）上表现不如 CoT。在算术和常识推理上表现强劲。
 
 ---
 
-## Multi-expert Prompting
+## 对比上下文学习
 
-**Mechanism:** Generate multiple expert identities, collect their independent responses, aggregate via 7-subtask process inspired by NGT (Nominal Group Technique, which has 4 steps), then select best answer. The 7 subtasks are: (1) identify agreed viewpoints, (2) identify conflicts, (3) resolve conflicts, (4) collect isolated viewpoints, (5) aggregate all viewpoints, (6) combine into unified response, (7) select best answer among individual and combined responses.
+**机制：** 提供带显式标签的正负示例对，在生成前引导模型推理两者之间的差异。
 
-**Triggers:**
+**为何有效：** 模型主要从演示中的标签空间、输入分布和格式中学习——真实标签是否正确仅对性能有边际影响。这意味着负面示例发挥作用不是通过「教什么不该做」（正确标注），而是通过扩展模型对输出空间的表示并强化对区分特征的注意力。对比对通过使所需区分显式化来利用这一特性。
 
-- Open-ended questions with multiple valid perspectives
-- Questions requiring diverse domain expertise
-- Tasks where truthfulness, factuality, and safety are critical
-- Long-form generation requiring informativeness and usefulness
-- Questions where single expert view introduces bias
+**触发条件：**
 
-**Tradeoffs:** 2x tokens (TruthfulQA), 1.5x (BOLD). Three distinct LLM operations: (1) generate n expert identities in one call, (2) n calls for expert responses, (3) one call executing all 7 aggregation subtasks in a single chain-of-thought. Requires good instruction-following capability. Less effective for short-form answers without CoT reasoning traces.
+- 需要用户偏好对齐（风格、语气、格式）
+- 期望的输出特征难以通过指令直接描述
+- 存在多个有效输出且需要偏好排序
+- 需要引导模型避免默认的机械风格
+- 隐式文体约束（简洁 vs 详细，正式 vs 随意）
+
+**权衡：** 2 倍 token（正负示例 vs 仅正面示例）。单次调用。需要配对的正负示例。可选的推理步骤额外增加约 50-100 token。
 
 ---
 
-## Argument Generation
+## 多专家 Prompting
 
-**Mechanism:** Generate arguments for and against each possible answer, then rank arguments to select the strongest one.
+**机制：** 生成多个专家身份，收集各自的独立响应，通过受名义群体技术（Nominal Group Technique，NGT 有 4 个步骤）启发的 7 子任务流程进行汇总，然后选出最佳答案。7 个子任务为：（1）识别共识观点，（2）识别分歧，（3）解决分歧，（4）收集孤立观点，（5）汇总所有观点，（6）合并为统一响应，（7）从各专家和合并响应中选出最佳答案。
 
-**Triggers:**
+**触发条件：**
 
-- Multiple choice questions with explicit answer candidates
-- Smaller language models (< 8B parameters) where reasoning boost needed
-- Tasks where counterarguments reveal the correct answer
-- Bias mitigation in classification tasks
-- When chain-of-thought reasoning produces insufficient performance
+- 有多个有效视角的开放式问题
+- 需要多元领域专业知识的问题
+- 真实性、事实准确性和安全性至关重要的任务
+- 需要信息量和实用性的长文本生成
+- 单一专家视角会引入偏差的问题
 
-**Tradeoffs:** 2-3x tokens (generate arguments for all candidates + ranking). Single call. Requires predefined answer candidates. Most effective for small models; diminishing returns for models > 8B parameters. May force larger models to generate convincing arguments for incorrect options.
+**权衡：** 2 倍 token（TruthfulQA），1.5 倍（BOLD）。三种不同的 LLM 操作：（1）一次调用生成 n 个专家身份，（2）n 次调用获取专家响应，（3）一次调用在单次链式推理中执行所有 7 个汇总子任务。需要良好的指令遵循能力。对没有 CoT 推理轨迹的短答案效果较差。
+
+---
+
+## 论证生成
+
+**机制：** 为每个可能的答案生成支持和反对的论证，然后通过排名论证强度来选出最强的答案。
+
+**触发条件：**
+
+- 有明确答案候选的多项选择题
+- 需要推理增强的较小语言模型（<8B 参数）
+- 反论证能揭示正确答案的任务
+- 分类任务中的偏差消除
+- 链式推理性能不足时
+
+**权衡：** 2-3 倍 token（为所有候选生成论证 + 排名）。单次调用。需要预定义的答案候选。对小型模型最有效；>8B 参数模型收益递减。可能迫使较大模型为错误选项生成令人信服的论证。
 
 ---
 
 ## EmotionPrompt
 
-**Mechanism:** Append psychological emotional stimuli phrases to prompts to enhance performance and truthfulness. Stimuli derive from two psychological theory categories: (1) Self-monitoring theory — phrases like "This is very important to my career" or "Are you sure?" that invoke social accountability; (2) Social cognitive theory (self-efficacy) — phrases like "Believe in your abilities" or "Embrace challenges as opportunities" that invoke intrinsic motivation.
+**机制：** 在 prompt 后追加心理情感刺激短语以增强性能和真实性。刺激来源于两类心理学理论：（1）自我监控理论——如「This is very important to my career」或「Are you sure?」这样引发社会责任感的短语；（2）社会认知理论（自我效能）——如「Believe in your abilities」或「Embrace challenges as opportunities」这样引发内在动机的短语。
 
-**Critical insight:** Few-shot settings show substantially larger gains than zero-shot. Prioritize this technique when using few-shot demonstrations.
+**关键洞见：** 少样本场景下收益远大于零样本场景。在使用少样本演示时应优先考虑此技术。
 
-**Triggers:**
+**触发条件：**
 
-- Few-shot learning scenarios where performance gains are valuable
-- Tasks requiring truthfulness and factual accuracy
-- Generative tasks where quality, truthfulness, and responsibility matter
-- When robustness to temperature variations is desired
+- 少样本学习场景（性能提升价值高）
+- 需要真实性和事实准确性的任务
+- 质量、真实性和责任感重要的生成任务
+- 希望对温度变化具有鲁棒性时
 
-**Tradeoffs:** Minimal overhead (11-50 tokens per stimulus). Single call. May produce overly deterministic language. Models without RLHF training show larger response to emotional stimuli — consider this when selecting models.
+**权衡：** 开销极小（每条刺激 11-50 token）。单次调用。可能产生过于确定性的表述。未经 RLHF 训练的模型对情感刺激的响应更大——选择模型时需考虑这一点。
 
 ---
 
 ## Code Prompting
 
-**Mechanism:** Transform natural language input into code representation (without executing the code) to elicit conditional reasoning abilities. The code uses variables for entities, if-blocks for conditional statements, and preserves original natural language as comments. The LLM reads the code and generates a natural language answer — the code syntax triggers reasoning pathways trained on programming, improving state tracking and multi-hop reasoning.
+**机制：** 将自然语言输入转化为代码表示（不执行代码）以引出条件推理能力。代码用变量表示实体、用 if 块表示条件语句，并保留原始自然语言作为注释。LLM 读取代码并生成自然语言答案——代码语法触发了在编程训练中习得的推理路径，改善状态追踪和多跳推理。
 
-**The transformation process:**
+**转化过程：**
 
 ```
-# Original NL preserved as comment
+# 保留原始自然语言作为注释
 # If you are married and your spouse passed away, you are eligible for X
 married = unknown
 spouse_passed_away = unknown
@@ -188,259 +188,259 @@ if married and spouse_passed_away:
 # Question: Is the user eligible for X?
 ```
 
-**Triggers:**
+**触发条件：**
 
-- Conditional reasoning tasks with multiple if-then rules
-- Multi-hop reasoning problems requiring entity state tracking
-- Tasks where variables or entities need tracking across reasoning steps
-- When limited demonstrations are available (code prompts are more sample-efficient)
-- Natural language rules with complex logical structure
+- 包含多个 if-then 规则的条件推理任务
+- 需要实体状态追踪的多跳推理问题
+- 需要在推理步骤间追踪变量或实体的任务
+- 可用演示较少时（代码 prompt 的样本效率更高）
+- 具有复杂逻辑结构的自然语言规则
 
-**Tradeoffs:** Requires intermediate transformation step (can be automated by a smaller model). Only benefits text+code LLMs (models trained on both text and code) — pure text or pure code models do not show gains. Code must faithfully represent NL semantics; anonymous or random code hurts performance. Removing NL comments from code causes the largest performance drop — both code structure AND original NL text are required.
-
----
-
-## Anticipatory Reflection
-
-**Mechanism:** Before executing an action in a multi-step workflow, prompt the model to anticipate potential failures and generate alternative remedies. The model asks itself: "If this action fails, what should I do instead?" This creates a stack of backup actions to try if the primary action doesn't achieve the subtask objective.
-
-**The process:**
-
-```
-1. Generate action for current subtask
-2. Ask: "If your answer above is not correct, instead, the next action should be:"
-3. Generate remedy action(s)
-4. Execute primary action
-5. Evaluate: does result align with subtask objective?
-6. If misaligned: backtrack and try remedy action
-7. Repeat until subtask complete or remedies exhausted
-```
-
-**Triggers:**
-
-- Multi-step agentic workflows where actions can fail or produce unexpected results
-- Tool-using agents (file operations, web navigation, API calls)
-- Tasks where backtracking is cheaper than starting over
-- Workflows where early errors compound into larger failures
-- When reducing trial-and-error iterations matters
-
-**Why this works:** Standard reflection operates sequentially — one error corrected per complete execution trajectory. Anticipatory reflection prepares alternatives *before* failure occurs, enabling immediate recovery without full replanning. The follow-up question ("If your answer above is not correct...") also mitigates position bias by forcing the model to consider alternatives to its first choice.
-
-**Critical insight:** The goal is *consistency in plan execution*, not constant replanning. Execute the current plan with backup options rather than revising the plan at each obstacle. Plan revision happens only when all remedy actions are exhausted.
-
-**CORRECT:**
-```
-Subtask: Find the order containing a picture frame from November 2022
-
-Action: Click "View Order" on order #179
-Remedy: If #179 doesn't contain picture frame, click "View Order" on order #175
-Remedy: If #175 doesn't contain picture frame, click "View Order" on order #182
-
-[Execute #179 → no picture frame → backtrack → execute #175 → found it]
-```
-
-**INCORRECT:**
-```
-Subtask: Find the order containing a picture frame from November 2022
-
-Action: Click "View Order" on order #179
-[Execute → no picture frame → revise entire plan → start over]
-```
-
-The incorrect version triggers full replanning after one failed action. The correct version prepared alternatives and recovers immediately.
-
-**Tradeoffs:** Generates remedy actions that may never be used. Best when backtracking cost is low (e.g., URL navigation) and action space is constrained. Less valuable when actions are irreversible or remedy generation is expensive.
+**权衡：** 需要中间转化步骤（可由较小模型自动完成）。仅对文本+代码联合训练的 LLM 有益——纯文本或纯代码模型不会有收益。代码必须忠实表示自然语言语义；匿名或随机代码会损害性能。去除代码中的自然语言注释会造成最大的性能下降——代码结构和原始自然语言文本都是必需的。
 
 ---
 
-## Multi-Perspective Reasoning
+## 预期反思（Anticipatory Reflection）
 
-**Mechanism:** Separate direction generation (Navigator role) from reasoning execution (Reasoner role). The Navigator generates multiple diverse framings or approaches to the problem; the Reasoner works through each independently. Final answer selection uses agreement scoring across perspectives rather than single-path confidence.
+**机制：** 在多步骤工作流中执行某个动作之前，提示模型预测潜在的失败并生成备选补救措施。模型会问自己：「如果这个动作失败，我该怎么办？」这创建了一个备选动作栈，供主要动作无法实现子任务目标时使用。
 
-**The process:**
+**流程：**
 
 ```
-1. Navigator generates K diverse directions/framings for approaching the question
-2. For each direction, Reasoner generates response with rationale
-3. Compute intra-consistency (self-consistency within each path)
-4. Compute inter-consistency (agreement across paths)
-5. If consistency exceeds threshold: return highest-agreement answer
-6. If not: Navigator generates new directions incorporating low-consistency signal
-7. Repeat until convergence or max iterations
+1. 为当前子任务生成动作
+2. 询问：「If your answer above is not correct, instead, the next action should be:」
+3. 生成补救动作
+4. 执行主要动作
+5. 评估：结果是否与子任务目标一致？
+6. 若不一致：回退并尝试补救动作
+7. 重复直至子任务完成或补救措施用尽
 ```
 
-**Triggers:**
+**触发条件：**
 
-- Knowledge-intensive reasoning where getting stuck on one path is likely
-- Tasks where self-assessment is unreliable without ground truth
-- When diverse perspectives would surface different relevant knowledge
-- Problems where the model confidently produces wrong answers (high confidence, low accuracy)
-- Multi-hop reasoning requiring exploration of alternative inference chains
+- 动作可能失败或产生意外结果的多步骤 agent 工作流
+- 使用工具的 agent（文件操作、网页浏览、API 调用）
+- 回退成本低于重新开始的任务
+- 早期错误会累积放大为更大失败的工作流
+- 减少反复试错迭代次数重要时
 
-**Why this works:** LLMs often get trapped in reasoning loops — even with explicit "your answer is wrong" feedback, they frequently fail to revise predictions. Multiple perspectives bypass this by exploring parallel reasoning paths. Agreement among independently-generated responses serves as a proxy for correctness when ground truth is unavailable.
+**为何有效：** 标准反思是顺序操作的——完整执行轨迹后只纠正一个错误。预期反思在失败发生*之前*就准备好备选方案，无需完整重新规划即可立即恢复。后续问题（「If your answer above is not correct...」）也通过迫使模型考虑其首选答案的替代方案来缓解位置偏差。
 
-**Critical insight:** Diversity between reasoning paths matters more than depth within a single path. If all perspectives converge on the same answer through different routes, confidence is warranted. If they diverge, the question likely requires more careful analysis or the model lacks sufficient knowledge.
+**关键洞见：** 目标是*计划执行的一致性*，而非不断重新规划。应以备选选项执行当前计划，而非在每个障碍处修改计划。只有当所有补救动作都用尽时，才进行计划修订。
 
-**CORRECT:**
+**正确做法：**
 ```
-Question: What factors contributed to the fall of the Roman Empire?
+子任务：找到 2022 年 11 月包含相框的订单
 
-Navigator directions:
-- Economic perspective: taxation, inflation, trade disruption
-- Military perspective: overextension, barbarian pressure, army loyalty
-- Political perspective: succession crises, division of empire, administrative decay
+动作：点击订单 #179 的「查看订单」
+补救：若 #179 不含相框，点击订单 #175 的「查看订单」
+补救：若 #175 不含相框，点击订单 #182 的「查看订单」
 
-[Reasoner produces three analyses → all mention military overextension and economic strain → high inter-consistency → return synthesized answer]
-```
-
-**INCORRECT:**
-```
-Question: What factors contributed to the fall of the Roman Empire?
-
-[Single reasoning chain → gets fixated on lead poisoning theory → high confidence, questionable accuracy]
+[执行 #179 → 无相框 → 回退 → 执行 #175 → 找到了]
 ```
 
-**Tradeoffs:** K×N token overhead (K directions × N reasoning steps each). Multiple LLM calls. Most valuable when single-path reasoning produces confident but incorrect answers. Overkill for simple factual questions with clear answers.
+**错误做法：**
+```
+子任务：找到 2022 年 11 月包含相框的订单
+
+动作：点击订单 #179 的「查看订单」
+[执行 → 无相框 → 修改整个计划 → 重新开始]
+```
+
+错误做法在一次动作失败后就触发了完整重新规划。正确做法预先准备好了备选方案，可以立即恢复。
+
+**权衡：** 会生成可能永远用不到的补救动作。当回退成本低（如 URL 导航）且动作空间受限时效果最好。当动作不可逆或补救生成成本高时价值较低。
 
 ---
 
-## Conversational Prompt Refinement
+## 多视角推理
 
-**Mechanism:** Structured multi-turn workflow for creating personalized prompts through conversation. Uses unlabeled user data to generate data-driven questions, iteratively refines instructions based on feedback, and collects approved outputs as few-shot examples.
+**机制：** 将方向生成（Navigator 角色）与推理执行（Reasoner 角色）分离。Navigator 为问题生成多种多样的框架或方法；Reasoner 独立推理每种方法。最终答案选择使用跨视角的一致性评分，而非单路径置信度。
 
-**The process:**
+**流程：**
 
 ```
-1. User provides unlabeled examples of their data
-2. Model analyzes examples, generates data-driven questions about preferences
-   ("Should summaries focus on plot or reviewer opinion?")
-3. User responses shape initial instruction
-4. Model generates outputs using instruction on user's data
-5. User provides feedback on outputs
-6. Model refines instruction based on feedback
-7. Repeat 4-6 until user approves outputs
-8. Approved outputs become few-shot examples in final prompt
+1. Navigator 为问题生成 K 个不同的方向/框架
+2. 对每个方向，Reasoner 生成带理由的响应
+3. 计算内部一致性（每个路径的自洽性）
+4. 计算跨路径一致性（路径间的一致程度）
+5. 若一致性超过阈值：返回一致度最高的答案
+6. 若未超过：Navigator 整合低一致性信号生成新方向
+7. 重复直至收敛或达到最大迭代次数
 ```
 
-**Triggers:**
+**触发条件：**
 
-- Repetitive tasks on similar data (summarizing emails, generating ad copy)
-- When desired output characteristics are hard to specify upfront
-- User knows good output when they see it but can't articulate requirements
-- Need to create reusable prompts without labeled training data
-- Personalizing style, tone, or format to specific preferences
+- 容易陷入单一路径的知识密集型推理
+- 自我评估在没有真实答案时不可靠的任务
+- 多样化视角能呈现不同相关知识的场景
+- 模型对错误答案高度自信的问题（高置信度，低准确率）
+- 需要探索替代推理链的多跳推理
 
-**Why this works:** Users struggle to articulate task requirements in abstract terms, but easily judge concrete outputs. Data-driven questions surface relevant preference dimensions the user may not have considered. Iterative refinement captures implicit requirements that emerge only when seeing actual outputs. Approved outputs provide concrete few-shot examples aligned with demonstrated preferences.
+**为何有效：** LLM 经常陷入推理循环——即使明确告知「你的答案是错的」，也常常无法修正预测。多视角通过探索并行推理路径来绕过这一问题。独立生成的响应之间的一致性，在无法获取真实答案时作为正确性的代理指标。
 
-**Critical insight:** The conversation produces two artifacts: (1) a refined instruction capturing explicit preferences, and (2) few-shot examples demonstrating implicit preferences. Both matter — the instruction alone may miss nuances that the examples capture.
+**关键洞见：** 推理路径之间的多样性比单一路径的深度更重要。如果所有视角通过不同路径收敛到同一答案，置信度是有依据的；若它们发散，则问题可能需要更仔细的分析，或模型知识不足。
 
-**CORRECT:**
+**正确做法：**
 ```
-User uploads: 3 movie review snippets
-Model: "Should summaries emphasize the plot, the reviewer's opinion, or both?"
-User: "Both, but keep them brief"
-Model generates summary → User: "Too formal, make it conversational"
-Model refines instruction, regenerates → User approves
-[Final prompt includes instruction + approved summaries as few-shot examples]
-```
+问题：哪些因素导致了罗马帝国的衰落？
 
-**INCORRECT:**
-```
-User: "Write me a prompt for summarizing movie reviews"
-Model: [Generates generic summarization prompt without seeing user's data or preferences]
+Navigator 方向：
+- 经济视角：税收、通货膨胀、贸易中断
+- 军事视角：过度扩张、蛮族压力、军队忠诚度
+- 政治视角：继承危机、帝国分裂、行政衰败
+
+[Reasoner 产出三份分析 → 都提到军事过度扩张和经济压力 → 跨视角一致性高 → 返回综合答案]
 ```
 
-**Tradeoffs:** Requires interactive session (not single-turn). Best for tasks performed repeatedly where upfront investment pays off. The few-shot examples add tokens to every subsequent use of the prompt — balance example count against token budget.
+**错误做法：**
+```
+问题：哪些因素导致了罗马帝国的衰落？
+
+[单一推理链 → 固着于铅中毒理论 → 高置信度，准确性存疑]
+```
+
+**权衡：** K×N 倍 token 开销（K 个方向 × N 个推理步骤）。多次 LLM 调用。当单路径推理产生高置信度但错误的答案时最有价值。对有明确答案的简单事实问题来说太重了。
 
 ---
 
-## Principled Persona Prompting
+## 对话式 Prompt 精炼
 
-**Mechanism:** Assign task-aligned expert personas while avoiding irrelevant attributes that degrade performance.
+**机制：** 通过对话创建个性化 prompt 的结构化多轮工作流。使用无标注用户数据生成数据驱动的问题，基于反馈迭代精炼指令，并将已认可的输出收集为少样本示例。
 
-**Triggers:**
+**流程：**
 
-- Task requires specialized domain knowledge
-- Expertise framing might improve task alignment
-- Task benefits from specific perspective or knowledge level
+```
+1. 用户提供无标注的数据示例
+2. 模型分析示例，生成数据驱动的偏好问题
+   （「摘要应聚焦于情节还是评论者的观点？」）
+3. 用户的回答塑造初始指令
+4. 模型使用指令在用户数据上生成输出
+5. 用户对输出提供反馈
+6. 模型基于反馈精炼指令
+7. 重复步骤 4-6 直至用户认可输出
+8. 被认可的输出成为最终 prompt 中的少样本示例
+```
 
-**Anti-patterns (avoid):**
+**触发条件：**
 
-- Adding task-irrelevant attributes like names or preferences
-- Using gendered roles when gender is irrelevant
-- Simple "You are a helpful assistant" prompts for objective factual tasks
+- 对相似数据的重复任务（摘要邮件、生成广告文案）
+- 期望的输出特征难以预先明确说明
+- 用户看到好的输出就能辨认，但无法预先表达需求
+- 需要创建可复用的 prompt 且没有标注训练数据
+- 需要针对特定偏好个性化风格、语气或格式
 
-**Tradeoffs:** Minimal overhead (5-20 tokens). Single call. High sensitivity to irrelevant attributes -- irrelevant personas cause 14-59% negative effects across models.
+**为何有效：** 用户难以用抽象的方式表达任务需求，但很容易对具体输出做出判断。数据驱动的问题呈现了用户可能未曾考虑的相关偏好维度。迭代精炼捕获了仅在看到实际输出时才浮现的隐式需求。被认可的输出提供了与已证明偏好对齐的具体少样本示例。
 
----
+**关键洞见：** 对话产出两个产物：（1）捕获显式偏好的精炼指令，（2）展示隐式偏好的少样本示例。两者都很重要——单独的指令可能遗漏示例所捕获的细节。
 
-## Persona Prompting Ineffectiveness (Anti-pattern)
+**正确做法：**
+```
+用户上传：3 段电影评论片段
+模型：「摘要应强调情节、评论者的观点，还是两者都要？」
+用户：「都要，但要简短」
+模型生成摘要 → 用户：「太正式了，要更口语化」
+模型精炼指令，重新生成 → 用户认可
+[最终 prompt 包含指令 + 被认可的摘要作为少样本示例]
+```
 
-**Mechanism:** Study finding that adding persona roles to system prompts does not improve and may harm LLM performance on objective tasks.
+**错误做法：**
+```
+用户：「帮我写一个总结电影评论的 prompt」
+模型：[在未查看用户数据或了解其偏好的情况下生成通用摘要 prompt]
+```
 
-**Key findings:**
-
-- Do NOT use persona prompting for objective factual questions
-- Do NOT add roles like "You are a helpful assistant" expecting performance gains
-- Do NOT use speaker-specific roles ("You are a lawyer") for factual accuracy
-- Audience-specific prompts marginally better than speaker-specific
-- Gender-neutral roles slightly better than gendered roles
-- Effects are largely random and unpredictable across 162 roles, 9 LLMs
-
----
-
-## Decision Guidance
-
-**Question clarity issues:** Use Rephrase and Respond first -- zero-shot, training-free, minimal overhead.
-
-**Need implicit reasoning without explicit CoT:** Use Role-Play Prompting with task-advantaged role.
-
-**Context being ignored for memorized facts:** Use Context-faithful Prompting (opinion-based reframing) with counterfactual demonstrations.
-
-**Multi-perspective synthesis needed:** Use Multi-expert Prompting for diverse expertise, or Argument Generation for smaller models.
-
-**Detailed problem requiring principles:** Use Step-Back Prompting to abstract first, then reason.
-
-**Conditional reasoning with if-then rules:** Use Code Prompting to transform rules into code representation for better state tracking.
-
-**Style/preference alignment:** Use Contrastive In-Context Learning with positive/negative pairs.
-
-**Simple domain expertise:** Use ExpertPrompting for automatic expert identity generation.
-
-**Multi-step agentic workflows:** Use Anticipatory Reflection to prepare backup actions before execution, enabling recovery without full replanning.
-
-**Getting stuck on single reasoning path:** Use Multi-Perspective Reasoning to explore diverse framings and select via agreement scoring.
-
-**Creating reusable prompts for repetitive tasks:** Use Conversational Prompt Refinement to iteratively shape instructions and collect few-shot examples through feedback.
-
-**Avoid:** Generic persona prompts on factual tasks -- they provide no benefit and may harm performance.
+**权衡：** 需要交互式会话（不适合单轮）。最适合反复执行且前期投入值得的任务。少样本示例会在每次后续使用该 prompt 时增加 token 消耗——需要在示例数量和 token 预算之间取得平衡。
 
 ---
 
-## Composability Notes
+## 原则性人设 Prompting
 
-**Rephrase and Respond + CoT:** Explicitly complementary. RaR clarifies the question, CoT handles reasoning. Combine by adding "let's think step by step" to RaR prompt.
+**机制：** 指定与任务对齐的专家人设，同时避免会降低性能的无关属性。
 
-**Role-Play + Self-Consistency:** Can be combined. Role-play acts as implicit CoT trigger; self-consistency samples diverse reasoning paths.
+**触发条件：**
 
-**Context-faithful + Counterfactual Demonstrations:** Best used together. Opinion-based prompts + counterfactual examples yield largest faithfulness gains.
+- 任务需要专业领域知识
+- 专家框架可能改善任务对齐
+- 特定视角或知识水平有利于任务完成
 
-**ExpertPrompting + Multi-expert:** Multi-expert extends ExpertPrompting by generating multiple identities and aggregating their responses.
+**反模式（避免）：**
 
-**Step-Back + CoT:** Sequential -- abstraction retrieves principles, then standard reasoning applies them.
+- 添加与任务无关的属性（如名字或偏好）
+- 在性别无关时使用带性别角色
+- 对客观事实任务使用简单的「You are a helpful assistant」prompt
 
-**Code Prompting + CoT:** Complementary. Code transformation handles state tracking; CoT can be applied to the code-formatted input for additional reasoning structure.
+**权衡：** 开销极小（5-20 token）。单次调用。对无关属性高度敏感——无关人设在各模型上产生 14-59% 的负面效果。
 
-**Code Prompting + Few-shot:** Code prompts are more sample-efficient than text prompts — achieves same performance with fewer demonstrations.
+---
 
-**Contrastive ICL + Standard Few-shot:** Contrastive replaces standard few-shot; uses same token budget more effectively with positive/negative pairs.
+## 人设 Prompting 的无效性（反模式）
 
-**Argument Generation + Larger Models:** Avoid -- may force convincing arguments for incorrect options. Best for models < 8B parameters.
+**机制：** 研究发现，在系统 prompt 中添加人设角色不会改善，反而可能损害 LLM 在客观任务上的性能。
 
-**Anticipatory Reflection + Multi-step Agents:** Core pattern for agentic workflows. Pairs naturally with tool-use agents. Can wrap any action-generation approach with pre-execution remedy planning.
+**关键发现：**
 
-**Multi-Perspective Reasoning + Self-Consistency:** Related but distinct. Self-consistency samples the same reasoning multiple times; Multi-Perspective deliberately generates different framings. Multi-Perspective is more expensive but explores more diverse solution paths.
+- 不要对客观事实问题使用人设 prompting
+- 不要添加「You are a helpful assistant」期待获得性能提升
+- 不要使用特定发言者角色（「You are a lawyer」）来提升事实准确性
+- 面向受众的 prompt 略优于面向发言者的 prompt
+- 中性性别角色略优于有性别的角色
+- 效果在 162 个角色、9 个 LLM 上基本随机且不可预测
 
-**Multi-Perspective Reasoning + Multi-expert:** Can be combined — experts provide perspectives, Navigator/Reasoner structure handles agreement scoring. Significant token overhead; use only when single-expert answers are unreliable.
+---
 
-**Conversational Prompt Refinement + Any Technique:** The output is a refined prompt that can incorporate any other technique. Use CPR to discover preferences, then embed techniques like CoT or Contrastive ICL into the final prompt.
+## 决策指引
+
+**问题表述不清晰：** 首选「Rephrase and Respond」——零样本、无需训练、开销极小。
+
+**需要隐式推理而非显式 CoT：** 使用具备任务优势的角色进行角色扮演 Prompting。
+
+**上下文被忽略，模型倾向于使用记忆中的事实：** 使用带反事实演示的上下文忠实 Prompting（基于观点重构）。
+
+**需要多视角综合：** 使用多专家 Prompting 获取多元专业知识，或对较小模型使用论证生成。
+
+**详细问题需要从原则出发：** 使用 Step-Back Prompting 先抽象再推理。
+
+**包含 if-then 规则的条件推理：** 使用 Code Prompting 将规则转化为代码表示以改善状态追踪。
+
+**风格/偏好对齐：** 使用带正负示例对的对比上下文学习。
+
+**简单领域专业知识：** 使用 ExpertPrompting 自动生成专家身份。
+
+**多步骤 agent 工作流：** 使用预期反思在执行前准备备选动作，无需完整重新规划即可恢复。
+
+**陷入单一推理路径：** 使用多视角推理探索不同框架，通过一致性评分选择答案。
+
+**为重复任务创建可复用 prompt：** 使用对话式 Prompt 精炼，通过反馈迭代塑造指令并收集少样本示例。
+
+**避免：** 在事实任务上使用通用人设 prompt——不会带来任何收益，反而可能损害性能。
+
+---
+
+## 可组合性说明
+
+**Rephrase and Respond + CoT：** 明确互补。RaR 澄清问题，CoT 处理推理。结合方式：在 RaR prompt 中追加「let's think step by step」。
+
+**角色扮演 + 自洽性：** 可以结合。角色扮演作为隐式 CoT 触发器；自洽性对多种推理路径采样。
+
+**上下文忠实 + 反事实演示：** 最佳组合使用。基于观点的 prompt + 反事实示例能获得最大的忠实性收益。
+
+**ExpertPrompting + 多专家：** 多专家通过生成多个身份并汇总其响应，扩展了 ExpertPrompting。
+
+**Step-Back + CoT：** 顺序关系——抽象检索原则，然后应用标准推理。
+
+**Code Prompting + CoT：** 互补。代码转化处理状态追踪；CoT 可应用于代码格式的输入以增加推理结构。
+
+**Code Prompting + 少样本：** 代码 prompt 比文本 prompt 样本效率更高——用更少的演示达到相同性能。
+
+**对比 ICL + 标准少样本：** 对比取代标准少样本；用正负示例对更有效地使用相同 token 预算。
+
+**论证生成 + 较大模型：** 避免——可能迫使模型为错误选项生成令人信服的论证。最适合 <8B 参数模型。
+
+**预期反思 + 多步骤 Agent：** agent 工作流的核心模式。与工具使用 agent 自然配合。可将任何动作生成方法与执行前补救规划相结合。
+
+**多视角推理 + 自洽性：** 相关但不同。自洽性对相同推理多次采样；多视角刻意生成不同框架。多视角成本更高，但探索了更多样化的解题路径。
+
+**多视角推理 + 多专家：** 可以结合——专家提供视角，Navigator/Reasoner 结构处理一致性评分。token 开销较大；仅在单专家答案不可靠时使用。
+
+**对话式 Prompt 精炼 + 任意技术：** 输出是一个精炼后的 prompt，可整合任何其他技术。使用 CPR 发现偏好，然后在最终 prompt 中嵌入 CoT 或对比 ICL 等技术。

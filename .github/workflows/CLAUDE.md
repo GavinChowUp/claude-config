@@ -1,9 +1,9 @@
 # workflows/
 
-GitHub Actions workflow definitions.
+GitHub Actions 工作流定义。
 
-## Files
+## 文件
 
-| File              | What               | When to read                                   |
-| ----------------- | ------------------ | ---------------------------------------------- |
-| `skills-test.yml` | Skills L0-L2 tests | Debugging CI failures, modifying test pipeline |
+| 文件               | 内容                    | 何时阅读                                         |
+| ------------------ | ----------------------- | ------------------------------------------------ |
+| `skills-test.yml`  | Skills L0-L2 测试       | 调试 CI 失败、修改测试流水线时                   |

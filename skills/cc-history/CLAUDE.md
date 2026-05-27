@@ -1,17 +1,17 @@
 # cc-history/
 
-Reference documentation for analyzing Claude Code conversation history files.
+分析 Claude Code 对话历史文件的参考文档。
 
-## Files
+## 文件
 
-| File      | What                                      | When to read                        |
+| 文件      | 内容                                      | 何时阅读                        |
 | --------- | ----------------------------------------- | ----------------------------------- |
-| SKILL.md  | Query patterns and command reference      | Analyzing conversation history      |
-| README.md | Design decisions and structural knowledge | Understanding format and trade-offs |
+| SKILL.md  | 查询模式与命令参考      | 分析对话历史      |
+| README.md | 设计决策与结构性知识 | 理解格式和权衡取舍 |
 
-## Related Directories
+## 相关目录
 
-| Directory                 | What                         | When to read                   |
+| 目录                      | 内容                         | 何时阅读                   |
 | ------------------------- | ---------------------------- | ------------------------------ |
-| `~/.claude/projects/`     | Conversation history storage | Querying actual history files  |
-| `~/.claude/settings.json` | Claude Code configuration    | Understanding project settings |
+| `~/.claude/projects/`     | 对话历史存储 | 查询实际历史文件  |
+| `~/.claude/settings.json` | Claude Code 配置    | 了解项目设置 |

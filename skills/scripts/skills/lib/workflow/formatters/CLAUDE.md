@@ -1,11 +1,11 @@
 # formatters/
 
-Re-exports from ast/ module for backwards compatibility. Use ast/ directly for new code.
+从 ast/ 模块重导出，用于向后兼容。新代码请直接使用 ast/。
 
-## Files
+## 文件
 
-| File          | What                    | When to read             |
+| 文件          | 内容                    | 何时阅读             |
 | ------------- | ----------------------- | ------------------------ |
-| `__init__.py` | Re-exports from ../ast/ | Checking available types |
+| `__init__.py` | 从 ../ast/ 重导出 | 查看可用类型时 |
 
-See `../ast/CLAUDE.md` for actual implementation.
+实际实现请参见 `../ast/CLAUDE.md`。

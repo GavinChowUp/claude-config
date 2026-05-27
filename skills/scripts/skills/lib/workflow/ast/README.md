@@ -1,11 +1,11 @@
-# AST Module
+# AST 模块
 
-Type-safe AST representation for workflow output with builder API and pluggable renderers.
+工作流输出的类型安全 AST 表示，提供构建器 API 与可插拔渲染器。
 
-## Architecture
+## 架构
 
 ```
-Skills (26 call sites)
+Skills（26 个调用点）
        |
        v
 +------------------+
@@ -16,7 +16,7 @@ Skills (26 call sites)
        |
        v
 +----------------------------------------+
-|              AST Nodes                 |
+|              AST 节点                  |
 | TextNode | HeaderNode | DispatchNode   |
 | CodeNode | ActionsNode | RoutingNode   |
 | RawNode  | CommandNode | GuidanceNode  |
@@ -26,104 +26,104 @@ Skills (26 call sites)
        v
 +------------------+     +------------------+
 | XMLRenderer      |     | PlainTextRenderer|
-| (primary)        |     | (future)         |
+| （主要）         |     | （未来）         |
 +------------------+     +------------------+
        |
        v
-    str output
+    str 输出
 ```
 
-## Data Flow
+## 数据流
 
 ```
-Skill step handler
+Skill 步骤 handler
        |
-       | calls W.header(script="x", step=1, total=5)
+       | 调用 W.header(script="x", step=1, total=5)
        v
-ASTBuilder accumulates nodes
+ASTBuilder 累积节点
        |
-       | .build() returns Document
+       | .build() 返回 Document
        v
 Document(children=[HeaderNode, ActionsNode, ...])
        |
        | render(doc, XMLRenderer())
        v
-XMLRenderer.render() matches each node type
+XMLRenderer.render() 匹配各节点类型
        |
-       | recursively renders children
+       | 递归渲染子节点
        v
 "<step_header script='x' step='1' total='5'>...</step_header>"
 ```
 
-## Why This Structure
+## 为何如此设计
 
-### Module Organization
+### 模块组织
 
-- **nodes.py**: Node definitions isolated from construction logic. Enables importing types without builder dependency.
-- **builder.py**: Fluent API separate from types. Builder can evolve (add convenience methods) without changing node structure.
-- **renderer.py**: Rendering decoupled from AST. Multiple renderers (XML, plain text, JSON) implement same interface.
-- **(deleted) compat.py**: Was transitional shim during migration. Removed after all skills migrated to W.\* builder API.
+- **nodes.py**：节点定义与构造逻辑分离。导入类型时无需引入构建器依赖。
+- **builder.py**：流式 API 与类型定义分离。构建器可独立演进（新增便捷方法），而不影响节点结构。
+- **renderer.py**：渲染逻辑与 AST 解耦。多种渲染器（XML、纯文本、JSON）实现同一接口。
+- **（已删除）compat.py**：迁移期间的过渡兼容层。所有 skill 迁移至 W.\* 构建器 API 后已移除。
 
-### Design Choices
+### 设计选择
 
-**Frozen Dataclasses**: Immutability aligns with FP style, prevents accidental mutation, and enables safe sharing of nodes between renders and caching.
+**冻结 dataclass**：不可变性契合函数式风格，防止意外修改，并允许节点在多次渲染和缓存中安全共享。
 
-**Flat Union**: Workflow output is sequential composition (Header + Actions + Command), not nested prose. Flat union with `children: list[Node]` matches actual patterns better than layered inline/block distinction.
+**扁平 Union**：工作流输出是顺序组合（Header + Actions + Command），而非嵌套散文。扁平 union 加 `children: list[Node]` 比分层行内/块状区分更契合实际模式。
 
-**Separate Dataclass Per Type**: Type-safe field access with IDE autocomplete. More explicit than shared attrs dict. Standard Python pattern for discriminated unions.
+**每种类型独立 dataclass**：类型安全的字段访问配合 IDE 自动补全。比共享 attrs 字典更明确。是 Python 判别联合的标准模式。
 
-**Builder API**: Direct construction requires knowing field names and types. Builder provides fluent API with autocomplete, reducing cognitive load for skill authors.
+**Builder API**：直接构造需要了解字段名与类型。Builder 提供带自动补全的流式 API，降低 skill 作者的认知负担。
 
-**Immutable Builder Pattern**: Each builder method returns NEW builder instance with accumulated node. No mutable state shared between calls. Functional style aligns with user preference for clean FP.
+**不可变 Builder 模式**：每个 builder 方法返回带有已累积节点的新 builder 实例，无可变共享状态。函数式风格与用户对简洁 FP 的偏好一致。
 
-**External render() Function**: Separation of concerns - Document doesn't need to know about renderers. Easier to add new renderers without modifying Document class. Multiple dispatch without coupling nodes to renderer interface.
+**外部 render() 函数**：关注点分离——Document 无需了解渲染器。新增渲染器无需修改 Document 类。无需将节点与渲染器接口耦合即可实现多分派。
 
-## Invariants
+## 不变量
 
-Core invariants enforced by the AST module:
+AST 模块强制执行的核心不变量：
 
-1. **Node types are frozen dataclasses**: Immutable after construction. No field mutation allowed.
-2. **Node = Union of 11 dataclass types**: Discriminated by class type, not field. Match statement provides exhaustiveness.
-3. **children is always list[Node], never None**: Empty list for leaf nodes. Simplifies rendering logic.
-4. **RawNode.content is never empty**: Use TextNode for intentional empty strings. RawNode is escape hatch for unstructured content.
-5. **Renderer must handle all 11 node types**: Match exhaustiveness enforced via assertNever pattern.
-6. **Builder methods return NEW builder instances**: Immutable chain. Final .build() returns Document.
+1. **节点类型为冻结 dataclass**：构造后不可变，不允许字段修改。
+2. **Node = 11 种 dataclass 类型的 Union**：按类类型判别，非字段判别。match 语句提供穷举性检查。
+3. **children 始终为 list[Node]，永不为 None**：叶节点为空列表。简化渲染逻辑。
+4. **RawNode.content 永不为空**：有意使用空字符串时用 TextNode。RawNode 是非结构化内容的应急出口。
+5. **渲染器必须处理全部 11 种节点类型**：通过 assertNever 模式强制 match 穷举性。
+6. **Builder 方法返回新 builder 实例**：不可变链式调用。最终 .build() 返回 Document。
 
-## Tradeoffs
+## 权衡
 
-### Flat union vs typed children
+### 扁平 union vs 类型化子节点
 
-**Chose**: Flat `children: list[Node]` over `children: list[InlineNode]`.
+**选择**：扁平 `children: list[Node]`，而非 `children: list[InlineNode]`。
 
-**Why**: Loses compile-time nesting enforcement but simplifies API. Workflow output is sequential composition, not nested prose. Runtime validation can catch invalid nesting if needed.
+**原因**：虽然失去了编译期嵌套约束，但简化了 API。工作流输出是顺序组合，而非嵌套散文。如有需要，运行期验证可检测无效嵌套。
 
-### Builder vs direct construction
+### Builder vs 直接构造
 
-**Chose**: Builder adds indirection but improves ergonomics.
+**选择**：Builder 增加了一层间接，但改善了人体工程学。
 
-**Why**: Skill authors use `W.header()` not `HeaderNode(type=NodeType.HEADER, ...)`. Fluent API with autocomplete reduces cognitive load. Direct construction exposes implementation details.
+**原因**：skill 作者使用 `W.header()`，而非 `HeaderNode(type=NodeType.HEADER, ...)`。带自动补全的流式 API 降低认知负担。直接构造会暴露实现细节。
 
-### Compatibility shim vs immediate migration
+### 兼容垫片 vs 即时迁移
 
-**Chose**: Shim adds temporary code but enables gradual rollout.
+**选择**：垫片增加了临时代码，但允许渐进式推出。
 
-**Why**: Worth the short-term complexity for risk reduction. Strangler Fig pattern isolates risk per-skill. No coordinated deployment required. Big bang rewrite would affect all 26 call sites simultaneously.
+**原因**：短期复杂度换来风险降低是值得的。Strangler Fig 模式将风险隔离在各个 skill。无需协调部署。大爆炸式重写会同时影响全部 26 个调用点。
 
-## RawNode Escape Hatch
+## RawNode 应急出口
 
-RawNode distinguishes "couldn't structure this" from intentional text (TextNode). Tracking `raw_nodes/total_nodes` ratio identifies when AST needs extension.
+RawNode 区分「无法结构化」与有意文本（TextNode）。追踪 `raw_nodes/total_nodes` 比例可识别 AST 何时需要扩展。
 
-**Threshold**: Extend AST if >20% of nodes are RawNode. This signals a design gap where new node types are needed.
+**阈值**：若超过 20% 的节点是 RawNode，则需扩展 AST。这表明存在设计缺口，需要新增节点类型。
 
-## Extending the AST
+## 扩展 AST
 
-To add a new node type:
+新增节点类型时：
 
-1. Add frozen dataclass to `nodes.py` with typed fields
-2. Add to `Node` union type
-3. Add builder method to `ASTBuilder` in `builder.py`
-4. Add render method to `XMLRenderer` in `renderer.py`
-5. Add case to `_render_node()` match statement
-6. Update tests to cover new node type for exhaustiveness
+1. 在 `nodes.py` 中添加带类型字段的冻结 dataclass
+2. 加入 `Node` 联合类型
+3. 在 `builder.py` 的 `ASTBuilder` 中添加 builder 方法
+4. 在 `renderer.py` 的 `XMLRenderer` 中添加渲染方法
+5. 在 `_render_node()` 的 match 语句中添加对应 case
+6. 更新测试以覆盖新节点类型的穷举性检查
 
-The match statement will catch missing cases at runtime if a case is not handled.
+如果某个 case 未处理，match 语句会在运行时捕获。

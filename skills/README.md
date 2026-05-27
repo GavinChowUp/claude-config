@@ -1,25 +1,25 @@
-# Skills Architecture
+# Skills 架构
 
-Script-based agent workflows with shared orchestration framework.
+基于脚本的 agent 工作流，共享同一套编排框架。
 
-## File Organization: The "Book" Pattern
+## 文件组织：「书本」模式
 
-Skill files read top-to-bottom like a book. Dependencies are defined before use. The ordering principle: **a reader should never need to scroll up to understand what they're reading.**
+Skill 文件从上到下像读书一样阅读。依赖项在使用前定义。核心原则：**读者永远不需要向上翻滚才能理解当前内容。**
 
-### Section Order
+### 区段顺序
 
-Files use a fixed section sequence. Group by type, not by step. Within each type-group, order by workflow step. Omit sections with no content.
+文件使用固定的区段序列。按类型分组，而非按步骤。在每个类型组内，按工作流步骤排序。无内容的区段可省略。
 
 ```python
 # ============================================================================
 # SHARED PROMPTS
 # ============================================================================
-# Prompts used by 2+ workflow steps. If large, extract to prompts/shared.py
+# 被 2 个及以上工作流步骤使用的 prompt。如果较大，提取到 prompts/shared.py
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-# Constants, temperatures, thresholds
+# 常量、温度参数、阈值
 
 # ============================================================================
 # SYSTEM PROMPTS
@@ -28,7 +28,7 @@ Files use a fixed section sequence. Group by type, not by step. Within each type
 # ============================================================================
 # MESSAGE TEMPLATES
 # ============================================================================
-# Step-delimited subsections (see below)
+# 按步骤划分的子区段（见下文）
 
 # ============================================================================
 # PARSING FUNCTIONS
@@ -37,34 +37,34 @@ Files use a fixed section sequence. Group by type, not by step. Within each type
 # ============================================================================
 # MESSAGE BUILDERS
 # ============================================================================
-# Functions that compose templates into complete messages
+# 将模板组合成完整消息的函数
 
 # ============================================================================
 # [DOMAIN] LOGIC
 # ============================================================================
-# Domain-specific (utility) functions
+# 领域相关的（工具性）函数
 
 # ============================================================================
 # STEP DEFINITIONS
 # ============================================================================
-# STATIC_STEPS and DYNAMIC_STEPS dicts (table-driven dispatch)
+# STATIC_STEPS 和 DYNAMIC_STEPS 字典（表驱动派发）
 
 # ============================================================================
 # OUTPUT FORMATTING
 # ============================================================================
-# format_output() entry point
+# format_output() 入口点
 
 # ============================================================================
 # ENTRY POINT
 # ============================================================================
-# main() function
+# main() 函数
 ```
 
-Rationale: functions often reference prompts from multiple steps. Grouping by type avoids forward references within function sections.
+原因：函数经常引用来自多个步骤的 prompt。按类型分组可避免函数区段内的前向引用。
 
-### Step-Delimited MESSAGE TEMPLATES
+### 按步骤划分的 MESSAGE TEMPLATES
 
-Within MESSAGE TEMPLATES, use step dividers to organize chronologically:
+在 MESSAGE TEMPLATES 内，使用步骤分隔符按时间顺序组织：
 
 ```python
 # ============================================================================
@@ -105,15 +105,15 @@ DEEPEN_LOW_INSTRUCTIONS = """..."""
 SYNTHESIZE_EXPLORING_INSTRUCTIONS = """..."""
 ```
 
-Step divider format: `# --- STEP N: PHASE_NAME ` followed by dashes to column 76.
+步骤分隔符格式：`# --- STEP N: PHASE_NAME ` 后跟破折号至第 76 列。
 
-Within a step section, order constants by execution flow. Dispatch-related constants (context, agents, guidance) come before instruction constants.
+在步骤区段内，按执行流程顺序排列常量。dispatch 相关常量（context、agents、guidance）放在 instruction 常量之前。
 
-### Dispatch Prompts: Templates vs Builders
+### Dispatch Prompt：模板 vs 构建函数
 
-Dispatch prompts combine static templates with dynamic composition. Split them:
+Dispatch prompt 将静态模板与动态组合结合。将其拆分：
 
-**Static parts -> MESSAGE TEMPLATES** (constants):
+**静态部分 -> MESSAGE TEMPLATES**（常量）：
 
 ```python
 # --- STEP 2: SURVEY ----------------------------------------------------------
@@ -142,7 +142,7 @@ WAIT for Explore results before re-invoking this step.
 ADVANCE: After results received, re-invoke with --confidence low."""
 ```
 
-**Composition -> MESSAGE BUILDERS** (functions that call `roster_dispatch()` etc.):
+**组合部分 -> MESSAGE BUILDERS**（调用 `roster_dispatch()` 等的函数）：
 
 ```python
 # ============================================================================
@@ -161,46 +161,46 @@ def build_survey_exploring_body() -> str:
     return f"DISPATCH Explore agent(s):\n\n{dispatch_text}\n\n{SURVEY_DISPATCH_GUIDANCE}"
 ```
 
-This separation ensures:
+这种分离确保：
 
-1. Prompt text is visible at the constant definition (no tracing into functions)
-2. Builders reference only constants defined above (chronological ordering)
-3. Changes to dispatch parameters don't require modifying prompt text
+1. Prompt 文本在常量定义处即可见（无需追踪函数）
+2. 构建函数只引用其上方定义的常量（按时间顺序）
+3. 修改 dispatch 参数时不需要改动 prompt 文本
 
-### Naming Convention
+### 命名规范
 
 ```
 [PHASE]_[TYPE]
 ```
 
-PHASE is the workflow phase: `SCOPE`, `SURVEY`, `DEEPEN`, `SYNTHESIZE`, `DISCOVERY`, `IDEATION`.
-TYPE is its role: `INSTRUCTIONS`, `DISPATCH_CONTEXT`, `DISPATCH_AGENTS`, `DISPATCH_GUIDANCE`, `FORMAT`, `FEEDBACK`.
+PHASE 是工作流阶段：`SCOPE`、`SURVEY`、`DEEPEN`、`SYNTHESIZE`、`DISCOVERY`、`IDEATION`。
+TYPE 是其角色：`INSTRUCTIONS`、`DISPATCH_CONTEXT`、`DISPATCH_AGENTS`、`DISPATCH_GUIDANCE`、`FORMAT`、`FEEDBACK`。
 
-Confidence variants use suffixes: `_LOW`, `_MEDIUM`, `_HIGH`, `_EXPLORING`, `_CERTAIN`.
+置信度变体使用后缀：`_LOW`、`_MEDIUM`、`_HIGH`、`_EXPLORING`、`_CERTAIN`。
 
-Examples:
+示例：
 
 ```python
-EVALUATION_CRITERIA              # shared (used by 2+ steps)
-SCOPE_INSTRUCTIONS               # step 1
-SURVEY_DISPATCH_CONTEXT          # step 2, dispatch context
-SURVEY_DISPATCH_AGENTS           # step 2, dispatch agent list
-SURVEY_LOW_INSTRUCTIONS          # step 2, low confidence variant
-DEEPEN_HIGH_INSTRUCTIONS         # step 3, high confidence variant
-SYNTHESIZE_FORMAT                # step 4, output format
+EVALUATION_CRITERIA              # 共享（被 2 个及以上步骤使用）
+SCOPE_INSTRUCTIONS               # 步骤 1
+SURVEY_DISPATCH_CONTEXT          # 步骤 2，dispatch 上下文
+SURVEY_DISPATCH_AGENTS           # 步骤 2，dispatch agent 列表
+SURVEY_LOW_INSTRUCTIONS          # 步骤 2，低置信度变体
+DEEPEN_HIGH_INSTRUCTIONS         # 步骤 3，高置信度变体
+SYNTHESIZE_FORMAT                # 步骤 4，输出格式
 ```
 
-### Placement Rule
+### 归属规则
 
-> A prompt belongs in the earliest section where it is used.
+> Prompt 归属于最早使用它的区段。
 
-- Used in Steps 2, 4, 6? -> SHARED PROMPTS section
-- Used only in Step 3? -> Step 3 position in MESSAGE TEMPLATES
-- Used in Steps 3 and 4 only? -> Step 3 position (consecutive use doesn't require SHARED)
+- 在步骤 2、4、6 中使用？-> SHARED PROMPTS 区段
+- 只在步骤 3 中使用？-> MESSAGE TEMPLATES 中步骤 3 的位置
+- 只在步骤 3 和 4 中使用？-> 步骤 3 的位置（连续使用不需要 SHARED）
 
-### Visual Formatting
+### 视觉格式
 
-Section headers (76 equals signs):
+区段标题（76 个等号）：
 
 ```python
 # ============================================================================
@@ -208,20 +208,20 @@ Section headers (76 equals signs):
 # ============================================================================
 ```
 
-Step dividers within MESSAGE TEMPLATES (76 chars total):
+MESSAGE TEMPLATES 内的步骤分隔符（共 76 个字符）：
 
 ```python
 # --- STEP N: PHASE_NAME ------------------------------------------------------
 ```
 
-Blank line before and after section headers. No blank line required around step dividers.
+区段标题前后各留一个空行。步骤分隔符前后不强制要求空行。
 
-### String Format Convention
+### 字符串格式规范
 
-Multi-line strings use parenthesized concatenation, not triple-quoted strings:
+多行字符串使用括号拼接，而非三引号字符串：
 
 ```python
-# GOOD - each line visible at its indentation level
+# GOOD - 每行在其缩进级别清晰可见
 SCOPE_INSTRUCTIONS = (
     "PARSE user intent:\n"
     "  - What codebase(s) are we analyzing?\n"
@@ -232,7 +232,7 @@ SCOPE_INSTRUCTIONS = (
     "  - 'Map dependencies between [A] and [B]'"
 )
 
-# GOOD - composing with variables
+# GOOD - 与变量组合
 EXECUTE_INSTRUCTIONS = (
     "Apply each approved change.\n"
     "\n"
@@ -245,27 +245,27 @@ EXECUTE_INSTRUCTIONS = (
     + CHANGE_PRESENTATION
 )
 
-# BAD - triple-quoted strings force column 0 for content
+# BAD - 三引号字符串强制内容从第 0 列开始
 SCOPE_INSTRUCTIONS = """\
 PARSE user intent:
   - What codebase(s) are we analyzing?
   - What is the user trying to understand?"""
 ```
 
-Rules:
+规则：
 
-- Every line gets its own string literal with explicit `\n`
-- Blank lines become `"\n"` on their own line
-- Last line has no trailing `\n`
-- Variable composition uses `+ VARIABLE + "\n"` (or no `"\n"` if last)
+- 每行都有自己的字符串字面量，并显式写 `\n`
+- 空行单独写成 `"\n"`
+- 最后一行没有尾随 `\n`
+- 变量组合使用 `+ VARIABLE + "\n"`（如果是最后一个则不加 `"\n"`）
 
-## How Skills Build Step Bodies
+## Skill 如何构建步骤体
 
-No "action factories". No inversion of control. Just strings.
+没有「action factories」，没有控制反转。只有字符串。
 
-### Pattern 1: Static Steps (deepthink subagent)
+### 模式 1：静态步骤（deepthink 子 agent）
 
-All-static workflows use separate `STEP_TITLES` and `STEP_INSTRUCTIONS` dicts:
+全静态工作流使用独立的 `STEP_TITLES` 和 `STEP_INSTRUCTIONS` 字典：
 
 ```python
 STEP_TITLES = {
@@ -291,9 +291,9 @@ def format_output(step: int) -> str:
     return format_step(instructions, next_cmd or "", title=f"WORKFLOW - {title}")
 ```
 
-### Pattern 2: Parameterized Steps (codebase-analysis)
+### 模式 2：参数化步骤（codebase-analysis）
 
-Templates and builders are separated. Templates are constants defined in MESSAGE TEMPLATES (step-delimited). Builders compose templates into complete messages.
+模板和构建函数分离。模板是 MESSAGE TEMPLATES 中定义的常量（按步骤划分）。构建函数将模板组合成完整消息。
 
 ```python
 # ============================================================================
@@ -357,7 +357,7 @@ def format_output(step: int, confidence: str) -> str:
     return format_step(body, next_cmd)
 ```
 
-### Pattern 3: Dispatch Steps (planner orchestrator)
+### 模式 3：Dispatch 步骤（planner 编排器）
 
 ```python
 from skills.lib.workflow.prompts import format_step, subagent_dispatch
@@ -376,7 +376,7 @@ def format_dispatch_step(agent_type: str, invoke_cmd: str, state_dir: str) -> st
     return format_step(body, next_step_cmd)
 ```
 
-### Pattern 4: File Injection (prompt-engineer)
+### 模式 4：文件注入（prompt-engineer）
 
 ```python
 from skills.lib.workflow.prompts import format_step, format_file_content
@@ -401,9 +401,9 @@ def format_technique_step(categories: list[str]) -> str:
     return format_step(body, "python3 -m skills.prompt_engineer.optimize --step 5")
 ```
 
-### Pattern 5: Hybrid Static/Dynamic Steps (deepthink)
+### 模式 5：混合静态/动态步骤（deepthink）
 
-Workflows with mostly static steps and few parameterized steps benefit from a hybrid approach:
+以静态步骤为主、少量参数化步骤的工作流适合使用混合方式：
 
 ```python
 # ============================================================================
@@ -411,7 +411,7 @@ Workflows with mostly static steps and few parameterized steps benefit from a hy
 # ============================================================================
 
 def build_dispatch_body() -> str:
-    """Builder functions that dynamic formatters may call."""
+    """动态格式化器可能调用的构建函数。"""
     # ... implementation
     return dispatch_text
 
@@ -420,29 +420,29 @@ def build_dispatch_body() -> str:
 # STEP DEFINITIONS
 # ============================================================================
 
-# Static steps: (title, instructions) tuples
+# 静态步骤：(title, instructions) 元组
 STATIC_STEPS = {
     1: ("Context Clarification", CONTEXT_CLARIFICATION_INSTRUCTIONS),
     2: ("Abstraction", ABSTRACTION_INSTRUCTIONS),
-    # ... more static steps
+    # ... 更多静态步骤
 }
 
 
-# Dynamic formatter functions - defined BEFORE DYNAMIC_STEPS dict
+# 动态格式化函数——必须在 DYNAMIC_STEPS 字典之前定义
 def _format_step_9(mode: str, confidence: str, iteration: int) -> tuple[str, str]:
-    """Dynamic step that calls a builder function."""
+    """调用构建函数的动态步骤。"""
     return ("Dispatch", build_dispatch_body())
 
 
 def _format_step_13(mode: str, confidence: str, iteration: int) -> tuple[str, str]:
-    """Dynamic step with parameterized title and body."""
+    """带参数化标题和体的动态步骤。"""
     suffix = " -> Complete" if confidence == "certain" else ""
     title = f"Iterative Refinement (Iteration {iteration}){suffix}"
     body = INSTRUCTIONS.format(iteration=iteration, max_iter=MAX_ITERATIONS)
     return (title, body)
 
 
-# Dynamic steps dict - references functions defined above
+# 动态步骤字典——引用上方定义的函数
 DYNAMIC_STEPS = {
     9: _format_step_9,
     13: _format_step_13,
@@ -454,7 +454,7 @@ DYNAMIC_STEPS = {
 # ============================================================================
 
 def format_output(step: int, mode: str, confidence: str, iteration: int) -> str:
-    """Callable dispatch: static lookup or dynamic function call."""
+    """可调用派发：静态查找或动态函数调用。"""
     if step in STATIC_STEPS:
         title, instructions = STATIC_STEPS[step]
     elif step in DYNAMIC_STEPS:
@@ -466,25 +466,25 @@ def format_output(step: int, mode: str, confidence: str, iteration: int) -> str:
     return format_step(instructions, next_cmd or "", title=f"WORKFLOW - {title}")
 ```
 
-**Ordering constraint (book pattern)**: Dynamic formatter functions that call MESSAGE BUILDERS must appear AFTER MESSAGE BUILDERS. The DYNAMIC*STEPS dictionary must appear AFTER all `\_format_step*\*` functions it references.
+**顺序约束（书本模式）**：调用 MESSAGE BUILDERS 的动态格式化函数必须出现在 MESSAGE BUILDERS 之后。DYNAMIC_STEPS 字典必须出现在它引用的所有 `_format_step_*` 函数之后。
 
-Use this pattern when:
+适用场景：
 
-- Many steps share the same structure (title + constant body)
-- Few steps need parameters for title or body construction
-- Parameters are uniform across all dynamic steps
+- 大多数步骤共享相同结构（title + 固定体）
+- 少数步骤需要参数来构建 title 或体
+- 参数在所有动态步骤中是统一的
 
-Benefits:
+优势：
 
-- Compact representation for static steps (one line per step)
-- Clear, readable functions for dynamic steps
-- Single dispatch point in `format_output()`
-- Follows "book pattern" (all references resolve to definitions above)
+- 静态步骤的紧凑表示（每个步骤一行）
+- 动态步骤的清晰可读函数
+- `format_output()` 中统一的派发点
+- 遵循「书本模式」（所有引用均解析到上方的定义）
 
-### Anti-Pattern: Action Factories
+### 反模式：Action Factories
 
 ```python
-# BAD - unnecessary indirection
+# BAD - 不必要的间接层
 def technique_review_actions(for_ecosystem=False):
     base = ["For each technique...", "1. QUOTE the trigger", ...]
     if for_ecosystem:
@@ -492,10 +492,10 @@ def technique_review_actions(for_ecosystem=False):
     return base
 ```
 
-Replace with:
+替换为：
 
 ```python
-# GOOD - text at call site
+# GOOD - 文本在调用处直接可见
 TECHNIQUE_REVIEW = (
     "For each technique in the Technique Selection Guide:\n"
     "1. QUOTE the trigger condition from the table\n"
@@ -508,7 +508,7 @@ TECHNIQUE_REVIEW_ECOSYSTEM = (
     "Note techniques that apply to multiple prompts."
 )
 
-# Usage: compose with +
+# 用法：用 + 组合
 body = (
     "...\n"
     + TECHNIQUE_REVIEW_ECOSYSTEM + "\n"
@@ -516,49 +516,49 @@ body = (
 )
 ```
 
-Functions that return prompt fragments are only justified when there's complex conditional logic (multiple if/else branches). Even then, they live in the skill, not the shared lib.
+只有当存在复杂的条件逻辑（多个 if/else 分支）时，返回 prompt 片段的函数才是合理的。即便如此，它们也应存在于 skill 中，而非共享库中。
 
-## Shared Library
+## 共享库
 
-Location: `skills/lib/workflow/prompts/`
+位置：`skills/lib/workflow/prompts/`
 
-Only abstractions used by 3+ skills with identical semantics:
+只有被 3 个及以上 skill 以相同语义使用的抽象才放这里：
 
 ```
 prompts/
-    __init__.py         # re-exports
-    subagent.py         # dispatch templates
+    __init__.py         # 重新导出
+    subagent.py         # dispatch 模板
     step.py             # format_step()
     file.py             # format_file_content()
 ```
 
 ### subagent.py
 
-Three dispatch patterns for spawning sub-agents via the Task tool:
+通过 Task 工具派发子 agent 的三种 dispatch 模式：
 
-- `subagent_dispatch(agent_type, command, prompt="", model=None)` -- single sequential dispatch
-- `template_dispatch(agent_type, template, targets, command, ...)` -- parallel SIMD (same template, N targets with $var substitution)
-- `roster_dispatch(agent_type, agents, command, shared_context="", ...)` -- parallel MIMD (shared context + unique tasks)
+- `subagent_dispatch(agent_type, command, prompt="", model=None)` —— 单个顺序 dispatch
+- `template_dispatch(agent_type, template, targets, command, ...)` —— 并行 SIMD（相同模板，N 个目标，用 $var 替换）
+- `roster_dispatch(agent_type, agents, command, shared_context="", ...)` —— 并行 MIMD（共享上下文 + 独立任务）
 
-Building blocks (also exported):
+构建块（同样导出）：
 
-- `task_tool_instruction(agent_type, model)` -- how to use Task tool
-- `sub_agent_invoke(cmd)` -- command the spawned agent runs
-- `parallel_constraint(count)` -- MANDATORY_PARALLEL enforcement
+- `task_tool_instruction(agent_type, model)` —— 如何使用 Task 工具
+- `sub_agent_invoke(cmd)` —— 派发的 agent 运行的命令
+- `parallel_constraint(count)` —— MANDATORY_PARALLEL 强制
 
 ### step.py
 
 ```python
 def format_step(body: str, next_cmd: str = "", title: str = "") -> str:
-    """Assemble a complete workflow step.
+    """组装完整的工作流步骤。
 
     Args:
-        body: The prompt content (free-form text)
-        next_cmd: Command to run next (empty string for final step)
-        title: Optional title rendered as "TITLE\\n======\\n\\n" header
+        body: Prompt 内容（自由格式文本）
+        next_cmd: 下一步运行的命令（最终步骤传空字符串）
+        title: 可选标题，渲染为 "TITLE\\n======\\n\\n" 头部
 
     Returns:
-        Complete step output as plain text
+        完整步骤输出的纯文本
     """
 ```
 
@@ -566,28 +566,28 @@ def format_step(body: str, next_cmd: str = "", title: str = "") -> str:
 
 ```python
 def format_file_content(path: str, content: str) -> str:
-    """Embed file content in a prompt.
+    """将文件内容嵌入 prompt。
 
-    Uses 4-backtick fence to handle content containing triple-backticks.
+    使用 4 个反引号围栏，以处理包含三重反引号的内容。
     """
 ```
 
-## Two Invoke Concepts
+## 两种调用概念
 
-The codebase has two distinct "invoke" situations:
+代码库中存在两种不同的「invoke」场景：
 
-**Sub-agent invoke** (`sub_agent_invoke()` in subagent.py): Appears INSIDE a dispatch prompt. Tells the SPAWNED agent what command to run after it's created.
+**子 agent invoke**（subagent.py 中的 `sub_agent_invoke()`）：出现在 dispatch prompt 内部。告知被派发的 agent 创建后应运行哪条命令。
 
-**Parent invoke_after** (in `format_step()`): Appears AFTER the body as the step's terminal directive. Tells the CURRENT agent what to run next.
+**父级 invoke_after**（`format_step()` 中）：出现在体之后，作为步骤的终止指令。告知当前 agent 下一步运行什么。
 
-A dispatch step has BOTH:
+一个 dispatch 步骤同时具备两者：
 
-- The body contains a dispatch prompt with the sub-agent's invoke command
-- The step ends with the parent's invoke_after for what happens after the sub-agent returns
+- 体包含一个带子 agent 调用命令的 dispatch prompt
+- 步骤以父级的 invoke_after 结束，指明子 agent 返回后的后续操作
 
-## Core Abstraction: The Step
+## 核心抽象：步骤
 
-Every workflow step has the same fundamental structure:
+每个工作流步骤都有相同的基本结构：
 
 ```
 [body]
@@ -595,7 +595,7 @@ Every workflow step has the same fundamental structure:
 [invoke_after]
 ```
 
-That's it. Two parts:
+就这样。两个部分：
 
-1. **body**: The actual prompt content. Free-form text.
-2. **invoke_after**: The command the LLM should run next. Optional (empty for final steps).
+1. **body**：实际的 prompt 内容，自由格式文本。
+2. **invoke_after**：LLM 接下来应运行的命令。可选（最终步骤为空）。

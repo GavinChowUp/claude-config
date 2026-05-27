@@ -1,54 +1,46 @@
 # Prompt Engineer
 
-Prompts are code. They have bugs, edge cases, and failure modes. This skill
-treats prompt optimization as a systematic discipline -- analyzing issues,
-applying documented patterns, and proposing changes with explicit rationale.
+Prompt 就是代码。它有 bug、边界情况和失败模式。本 skill 将 prompt 优化视为一门系统性学科——分析问题、应用有文档支撑的模式、并在提出改动时明确标注所依据的理论依据。
 
-I use this on my own workflow. The skill was optimized using itself -- of
-course.
+我在自己的工作流中使用它。这个 skill 本身也是用它自己优化出来的——当然。
 
-## When to Use
+## 使用场景
 
-- A sub-agent definition that misbehaves (agents/developer.md)
-- A Python script with embedded prompts that underperform
-  (skills/planner/scripts/planner.py)
-- A multi-prompt workflow that produces inconsistent results
-- Any prompt that does not do what you intended
+- 行为异常的子 agent 定义（agents/developer.md）
+- 内嵌 prompt 表现不佳的 Python 脚本（skills/planner/scripts/planner.py）
+- 产出结果不一致的多 prompt 工作流
+- 任何没有达到预期效果的 prompt
 
-## How It Works
+## 工作原理
 
-The skill:
+本 skill 会：
 
-1. Reads prompt engineering pattern references
-2. Analyzes the target prompt for issues
-3. Proposes changes with explicit pattern attribution
-4. Waits for approval before applying changes
-5. Presents optimized result with self-verification
+1. 读取 prompt 工程模式参考文档
+2. 分析目标 prompt 存在的问题
+3. 提出改动，并明确标注所依据的模式
+4. 等待确认后再应用改动
+5. 呈现优化结果，并附带自验证
 
-I use recitation and careful output ordering to ground the skill in the
-referenced patterns. This prevents the model from inventing techniques.
+我使用逐字复述和谨慎的输出排序来将 skill 锚定在参考模式上，防止模型自行发明技术。
 
-## Example Usage
+## 使用示例
 
-Optimize a sub-agent:
+优化一个子 agent：
 
 ```
-Use your prompt engineer skill to optimize the system prompt for
-the following claude code sub-agent: agents/developer.md
+使用你的 prompt engineer skill 优化以下 Claude Code 子 agent 的系统 prompt：agents/developer.md
 ```
 
-Optimize a multi-prompt workflow:
+优化多 prompt 工作流：
 
 ```
-Consider @skills/planner/scripts/planner.py. Identify all prompts,
-understand how they interact, then use your prompt engineer skill
-to optimize each.
+参考 @skills/planner/scripts/planner.py，识别其中所有 prompt，
+理解它们之间的交互关系，然后使用你的 prompt engineer skill 对每个 prompt 进行优化。
 ```
 
-## Example Output
+## 输出示例
 
-Each proposed change includes scope, problem, technique, before/after, and
-rationale. A single invocation may propose many changes:
+每条改动建议包含范围、问题描述、所用技术、修改前后对比，以及改动理由。单次调用可能产出多条建议：
 
 ```
   +==============================================================================+
@@ -120,30 +112,28 @@ rationale. A single invocation may propose many changes:
   |                                                                              |
   +==============================================================================+
 
-  ... many more
+  ... 以及更多改动
 
 
   ---
-  Compatibility check:
-  - STOP Escalation + Affirmative Directives: Compatible (STOP is for interrupting specific behaviors)
-  - History Accumulation + Completeness Checkpoint Tags: Synergistic (both enforce state tracking)
-  - Quote Extraction + Chain-of-Verification: Complementary (both prevent hallucination)
-  - Progressive depth + Pre-Work Context Analysis: Sequential (planning enables deeper execution)
+  兼容性检查：
+  - STOP Escalation + Affirmative Directives：兼容（STOP 用于中断特定行为）
+  - History Accumulation + Completeness Checkpoint Tags：协同增强（两者都强制状态追踪）
+  - Quote Extraction + Chain-of-Verification：互补（两者均能防止幻觉）
+  - Progressive depth + Pre-Work Context Analysis：顺序关系（规划为更深层执行铺路）
 
-  Anti-patterns verified:
-  - No hedging spiral (replaced "should have" with "STOP. Verify...")
-  - No everything-is-critical (CRITICAL used only for state requirement)
-  - Affirmative directives used (changed negatives to positives)
-  - No implicit category trap (explicit checklists provided)
+  反模式验证：
+  - 无模糊措辞螺旋（将「should have」替换为「STOP. Verify...」）
+  - 无「万事皆关键」（CRITICAL 仅用于状态要求）
+  - 使用肯定式指令（将否定改为肯定）
+  - 无隐式类别陷阱（提供了明确的检查清单）
 
   ---
-  Does this plan look reasonable? I'll apply these changes once you confirm.
+  这个方案看起来合理吗？确认后我就应用这些改动。
 ```
 
-## Caveat
+## 注意事项
 
-When you tell an LLM "find problems and opportunities for optimization", it will
-find problems. That is what you asked it to do. Some may not be real issues.
+当你让一个 LLM「找出问题和优化机会」时，它会找出问题。这正是你要求它做的。其中某些可能并非真正的问题。
 
-I recommend invoking the skill multiple times on challenging prompts, but
-recognize when it is good enough and stop. Diminishing returns are real.
+我建议对难度较高的 prompt 多次调用本 skill，但要懂得适可而止。边际收益递减是真实存在的。

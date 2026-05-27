@@ -1,17 +1,17 @@
 # refactor/
 
-Python workflow scripts for the refactor skill.
+refactor skill 的 Python 工作流脚本。
 
-## Files
+## 文件
 
-| File          | What                                    | When to read                                    |
+| 文件          | 内容                                    | 何时阅读                                    |
 | ------------- | --------------------------------------- | ----------------------------------------------- |
-| `refactor.py` | Main 5-step orchestrator                | Debugging dispatch/triage/cluster/contextualize |
-| `explore.py`  | Per-category 5-step smell detection     | Debugging domain context/pattern/search steps   |
+| `refactor.py` | 5 步主编排器                | 调试 dispatch/triage/cluster/contextualize 时 |
+| `explore.py`  | 按类别执行的 5 步代码异味检测     | 调试领域上下文/模式/搜索步骤时   |
 
-## Related
+## 相关文件
 
-| Path                        | What                            | When to read                   |
+| 路径                        | 内容                            | 何时阅读                   |
 | --------------------------- | ------------------------------- | ------------------------------ |
-| `skills/refactor/`          | Skill definition and design doc | Understanding overall workflow |
-| `conventions/code-quality/` | Smell category definitions      | Adding/modifying categories    |
+| `skills/refactor/`          | skill 定义与设计文档 | 理解整体工作流时 |
+| `conventions/code-quality/` | 代码异味类别定义      | 新增/修改类别时    |

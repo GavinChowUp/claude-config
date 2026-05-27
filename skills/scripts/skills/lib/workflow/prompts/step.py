@@ -10,6 +10,12 @@ from pathlib import Path
 # traverses: prompts/ -> workflow/ -> lib/ -> skills/ -> scripts/
 SKILLS_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
 
+# Prepended to every step so all skills produce user-facing output in Chinese.
+LANGUAGE_DIRECTIVE = (
+    "语言要求：用简体中文进行所有面向用户的输出、分析与思考。"
+    "代码、命令、文件路径、技术标识符保留英文原文。\n\n"
+)
+
 
 def format_step(body: str, next_cmd: str = "", title: str = "",
                 if_pass: str = "", if_fail: str = "") -> str:
@@ -28,6 +34,8 @@ def format_step(body: str, next_cmd: str = "", title: str = "",
     if title:
         header = f"{title}\n{'=' * len(title)}\n\n"
         body = header + body
+
+    body = LANGUAGE_DIRECTIVE + body
 
     if if_pass and if_fail:
         # Branching invoke for QR gate routing: the LLM chooses based on

@@ -1,12 +1,12 @@
-# Unified Diff Format for Plan Code Changes
+# 计划代码变更的统一 Diff 格式
 
-This document is the authoritative specification for code changes in implementation plans.
+本文档是实现计划中代码变更的权威规范。
 
-## Purpose
+## 目的
 
-Unified diff format encodes both **location** and **content** in a single structure. This eliminates the need for location directives in comments (e.g., "insert at line 42") and provides reliable anchoring even when line numbers drift.
+统一 diff 格式在单一结构中同时编码**位置**和**内容**。这消除了在注释中使用位置指令（如「在第 42 行插入」）的需要，即使行号发生漂移，也能提供可靠的锚点。
 
-## Anatomy
+## 结构解析
 
 ```diff
 --- a/path/to/file.py
@@ -23,27 +23,27 @@ Unified diff format encodes both **location** and **content** in a single struct
     more_existing_code()
 ```
 
-## Components
+## 组成部分
 
-| Component                                  | Authority                 | Purpose                                                    |
-| ------------------------------------------ | ------------------------- | ---------------------------------------------------------- |
-| File path (`--- a/path/to/file.py`)        | **AUTHORITATIVE**         | Exact target file                                          |
-| Line numbers (`@@ -123,6 +123,15 @@`)      | **APPROXIMATE**           | May drift as earlier milestones modify the file            |
-| Function context (`@@ ... @@ def func():`) | **SCOPE HINT**            | Function/method containing the change                      |
-| Context lines (unchanged)                  | **AUTHORITATIVE ANCHORS** | Developer matches these patterns to locate insertion point |
-| `+` lines                                  | **NEW CODE**              | Code to add, including WHY comments                        |
-| `-` lines                                  | **REMOVED CODE**          | Code to delete                                             |
+| 组成部分                                   | 权威性                    | 用途                                                        |
+| ------------------------------------------ | ------------------------- | ----------------------------------------------------------- |
+| 文件路径 (`--- a/path/to/file.py`)        | **AUTHORITATIVE**         | 精确的目标文件                                              |
+| 行号 (`@@ -123,6 +123,15 @@`)      | **APPROXIMATE**           | 随前面的里程碑修改文件后可能发生漂移                        |
+| 函数上下文 (`@@ ... @@ def func():`) | **SCOPE HINT**            | 包含该变更的函数/方法                                       |
+| 上下文行（未变更）                  | **AUTHORITATIVE ANCHORS** | Developer 通过匹配这些模式来定位插入点                      |
+| `+` 行                                  | **NEW CODE**              | 要添加的代码，包含 WHY 注释                                 |
+| `-` 行                                  | **REMOVED CODE**          | 要删除的代码                                                |
 
-## Two-Layer Location Strategy
+## 双层定位策略
 
-Code changes use two complementary layers for location:
+代码变更使用两种互补层来定位：
 
-1. **Prose scope hint** (optional): Natural language describing conceptual location
-2. **Diff with context**: Precise insertion point via context line matching
+1. **散文范围提示**（可选）：用自然语言描述概念层面的位置
+2. **带上下文的 diff**：通过上下文行匹配精确定位插入点
 
-### Layer 1: Prose Scope Hints
+### 第一层：散文范围提示
 
-For complex changes, add a prose description before the diff block:
+对于复杂变更，在 diff 块前添加散文描述：
 
 ````markdown
 Add validation after input sanitization in `UserService.validate()`:
@@ -56,54 +56,55 @@ Add validation after input sanitization in `UserService.validate()`:
 +    if not is_valid_format(sanitized):
 +        raise ValidationError("Invalid format")
 +
+
      return process(sanitized)
 `` `
 ```
 ````
 
-The prose tells Developer **where conceptually** (which method, what operation precedes it). The diff tells Developer **where exactly** (context lines to match).
+散文告诉 Developer **概念层面在哪里**（哪个方法、前置操作是什么）。diff 告诉 Developer **精确在哪里**（要匹配的上下文行）。
 
-**When to use prose hints:**
+**何时使用散文提示：**
 
-- Changes to large files (>300 lines)
-- Multiple changes to the same file in one milestone
-- Complex nested structures where function context alone is ambiguous
-- When the surrounding code logic matters for understanding placement
+- 大文件变更（>300 行）
+- 一个里程碑中对同一文件进行多处修改
+- 复杂嵌套结构中仅凭函数上下文不足以定位
+- 周围代码逻辑对理解插入位置有帮助时
 
-**When prose is optional:**
+**何时散文可省略：**
 
-- Small files with obvious structure
-- Single change with unique context lines
-- Function context in @@ line provides sufficient scope
+- 小文件且结构清晰
+- 单处变更且上下文行唯一
+- `@@` 行的函数上下文已提供足够范围信息
 
-### Layer 2: Function Context in @@ Line
+### 第二层：@@ 行中的函数上下文
 
-The `@@` line can include function/method context after the line numbers:
+`@@` 行可在行号后附上函数/方法上下文：
 
 ```diff
 @@ -123,6 +123,15 @@ def validate(self, user):
 ```
 
-This follows standard unified diff format (git generates this automatically). It tells Developer which function contains the change, aiding navigation even when line numbers drift.
+这遵循标准统一 diff 格式（git 自动生成）。它告诉 Developer 变更所在函数，即使行号发生漂移也便于导航。
 
-## Why Context Lines Matter
+## 为什么上下文行很重要
 
-When a plan has multiple milestones that modify the same file, earlier milestones shift line numbers. The `@@ -123` in Milestone 3 may no longer be accurate after Milestones 1 and 2 execute.
+当一个计划包含多个修改同一文件的里程碑时，前面的里程碑会导致行号偏移。里程碑 3 中的 `@@ -123` 在里程碑 1 和 2 执行后可能已不准确。
 
-**Context lines solve this**: Developer searches for the unchanged context patterns in the actual file. These patterns are stable anchors that survive line number drift.
+**上下文行解决了这个问题**：Developer 在实际文件中搜索未更改的上下文模式。这些模式是稳定的锚点，能在行号漂移后依然有效。
 
-Include 2-3 context lines before and after changes for reliable matching.
+变更前后各保留 2-3 行上下文，以确保可靠匹配。
 
-## Comment Placement
+## 注释放置
 
-Comments in `+` lines explain **WHY**, not **WHAT**. These comments:
+`+` 行中的注释解释 **WHY**，不解释 WHAT。这些注释：
 
-- Are transcribed verbatim by Developer
-- Source rationale from Planning Context (Decision Log, Rejected Alternatives)
-- Use concrete terms without hidden baselines
-- Must pass temporal contamination review (see `.claude/conventions/temporal.md`)
+- 由 Developer 原文转录
+- 来源于规划上下文（决策日志、被否决的替代方案）
+- 使用具体术语，不引入隐藏基线
+- 必须通过时间污染审查（参见 `.claude/conventions/temporal.md`）
 
-**Important**: Comments written during planning often contain temporal contamination -- change-relative language, baseline references, or location directives. @agent-technical-writer reviews and fixes these before @agent-developer transcribes them.
+**重要**：规划阶段编写的注释常含有时间污染——变更相对语言、基线引用或位置指令。@agent-technical-writer 会在 @agent-developer 转录前审查并修正。
 
 <example type="CORRECT" category="why_comment">
 ```diff
@@ -111,7 +112,7 @@ Comments in `+` lines explain **WHY**, not **WHAT**. These comments:
 +   # WebSocket rejected to preserve stateless architecture
 +   updates = poll_api(interval=30)
 ```
-Explains WHY this approach was chosen.
+解释了为什么选择这种方案。
 </example>
 
 <example type="INCORRECT" category="what_comment">
@@ -119,7 +120,7 @@ Explains WHY this approach was chosen.
 +   # Poll the API every 30 seconds
 +   updates = poll_api(interval=30)
 ```
-Restates WHAT the code does - redundant with the code itself.
+重述了代码的 WHAT——与代码本身冗余。
 </example>
 
 <example type="INCORRECT" category="hidden_baseline">
@@ -127,7 +128,7 @@ Restates WHAT the code does - redundant with the code itself.
 +   # Generous timeout for slow networks
 +   REQUEST_TIMEOUT = 60
 ```
-"Generous" compared to what? Hidden baseline provides no actionable information.
+「宽裕」与什么相比？隐藏基线没有提供可操作的信息。
 </example>
 
 <example type="CORRECT" category="concrete_justification">
@@ -135,12 +136,12 @@ Restates WHAT the code does - redundant with the code itself.
 +   # 60s accommodates 95th percentile upstream response times
 +   REQUEST_TIMEOUT = 60
 ```
-Concrete justification that explains why this specific value.
+具体论证，解释了为什么选择这个特定值。
 </example>
 
-## Location Directives: Forbidden
+## 位置指令：禁止使用
 
-The diff structure handles location. Location directives in comments are redundant and error-prone.
+diff 结构已处理位置信息。注释中的位置指令是冗余且容易出错的。
 
 <example type="INCORRECT" category="location_directive">
 ```python
@@ -148,7 +149,7 @@ The diff structure handles location. Location directives in comments are redunda
 # Timestamp guard: prevent older data from overwriting newer
 get_ctx, get_cancel = context.with_timeout(ctx, 500)
 ```
-Location directive leaked into comment - line numbers become stale.
+位置指令泄露到注释中——行号会过时。
 </example>
 
 <example type="CORRECT" category="location_directive">
@@ -165,37 +166,36 @@ Location directive leaked into comment - line numbers become stale.
         for attempt in range(max_retries):
 
 ```
-Context lines (`for tag in tags`, `# Retry loop`) are stable anchors that survive line number drift.
+上下文行（`for tag in tags`、`# Retry loop`）是稳定锚点，在行号漂移后依然有效。
 </example>
 
-## When to Use Diff Format
+## 何时使用 Diff 格式
 
 <diff_format_decision>
 
-| Code Characteristic                     | Use Diff? | Boundary Test                            |
-| --------------------------------------- | --------- | ---------------------------------------- |
-| Conditionals, loops, error handling,    | YES       | Has branching logic                      |
-| state machines                          |           |                                          |
-| Multiple insertions same file           | YES       | >1 change location                       |
-| Deletions or replacements               | YES       | Removing/changing existing code          |
-| Pure assignment/return (CRUD, getters)  | NO        | Single statement, no branching           |
-| Boilerplate from template               | NO        | Developer can generate from pattern name |
+| 代码特征                                | 用 Diff？ | 边界测试                                     |
+| --------------------------------------- | --------- | -------------------------------------------- |
+| 条件语句、循环、错误处理、状态机        | YES       | 有分支逻辑                                   |
+| 同一文件多处插入                        | YES       | 超过 1 个变更位置                            |
+| 删除或替换                              | YES       | 移除/修改现有代码                            |
+| 纯赋值/返回（CRUD、getter）             | NO        | 单条语句，无分支                             |
+| 来自模板的样板代码                      | NO        | Developer 可从模式名称生成                   |
 
-The boundary test: "Does Developer need to see exact placement and context to implement correctly?"
+边界测试：「Developer 是否需要看到精确的位置和上下文才能正确实现？」
 
-- YES -> diff format
-- NO (can implement from description alone) -> prose sufficient
+- YES → diff 格式
+- NO（仅凭描述即可实现）→ 散文足够
 
 </diff_format_decision>
 
-## Validation Checklist
+## 验证清单
 
-Before finalizing code changes in a plan:
+在计划中确定代码变更之前：
 
-- [ ] File path is exact (not "auth files" but `src/auth/handler.py`)
-- [ ] Context lines exist in target file (validate patterns match actual code)
-- [ ] Comments explain WHY, not WHAT
-- [ ] No location directives in comments
-- [ ] No hidden baselines (test: "[adjective] compared to what?")
-- [ ] 2-3 context lines for reliable anchoring
+- [ ] 文件路径精确（不是「auth files」，而是 `src/auth/handler.py`）
+- [ ] 上下文行在目标文件中存在（验证模式与实际代码匹配）
+- [ ] 注释解释 WHY，不解释 WHAT
+- [ ] 注释中无位置指令
+- [ ] 无隐藏基线（测试：「[形容词]与什么相比？」）
+- [ ] 2-3 行上下文以确保可靠锚定
 ```

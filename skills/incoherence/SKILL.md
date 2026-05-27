@@ -1,31 +1,27 @@
 ---
 name: incoherence
-description: Detect and resolve incoherence in documentation, code, specs vs implementation.
+description: 检测并解决文档、代码、规范与实现之间的不一致。Detect and resolve incoherence in documentation, code, specs vs implementation.
 ---
 
-# Incoherence Detector
+# 一致性检测器
 
-When this skill activates, IMMEDIATELY invoke the script. The script IS the
-workflow.
+本 skill 激活时，立即调用脚本。脚本就是工作流。
 
-## Invocation
+## 调用
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.incoherence.incoherence --step-number 1 --thoughts '<context>'" />
 
-| Argument        | Required | Description                               |
+| 参数            | 是否必填 | 描述                               |
 | --------------- | -------- | ----------------------------------------- |
-| `--step-number` | Yes      | Current step (starts at 1)                |
-| `--thoughts`    | Yes      | Accumulated state from all previous steps |
+| `--step-number` | 是      | 当前步骤（从 1 开始）                |
+| `--thoughts`    | 是      | 所有前置步骤积累的状态 |
 
-Do NOT explore or detect first. Run the script and follow its output.
+不要先探索或检测。直接运行脚本并遵照其输出操作。
 
-## Workflow Phases
+## 工作流阶段
 
-1. **Detection (steps 1-12)**: Survey codebase, explore dimensions, verify
-   candidates
-2. **Resolution (steps 13-15)**: Present issues via AskUserQuestion, collect
-   user decisions
-3. **Application (steps 16-21)**: Apply resolutions, present final report
+1. **检测（步骤 1-12）**：扫查代码库、探索维度、验证候选问题
+2. **解决（步骤 13-15）**：通过 AskUserQuestion 呈现问题，收集用户决策
+3. **应用（步骤 16-21）**：应用解决方案，呈现最终报告
 
-Resolution is interactive - user answers structured questions inline. No manual
-file editing required.
+解决阶段是交互式的——用户在线回答结构化问题。不需要手动编辑文件。

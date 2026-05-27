@@ -1,352 +1,323 @@
-# Output Structure Techniques
+# 输出结构技术
 
-Structured output techniques constrain LLM responses into predictable formats
-(tables, code, JSON, XML) to improve reasoning accuracy, enable programmatic
-verification, and facilitate downstream processing. Use these techniques when
-free-form text produces inconsistent results, when outputs require machine
-parsing, or when complex reasoning benefits from explicit step organization.
+结构化输出技术将 LLM 的响应约束为可预测的格式（表格、代码、JSON、XML），以提升推理准确率、支持程序化验证，并便于下游处理。当自由文本产出结果不一致时、当输出需要机器解析时，或当复杂推理受益于显式步骤组织时，可使用这些技术。
 
 ---
 
-## Tabular Chain of Thought (Tab-CoT)
+## 表格式思维链（Tab-CoT）
 
-**Mechanism:** Replace "let's think step by step" with a table header prompt
-like `|step|subquestion|process|result|` to organize reasoning in 2D grid
-format.
+**机制：** 将「let's think step by step」替换为表格标题 prompt（如 `|step|subquestion|process|result|`），以二维网格形式组织推理。
 
-**When to use:**
+**使用场景：**
 
-- Multi-step arithmetic or symbolic reasoning
-- Problems requiring both vertical (step progression) and horizontal (within-step
-  detail) reasoning
-- Zero-shot settings where explicit structure improves accuracy
+- 多步骤算术或符号推理
+- 同时需要纵向（步骤推进）和横向（步骤内细节）推理的问题
+- 零样本场景下显式结构能提升准确率
 
-**Implementation:**
+**实现方式：**
 
-- Use pipe-delimited markdown table format: `|step|subquestion|process|result|`
-- Each row = one reasoning step; columns capture sub-question, process, answer
-- Follow with answer extraction prompt: "the answer is"
-- Works best with code-trained models (Codex-style) due to table familiarity
+- 使用管道符分隔的 Markdown 表格格式：`|step|subquestion|process|result|`
+- 每行代表一个推理步骤；各列分别记录子问题、过程和答案
+- 在末尾追加答案提取 prompt：「the answer is」
+- 对代码训练的模型（Codex 风格）效果最好，因为其对表格格式更熟悉
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) ~2% average accuracy gain over vanilla CoT on arithmetic tasks
-- (+) More concise output (28 words vs 140 for equivalent reasoning)
-- (+) Task-specific columns can dramatically boost domain performance (e.g.,
-  Last Letter task: 25.2% -> 72.8% with `|step|word|last letter|answer|`)
-- (+) Self-consistency across 3 different schemas yields 68.2% avg (vs 62.6%
-  single best)
-- (-) Requires models pre-trained on tabular data
-- (-) Less effective on commonsense reasoning without fixed answer patterns
+- (+) 在算术任务上比普通 CoT 平均提升约 2% 准确率
+- (+) 输出更简洁（同等推理内容仅需 28 词 vs 140 词）
+- (+) 特定任务的列设计可大幅提升领域性能（如 Last Letter 任务：25.2% -> 72.8%，使用 `|step|word|last letter|answer|`）
+- (+) 3 种不同模式的自洽性平均达到 68.2%（vs 单最优模式的 62.6%）
+- (-) 需要预训练过表格数据的模型
+- (-) 对没有固定答案模式的常识推理效果较差
 
 ---
 
-## Program of Thoughts (PoT)
+## 思维程序（Program of Thoughts，PoT）
 
-**Mechanism:** Generate Python code with semantically meaningful variable names
-instead of natural language reasoning; delegate computation to interpreter.
+**机制：** 生成带有语义化变量名的 Python 代码而非自然语言推理；将计算委托给解释器执行。
 
-**When to use:**
+**使用场景：**
 
-- Numerical reasoning with large numbers or high-precision floats
-- Problems requiring iteration, symbolic math, or equation solving
-- Tasks where LLM arithmetic errors are a primary failure mode
+- 涉及大数字或高精度浮点数的数值推理
+- 需要迭代、符号数学或方程求解的问题
+- LLM 算术错误是主要失败模式的任务
 
-**Implementation:**
+**实现方式：**
 
-- Prompt model to generate executable Python (import sympy for equations)
-- Use semantic variable names: `interest_rate`, `sum_in_two_years`
-- Execute generated code; answer = final variable value
-- For complex problems, combine with CoT: PoT computes, CoT interprets
+- 提示模型生成可执行的 Python 代码（用 sympy 处理方程）
+- 使用语义化变量名：`interest_rate`、`sum_in_two_years`
+- 执行生成的代码；答案 = 最终变量值
+- 对于复杂问题，结合 CoT：PoT 负责计算，CoT 负责解释
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) ~12% average accuracy gain over CoT (8% on math word problems, 15% on
-  financial QA)
-- (+) Eliminates arithmetic errors on iterative problems (50+ steps)
-- (+) Symbolic solver handles polynomial/differential equations
-- (+) Semantic binding is critical: removing meaningful variable names drops
-  GSM8K accuracy from 71.6% to 60.2%
-- (-) Requires code execution environment (security considerations)
-- (-) Value grounding errors (47% of failures) harder to detect than logic errors
+- (+) 比 CoT 平均提升约 12% 准确率（数学文字题 +8%，金融问答 +15%）
+- (+) 消除迭代问题（50+ 步骤）中的算术错误
+- (+) 符号求解器可处理多项式/微分方程
+- (+) 语义绑定至关重要：移除有意义的变量名会使 GSM8K 准确率从 71.6% 降至 60.2%
+- (-) 需要代码执行环境（存在安全考量）
+- (-) 值绑定错误（47% 的失败案例）比逻辑错误更难检测
 
 ---
 
-## Table as Thought
+## 表格作为思维（Table as Thought）
 
-**Mechanism:** Structure reasoning within a tabular schema where rows =
-sequential steps and columns = constraints/context; iteratively populate until
-verification passes.
+**机制：** 在表格模式中组织推理，行代表顺序步骤，列代表约束/上下文；迭代填充直至通过验证。
 
-**When to use:**
+**使用场景：**
 
-- Constraint-satisfaction planning (scheduling, travel planning)
-- Tasks requiring explicit constraint tracking across steps
-- Problems where schema design can capture domain logic
+- 约束满足规划（排班、旅行规划）
+- 需要在步骤间显式追踪约束的任务
+- 模式设计能够捕获领域逻辑的问题
 
-**Implementation:**
+**实现方式：**
 
-- Schema Development: LLM designs table headers capturing problem constraints
-- Table Construction: Iteratively populate rows (max 10 iterations)
-- Verification: Check completeness (all constraints satisfied) and correctness
-- Auto-Check: Structured format enables programmatic constraint validation
+- 模式开发：LLM 设计表格标题以捕获问题约束
+- 表格构建：迭代填充行（最多 10 次迭代）
+- 验证：检查完整性（所有约束满足）和正确性
+- 自动检查：结构化格式支持程序化约束验证
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) 5-10% improvement on calendar scheduling over CoT
-- (+) Enables external verification without LLM (auto-check constraints)
-- (+) Multi-row schemas outperform single-row on capable models (GPT-4o)
-- (-) Schema design is hard; LLM-generated schemas often suboptimal for complex
-  tasks
-- (-) Simpler models perform worse with complex schemas (GPT-4o-mini)
-- (-) Requires structured output API support (OpenAI Structured Outputs)
+- (+) 在日历排班上比 CoT 提升 5-10%
+- (+) 无需 LLM 即可进行外部验证（自动检查约束）
+- (+) 对有能力的模型（GPT-4o），多行模式优于单行模式
+- (-) 模式设计较难；LLM 生成的模式对复杂任务往往不够优化
+- (-) 较简单的模型在复杂模式下表现更差（GPT-4o-mini）
+- (-) 需要结构化输出 API 支持（OpenAI Structured Outputs）
 
 ---
 
 ## Meta Prompting
 
-**Mechanism:** Provide structure-only templates (JSON/XML/Markdown schemas) that
-define HOW to think rather than content examples showing WHAT to think.
+**机制：** 提供仅含结构的模板（JSON/XML/Markdown 模式），定义「如何思考」而非展示「思考什么」的内容示例。
 
-**When to use:**
+**使用场景：**
 
-- Token-constrained settings where few-shot examples are expensive
-- Fair model comparison without example selection bias
-- Tasks with well-defined procedural structure (math proofs, code generation)
+- token 受限场景下少样本示例成本较高
+- 在没有示例选择偏差的情况下进行公平模型对比
+- 具有明确程序性结构的任务（数学证明、代码生成）
 
-**Implementation:**
+**实现方式：**
 
-- Define typed schema: `{"Problem": "[question]", "Solution": {"Step 1": "...",
-"Step 2": "..."}}`
-- Use XML or Markdown delimiters for section boundaries
-- Recursive Meta Prompting: LLM generates/refines its own meta-prompts
-- Combine with output primers: end prompt with start of expected response
+- 定义类型化模式：`{"Problem": "[question]", "Solution": {"Step 1": "...", "Step 2": "..."}}`
+- 使用 XML 或 Markdown 分隔符划定区段边界
+- 递归 Meta Prompting：LLM 自行生成/精炼其 meta-prompt
+- 结合输出前缀：将 prompt 以预期响应的开头结束
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) 46% MATH accuracy with Qwen-72B base (competitive with GPT-4 CoT)
-- (+) Dramatic token efficiency on batchable tasks: ~1/N API calls when N tasks
-  share structure (e.g., Game of 24 with N=1362 puzzles)
-- (+) Example-agnostic: no cherry-picked demonstrations
-- (-) Requires careful schema design; wrong structure hurts more than helps
-- (-) Less effective than few-shot when task semantics are ambiguous
+- (+) Qwen-72B base 在 MATH 上达到 46% 准确率（与 GPT-4 CoT 竞争）
+- (+) 可批处理任务上 token 效率极高：当 N 个任务共享结构时，约需 1/N 次 API 调用（如 Game of 24，N=1362 个谜题）
+- (+) 示例无关：无精心挑选的演示
+- (-) 需要精心设计模式；错误结构的危害大于帮助
+- (-) 当任务语义模糊时，效果不如少样本
 
 ---
 
-## Prefill Technique
+## 预填充技术（Prefill Technique）
 
-**Mechanism:** Prefill the assistant response with the start of the expected
-output format to bypass preamble and enforce structure.
+**机制：** 用预期输出格式的开头预填充助手响应，跳过前言并强制执行结构。
 
-**When to use:**
+**使用场景：**
 
-- Need strict JSON/XML output without "Here's my analysis:" preamble
-- Forcing enumerated lists to start mid-flow
-- Continuing partial code blocks
-- Ensuring immediate structured output
+- 需要严格 JSON/XML 输出而无「Here's my analysis:」前言
+- 强制枚举列表从流程中途开始
+- 继续部分代码块
+- 确保立即输出结构化内容
 
-**Implementation:**
+**实现方式：**
 
 ```
 User: Classify this feedback: {{TEXT}}
 Assistant: {"sentiment":"
 ```
 
-Claude continues from the prefill, maintaining the JSON structure. The model
-has no opportunity to add preamble because the response is already started.
+Claude 从预填充处继续，保持 JSON 结构。由于响应已经开始，模型没有机会添加前言。
 
-- Works with any format: JSON, XML, Markdown, code blocks
-- Combine with output primers (ending prompt with expected output start)
-- For multi-field JSON, prefill first key: `{"field_1":"`
+- 适用于任意格式：JSON、XML、Markdown、代码块
+- 结合输出前缀（将 prompt 以预期输出开头结束）
+- 对多字段 JSON，预填充第一个键：`{"field_1":"`
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) Eliminates preamble tokens entirely
-- (+) Forces consistent format without explicit instruction
-- (+) Works with any model supporting assistant prefill (Claude, GPT-4)
-- (-) Requires API-level access to prefill (not available in all interfaces)
-- (-) Model may struggle if prefill conflicts with natural response
-
----
-
-## Agent-Computer Interface (ACI) Design
-
-**Mechanism:** Design LLM-facing interfaces with simple commands, consistent
-feedback formats, and guardrails to prevent cascading errors.
-
-**When to use:**
-
-- Multi-turn agentic tasks (code editing, file navigation)
-- Environments where standard CLI tools produce verbose/inconsistent output
-- Tasks requiring iterative editing with feedback
-
-**Implementation:**
-
-- Simple commands: `edit <start> <end> <replacement>` vs complex sed syntax
-- Concise feedback: Show only relevant lines with line numbers, omit noise
-- Guardrails: Syntax linter rejects invalid edits before applying
-- Context management: Collapse old observations to single-line summaries
-
-**Tradeoffs:**
-
-- (+) 64% relative improvement over shell-only on SWE-bench
-- (+) Linting guardrails help recovery from edit errors (51.7% of trajectories
-  have 1+ failed edits; agents recover 90.5% of the time on first attempt)
-- (+) Consistent output format reduces parsing failures
-- (-) Interface must be co-designed with task; not general-purpose
-- (-) Some guardrails (e.g., lint rejection) force specific edit orderings
+- (+) 完全消除前言 token
+- (+) 无需显式指令即可强制一致格式
+- (+) 适用于任何支持助手预填充的模型（Claude、GPT-4）
+- (-) 需要 API 层面的预填充访问权限（并非所有界面都支持）
+- (-) 若预填充与自然响应冲突，模型可能出现问题
 
 ---
 
-## Contextual Calibration
+## Agent-计算机接口（ACI）设计
 
-**Mechanism:** Estimate and correct model bias toward certain outputs by testing
-with content-free inputs (e.g., "N/A") and applying inverse calibration.
+**机制：** 为 LLM 设计具有简单命令、一致反馈格式和防错机制的接口，以防止错误级联。
 
-**When to use:**
+**使用场景：**
 
-- Few-shot classification with imbalanced examples
-- Tasks where example ordering affects predictions (recency bias)
-- Label names with different pre-training frequencies (common token bias)
+- 多轮 agent 任务（代码编辑、文件导航）
+- 标准 CLI 工具产生冗长/不一致输出的环境
+- 需要带反馈的迭代编辑任务
 
-**Implementation:**
+**实现方式：**
 
-- Get p_cf = model probability on content-free input ("N/A", empty string,
-  "[MASK]")
-- Set W = diag(p_cf)^-1, apply to all predictions: q = softmax(W \* p)
-- Average across multiple content-free inputs for robustness
-- Apply per-prompt (calibration is contextual to example selection/order)
+- 简单命令：`edit <start> <end> <replacement>` 而非复杂的 sed 语法
+- 简洁反馈：仅显示带行号的相关行，省略噪声
+- 防错机制：语法检查器在应用前拒绝无效编辑
+- 上下文管理：将旧的观察记录折叠为单行摘要
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) Up to 30% absolute accuracy improvement on GPT-3
-- (+) Reduces variance across prompt formats and example orderings
-- (+) Zero additional training data required
-- (-) Only addresses distribution shift, not reasoning quality
-- (-) Less effective on generation tasks than classification
+- (+) 在 SWE-bench 上比仅用 shell 相对提升 64%
+- (+) 代码检查防错机制有助于从编辑错误中恢复（51.7% 的轨迹至少有 1 次编辑失败；agent 在首次尝试时的恢复率为 90.5%）
+- (+) 一致的输出格式减少解析失败
+- (-) 接口必须与任务联合设计；非通用目的
+- (-) 某些防错机制（如代码检查拒绝）会强制特定的编辑顺序
 
 ---
 
-## Prompt Format Sensitivity
+## 上下文校准（Contextual Calibration）
 
-**Mechanism:** Understand that output format specifications (JSON, XML, YAML)
-and minor perturbations (whitespace, greetings) measurably change predictions.
+**机制：** 通过使用无内容输入（如「N/A」）测试并应用逆校准来估计并修正模型对某些输出的偏差。
 
-**When to use:**
+**使用场景：**
 
-- Choosing output format for data labeling pipelines
-- Debugging inconsistent model behavior
-- Establishing robust prompt templates
+- 带不平衡示例的少样本分类
+- 示例顺序影响预测结果的任务（近因偏差）
+- 具有不同预训练频率的标签名称（常见 token 偏差）
 
-**Implementation:**
+**实现方式：**
 
-- No specified format often yields highest accuracy (ChatGPT)
-- JSON format works best for code-trained models (Llama)
-- Avoid XML for general LLMs: causes 5-10% accuracy drops on larger models
-- Exception: Claude-specific XML patterns work well when used for structure:
-  - Separation: `<data>{{INPUT}}</data>` prevents instruction/data conflation
-  - Reference: Name tags descriptively, reference in prose
-  - Instruction-as-tag: `<prioritize_security>...</prioritize_security>`
-- Ensemble via majority vote across formats for robustness
-- Avoid: jailbreak patterns (even on innocuous tasks), unnecessary tokens
+- 获取 p_cf = 模型在无内容输入（「N/A」、空字符串、「[MASK]」）上的概率
+- 设置 W = diag(p_cf)^-1，应用于所有预测：q = softmax(W \* p)
+- 对多个无内容输入取平均以提高鲁棒性
+- 按 prompt 应用（校准与示例选择/顺序的上下文相关）
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) Awareness prevents accidental accuracy loss from format choice
-- (+) Ensemble across formats yields best aggregate accuracy
-- (-) No single format dominates across all models/tasks
-- (-) API-enforced JSON (ChatGPT) underperforms plain JSON prompt
+- (+) 在 GPT-3 上准确率绝对提升最高 30%
+- (+) 减少不同 prompt 格式和示例顺序的方差
+- (+) 无需额外训练数据
+- (-) 仅处理分布偏移，不改善推理质量
+- (-) 对生成任务的效果不如分类任务
 
 ---
 
-## Instructed Prompting for Noise Handling
+## Prompt 格式敏感性
 
-**Mechanism:** Explicitly instruct model to ignore irrelevant context: "Feel
-free to ignore irrelevant information given in the questions."
+**机制：** 理解输出格式规范（JSON、XML、YAML）和细微扰动（空白字符、问候语）会显著影响预测结果。
 
-**When to use:**
+**使用场景：**
 
-- Problems with distracting information in context
-- Real-world inputs that naturally contain noise
-- Tasks where model incorrectly incorporates irrelevant numbers/entities
+- 为数据标注流水线选择输出格式
+- 调试不一致的模型行为
+- 建立稳健的 prompt 模板
 
-**Implementation:**
+**实现方式：**
 
-- Prepend task instruction: "Solve grade school math problems. Feel free to
-  ignore irrelevant information."
-- Optionally include exemplars with irrelevant context (shows how to ignore)
-- Combine with self-consistency (sample multiple paths, majority vote)
+- 不指定格式通常能获得最高准确率（ChatGPT）
+- JSON 格式对代码训练模型（Llama）效果最好
+- 避免对通用 LLM 使用 XML：较大模型准确率下降 5-10%
+- 例外：Claude 专用 XML 模式在用于结构化时效果好：
+  - 分隔：`<data>{{INPUT}}</data>` 防止指令与数据混淆
+  - 引用：描述性命名标签，在散文中引用
+  - 指令即标签：`<prioritize_security>...</prioritize_security>`
+- 通过多种格式的多数投票获得最优鲁棒性
+- 避免：越狱模式（即使针对无害任务）、不必要的 token
 
-**Tradeoffs:**
+**权衡：**
 
-- (+) Significant accuracy recovery on GSM-IC (problems with distractors)
-- (+) No accuracy drop on clean datasets when instruction is present
-- (+) Works for both CoT and Least-to-Most prompting
-- (-) Does not fully solve distractibility (fundamental limitation remains)
-- (-) More exemplars can actually hurt robustness on complex tasks
-
----
-
-## Directional Stimulus Prompting
-
-**Mechanism:** Train small policy model to generate instance-specific hints
-(keywords, dialogue acts, trigger phrases) that guide the LLM.
-
-**When to use:**
-
-- Supervised tasks where reference outputs provide training signal
-- Dialogue systems requiring consistent intent/act alignment
-- When you have labeled data but cannot fine-tune the main LLM
-
-**Implementation:**
-
-- Policy model (T5/Flan-T5) generates stimulus per input
-- Stimulus types: keywords for summarization, dialogue acts for TOD, CoT
-  triggers for reasoning
-- Train via supervised fine-tuning, then RL with task reward (ROUGE, accuracy)
-- Append stimulus to LLM prompt as hints
-
-**Tradeoffs:**
-
-- (+) 41% improvement on MultiWOZ with only 80 labeled dialogues
-- (+) Instance-specific guidance outperforms task-level prompts
-- (+) RL refinement finds stimuli better than supervised pseudo-labels
-- (-) Requires training separate policy model per task
-- (-) BLEU may not improve even when task success improves
+- (+) 了解格式敏感性可避免因格式选择造成意外准确率损失
+- (+) 跨格式集成可获得最佳整体准确率
+- (-) 没有单一格式在所有模型/任务上均占优
+- (-) API 强制 JSON（ChatGPT）的表现不如纯文本 JSON prompt
 
 ---
 
-## Decision Guidance: Choosing Techniques
+## 抗噪声的指令式 Prompting
 
-**By problem type:**
+**机制：** 明确指示模型忽略无关上下文：「Feel free to ignore irrelevant information given in the questions.」
 
-- Arithmetic/symbolic reasoning -> PoT (delegate computation)
-- Multi-step with intermediate structure -> Tab-CoT or Table as Thought
-- Classification with format requirement -> Test formats; prefer JSON or none
-- Noisy/distractor-filled context -> Instructed prompting + self-consistency
-- Few-shot instability -> Contextual calibration
-- Agentic/iterative tasks -> ACI design principles
+**使用场景：**
 
-**By constraint:**
+- 上下文中包含干扰信息的问题
+- 自然含有噪声的真实世界输入
+- 模型错误地利用无关数字/实体的任务
 
-- Token-limited -> Meta Prompting (structure-only, no examples)
-- No code execution -> Tab-CoT or Table as Thought
-- Need programmatic verification -> Table as Thought (auto-check) or PoT
-- Labeled data available -> Directional Stimulus Prompting
-- Must eliminate preamble -> Prefill technique
+**实现方式：**
 
-**Composability:**
+- 在任务指令前追加：「Solve grade school math problems. Feel free to ignore irrelevant information.」
+- 可选择性地包含带无关上下文的示例（展示如何忽略）
+- 与自洽性结合（多路径采样，多数投票）
 
-- Tab-CoT + Self-consistency: Sample multiple table schemas, majority vote
-- PoT + CoT: PoT computes intermediate, CoT interprets for final answer
-- Meta Prompting + PoT: Structured schema that specifies code generation slots
-- Table as Thought + Auto-check: Schema enables external constraint validation
-- Any technique + Contextual Calibration: Apply calibration as post-processing
-- Prefill + Any format technique: Prefill enforces format, technique structures content
+**权衡：**
+
+- (+) 在 GSM-IC（含干扰项的问题）上准确率显著恢复
+- (+) 指令存在时，在干净数据集上准确率不下降
+- (+) 适用于 CoT 和 Least-to-Most prompting
+- (-) 不能完全解决可分散注意力的问题（根本局限依然存在）
+- (-) 在复杂任务上，更多示例实际上可能降低鲁棒性
 
 ---
 
-## Sources
+## 方向刺激 Prompting
+
+**机制：** 训练小型策略模型生成实例特定的提示（关键词、对话行为、触发短语），用于引导 LLM。
+
+**使用场景：**
+
+- 有参考输出提供训练信号的监督任务
+- 需要一致意图/行为对齐的对话系统
+- 拥有标注数据但无法微调主 LLM 时
+
+**实现方式：**
+
+- 策略模型（T5/Flan-T5）为每个输入生成刺激
+- 刺激类型：摘要任务用关键词、面向任务的对话用对话行为、推理用 CoT 触发短语
+- 通过监督微调训练，再用任务奖励进行强化学习（ROUGE、准确率）
+- 将刺激追加到 LLM prompt 中作为提示
+
+**权衡：**
+
+- (+) 在 MultiWOZ 上仅用 80 个标注对话提升 41%
+- (+) 实例特定的引导优于任务级 prompt
+- (+) 强化学习精炼找到的刺激优于监督伪标签
+- (-) 需要针对每个任务训练单独的策略模型
+- (-) 即使任务成功率提升，BLEU 分数也可能不提升
+
+---
+
+## 决策指引：选择技术
+
+**按问题类型：**
+
+- 算术/符号推理 -> PoT（委托计算）
+- 需要中间结构的多步骤推理 -> Tab-CoT 或 Table as Thought
+- 带格式要求的分类 -> 测试各种格式；倾向 JSON 或不指定
+- 有噪声/干扰的上下文 -> 指令式 prompting + 自洽性
+- 少样本不稳定 -> 上下文校准
+- Agent/迭代任务 -> ACI 设计原则
+
+**按约束：**
+
+- token 受限 -> Meta Prompting（仅含结构，无示例）
+- 无代码执行环境 -> Tab-CoT 或 Table as Thought
+- 需要程序化验证 -> Table as Thought（自动检查）或 PoT
+- 有标注数据 -> 方向刺激 Prompting
+- 必须消除前言 -> 预填充技术
+
+**可组合性：**
+
+- Tab-CoT + 自洽性：对多种表格模式采样，多数投票
+- PoT + CoT：PoT 计算中间结果，CoT 解释最终答案
+- Meta Prompting + PoT：指定代码生成槽的结构化模式
+- Table as Thought + 自动检查：模式支持外部约束验证
+- 任意技术 + 上下文校准：将校准作为后处理步骤
+- 预填充 + 任意格式技术：预填充强制格式，技术组织内容
+
+---
+
+## 来源
 
 - Anthropic Prompt Engineering: docs.anthropic.com (Prefill, XML patterns)
 - Tab-CoT: Jin & Lu (2023), arXiv:2305.17812

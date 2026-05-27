@@ -1,13 +1,13 @@
-# Workflow Test Framework
+# 工作流测试框架
 
-## Overview
+## 概述
 
-Data-driven test framework that exhaustively tests all steps of all workflow-based skills with all valid parameter combinations. Uses typed domain abstractions (BoundedInt, ChoiceSet, Constant) to represent parameter spaces, extracts schemas from Workflow ASTs, generates Cartesian products of valid inputs, and integrates with pytest via parametrize.
+数据驱动的测试框架，用所有合法参数组合穷举测试所有基于工作流的 skill 的每个步骤。使用类型化领域抽象（BoundedInt、ChoiceSet、Constant）表示参数空间，从 Workflow AST 提取 schema，生成合法输入的笛卡尔积，并通过 parametrize 与 pytest 集成。
 
-## Architecture
+## 架构
 
 ```
-Workflow AST          Domain Types           Test Generation
+Workflow AST          领域类型           测试生成
      |                     |                       |
      v                     v                       v
 +----------+        +-------------+         +--------------+
@@ -22,64 +22,64 @@ Workflow AST          Domain Types           Test Generation
                                            +-------------+
 ```
 
-## Data Flow
+## 数据流
 
-1. Import skills -> Workflow objects registered
+1. 导入 skill -> 注册 Workflow 对象
 2. extract_schema(workflow) -> {step: {param: Domain}}
-3. generate_inputs(workflow) -> Iterator[dict] (Cartesian product)
-4. pytest.parametrize -> test cases with IDs
-5. run_skill_invocation(workflow, params) -> subprocess exit code
+3. generate_inputs(workflow) -> Iterator[dict]（笛卡尔积）
+4. pytest.parametrize -> 带 ID 的测试用例
+5. run_skill_invocation(workflow, params) -> 子进程退出码
 
-## Why This Structure
+## 为何如此设计
 
-Domain types are separate from generation logic because:
+领域类型与生成逻辑分离，原因如下：
 
-- Domains are reusable (could drive fuzzing, documentation generation, etc.)
-- Generation logic depends on workflow structure, not domain semantics
-- Test file depends on both but adds pytest-specific concerns
+- 领域类型可复用（可驱动模糊测试、文档生成等）
+- 生成逻辑依赖工作流结构，而非领域语义
+- 测试文件依赖两者，但额外引入 pytest 专属关注点
 
-This separation enables:
+这种分离带来以下好处：
 
-- Testing the test framework itself (domain types can be unit tested)
-- Reusing domain abstractions for other purposes
-- Clear boundaries between concerns (FP composability)
+- 可对测试框架本身进行测试（领域类型可单元测试）
+- 可将领域抽象复用于其他目的
+- 关注点边界清晰（FP 可组合性）
 
-## Design Decisions
+## 设计决策
 
-### Exhaustive vs Sampling
+### 穷举 vs 采样
 
-Chose exhaustive enumeration because domain sizes are small. Current workflows generate ~300-500 test cases total (5 iterations x 5 confidences x 2 modes per iterating step). Exhaustive testing is tractable and catches all corner cases. Sampling would miss edge combinations where specific parameter values interact to cause failures.
+选择穷举枚举，因为领域规模很小。当前工作流共生成约 300–500 个测试用例（每个迭代步骤：5 次迭代 x 5 种置信度 x 2 种模式）。穷举测试可行，且能覆盖所有边界情况。采样会遗漏特定参数值相互作用导致失败的边界组合。
 
-Cost: More test cases to run
-Gain: Complete coverage of valid input space
+代价：更多测试用例需要运行
+收益：合法输入空间的完整覆盖
 
-### Hardcoded vs Introspected Mode-Gating
+### 硬编码 vs 内省模式门控
 
-Chose hardcoding for mode-gated steps (currently only deepthink has quick mode that skips steps 6-11). Introspecting handler bytecode to detect mode-gating would add complexity not justified for a single workflow.
+选择硬编码模式门控步骤（目前只有 deepthink 有跳过步骤 6–11 的 quick 模式）。通过内省 handler 字节码来检测模式门控，对于单一工作流而言复杂度不合算。
 
-Cost: Manual update if more workflows add mode-gating
-Gain: Clear, maintainable code
+代价：若更多工作流添加模式门控，需手动更新
+收益：代码清晰、易于维护
 
-### Domain Types in types.py
+### 领域类型放在 types.py
 
-Domain types (BoundedInt, ChoiceSet, Constant) live in workflow/types.py alongside Arg, QRStatus, Confidence. This maintains cohesion - domain types are type system extensions. Alternative would create import fragmentation.
+领域类型（BoundedInt、ChoiceSet、Constant）与 Arg、QRStatus、Confidence 一起放在 workflow/types.py 中。这保持了内聚性——领域类型是类型系统的扩展。另一种方案会造成导入碎片化。
 
-### Iteration Bound Hardcoded to 5
+### 迭代上界硬编码为 5
 
-BoundedInt(1, 5) for iteration domain matches QR_ITERATION_LIMIT constant. Hardcoded to avoid import coupling to config constants. Current value (5) is standard across all iterating workflows.
+iteration 领域的 BoundedInt(1, 5) 与 QR_ITERATION_LIMIT 常量一致。硬编码以避免对配置常量的导入耦合。当前值（5）是所有迭代工作流的标准。
 
-## Invariants
+## 不变量
 
-- Each test case has unique ID (workflow-step-params combination)
-- Conditional params only apply to applicable steps (iteration only at iterating steps)
-- Mode-gated steps skipped when mode value gates them out
-- step param always present (1 to workflow.total_steps)
-- Workflow.\_step_order provides authoritative step index mapping: len(\_step_order) == workflow.total_steps and indices correspond to CLI --step values
+- 每个测试用例有唯一 ID（workflow-step-params 组合）
+- 条件参数仅适用于对应步骤（iteration 只在迭代步骤出现）
+- 模式门控步骤在对应模式值下会被跳过
+- step 参数始终存在（1 到 workflow.total_steps）
+- Workflow.\_step_order 提供权威的步骤索引映射：len(\_step_order) == workflow.total_steps，索引对应 CLI --step 值
 
-## Constraints
+## 约束
 
-- Python 3.10+ (dataclass, match statements)
-- pytest available
-- run_skill_invocation() in conftest.py handles subprocess execution
-- MAX_ITERATIONS = 5 standard across workflows
-- Excluded skills: leon-writing-style, prompt-engineer-improver (not in git)
+- Python 3.10+（dataclass、match 语句）
+- pytest 可用
+- conftest.py 中的 run_skill_invocation() 负责子进程执行
+- MAX_ITERATIONS = 5，所有工作流统一
+- 排除的 skill：leon-writing-style、prompt-engineer-improver（不在 git 中）

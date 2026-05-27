@@ -1,194 +1,163 @@
-# My Claude Code Workflow
+# 我的 Claude Code 工作流
 
-I use Claude Code for most of my work. After months of iteration, I noticed a
-pattern: LLM-assisted code rots faster than hand-written code. Technical debt
-accumulates because the LLM does not know what it does not know, and neither do
-you until it is too late.
+我的大部分工作都用 Claude Code 完成。经过几个月的迭代，我发现一个规律：LLM
+辅助写出的代码，腐烂得比手写代码更快。技术债不断累积，因为 LLM 不知道自己不知道
+什么，而你也要等到为时已晚才会察觉。
 
-This repo is my solution: skills and workflows that force planning before
-execution, keep context focused, and catch mistakes before they compound.
+这个 repo 就是我的解法：一套 skill 和工作流，强制「先规划后执行」、让上下文保持
+聚焦、并在错误滚雪球之前就拦住它们。
 
-## Why This Exists
+## 为什么需要它
 
-LLM-assisted coding fails long-term. Technical debt accumulates because the LLM
-cannot see it, and you are moving too fast to notice. I treat this as an
-engineering problem, not a tooling problem.
+LLM 辅助编程在长期是失败的。技术债不断累积，因为 LLM 看不见它，而你又跑得太快、
+来不及注意。我把这当作一个工程问题来对待，而不是工具问题。
 
-LLMs are tools, not collaborators. When an engineer says "add retry logic",
-another engineer infers exponential backoff, jitter, and idempotency. An LLM
-infers nothing you do not explicitly state. It cannot read the room. It has no
-institutional memory. It will cheerfully implement the wrong thing with perfect
-confidence and call it "production-ready".
+LLM 是工具，不是协作者。当一个工程师说「加上重试逻辑」，另一个工程师会自动推断出
+指数退避、抖动和幂等性。而 LLM 不会推断任何你没有明确说出的东西。它读不懂言外之
+意，没有制度记忆，会满怀信心地实现错误的东西，还称之为「生产就绪」。
 
-Larger context windows do not help. Giving an LLM more text is like giving a
-human a larger stack of papers; attention drifts to the beginning and end, and
-details in the middle get missed. More context makes this worse. Give the LLM
-exactly what it needs for the task at hand -- nothing more.
+更大的上下文窗口也帮不上忙。给 LLM 更多文字，就像给人更厚的一摞文件；注意力会漂
+向开头和结尾，中间的细节被漏掉。上下文越多，情况越糟。只给 LLM 当前任务恰好需要
+的东西——别多给。
 
-## Principles
+## 设计原则
 
-This workflow is built on four principles.
+这套工作流建立在四条原则之上。
 
-### Context Hygiene
+### 上下文卫生
 
-Each task gets precisely the information it needs -- no more. Sub-agents start
-with a fresh context, so architectural knowledge must be encoded somewhere
-persistent.
+每个任务只拿到它恰好需要的信息——不多给。子 agent 从全新的上下文起步，因此架构知
+识必须被编码到某个持久的地方。
 
-I use a two-file pattern in every directory:
+我在每个目录里都用一种「双文件」模式：
 
-**CLAUDE.md** -- Claude loads these automatically when entering a directory.
-Because they load whether needed or not, content must be minimal: a tabular
-index with short descriptions and triggers for when to open each file. When
-Claude opens `app/web/controller.py`, it retrieves just the indexes along that
-path -- not prose it might never need.
+**CLAUDE.md** —— Claude 进入目录时会自动加载。正因为它不管需不需要都会加载，内容
+必须极简：一份表格式索引，配上简短描述和「何时打开该文件」的触发条件。当 Claude
+打开 `app/web/controller.py` 时，它只会沿这条路径取回相关索引——而不是那些它可能
+永远用不到的正文。
 
-**README.md** -- Invisible knowledge: architecture decisions, invariants not
-apparent from code. The test: if a developer could learn it by reading source
-files, it does not belong here. Claude reads these only when the CLAUDE.md
-trigger says to.
+**README.md** —— 隐性知识：架构决策、从代码看不出来的不变量。判断标准是：如果开发
+者读源码就能学到，那它就不该写在这里。Claude 只在 CLAUDE.md 的触发条件指示时才读
+它。
 
-The principle is just-in-time context. Indexes load automatically but stay
-small. Detailed knowledge loads only when relevant.
+核心原则是「即时上下文」（just-in-time context）。索引自动加载但保持精简，详细知识
+只在相关时才加载。
 
-The technical writer agent enforces token budgets: ~200 tokens for CLAUDE.md,
-~500 for README.md, 100 for function docs, 150 for module docs. These limits
-force discipline -- if you are exceeding them, you are probably documenting what
-code already shows. Function docs include "use when..." triggers so the LLM
-knows when to reach for them.
+technical-writer agent 会强制执行 token 预算：CLAUDE.md 约 200 token，README.md
+约 500，函数文档 100，模块文档 150。这些上限强制纪律——如果你超了，多半是在记录代
+码本身已经说明的东西。函数文档带有「use when…」触发条件，好让 LLM 知道何时该用到
+它们。
 
-The planner workflow maintains this hierarchy automatically. If you bypass the
-planner, you maintain it yourself.
+planner 工作流会自动维护这套层级。如果你绕过 planner，就得自己维护。
 
-### Planning Before Execution
+### 先规划后执行
 
-LLMs make first-shot mistakes. Always. The workflow separates planning from
-execution, forcing ambiguities to surface when they are cheap to fix.
+LLM 总会犯「第一枪」错误，无一例外。这套工作流把规划和执行分开，强制让歧义在「修
+正成本还很低」时就浮现出来。
 
-Plans capture why decisions were made, what alternatives were rejected, and what
-risks were accepted. Plans are written to files. When you clear context and
-start fresh, the reasoning survives.
+计划会记录：决策为什么这么做、哪些备选方案被否决、接受了哪些风险。计划写入文件。
+当你清空上下文、重新开始时，这些推理依然留存。
 
-### Review Cycles
+### 复审循环
 
-Execution is split into milestones -- smaller units that are manageable and can
-be validated individually. This ensures continuous, verified progress. Without
-it, execution becomes a waterfall: one small oversight early on and agents
-compound each mistake until the result is unusable.
+执行被拆成一个个里程碑——更小的单元，便于管理、可单独验证。这确保进度持续推进且
+经过验证。否则执行就退化成瀑布式：早期一个小疏漏，agent 会层层放大每个错误，直到
+结果无法使用。
 
-Quality gates run at every stage. A technical writer agent checks clarity; a
-quality reviewer checks completeness. The loop runs until both pass.
+每个阶段都有质量门把关。technical-writer agent 检查清晰度，quality-reviewer 检查完
+整性。循环一直跑到两者都通过为止。
 
-Plans pass review before execution begins. During execution, each milestone
-passes review before the next starts.
+计划在执行开始前先过复审。执行期间，每个里程碑也要过复审，才轮到下一个。
 
-### Cost-Effective Delegation
+### 高性价比委派
 
-The orchestrator delegates to smaller agents -- Haiku for straightforward tasks,
-Sonnet for moderate complexity. Prompts are injected just-in-time, giving
-smaller models precisely the guidance they need at each step.
+编排器（orchestrator）把任务委派给更小的 agent——简单任务用 Haiku，中等复杂度用
+Sonnet。prompt 即时注入，恰好给小模型在每一步所需的引导。
 
-When quality review fails or problems recur, the orchestrator escalates to
-higher-quality models. Expensive models are reserved for genuine ambiguity, not
-routine work.
+当质量复审失败或问题反复出现时，编排器会升级到更高质量的模型。昂贵的模型只留给真
+正的歧义，而非例行工作。
 
-## Does This Actually Work?
+## 这玩意儿真的有用吗？
 
-I have not run formal benchmarks. I can only tell you what I have observed using
-this workflow to build and maintain non-trivial applications entirely with
-Claude Code -- backend systems, data pipelines, streaming applications in C++,
-Python, and Go.
+我没跑过正式的基准测试。我只能告诉你，我用这套工作流、完全靠 Claude Code 来构建和
+维护非平凡应用时观察到了什么——后端系统、数据管道，以及用 C++、Python 和 Go 写的
+流式应用。
 
-The problems I used to hit constantly are gone:
+那些我以前不断踩的坑，现在没有了：
 
-**Ambiguity resolution.** You ask an LLM "make me a sandwich" and it comes back
-with a grilled cheese. Technically correct. Not what you meant. The planning
-phase forces these misunderstandings to surface before you have built the wrong
-thing.
+**歧义消解。** 你让 LLM「给我做个三明治」，它端回来一份烤奶酪。技术上没错，但不是
+你想要的。规划阶段强制这些误解在你把错的东西造出来之前就暴露。
 
-**Code hygiene.** Without review cycles, the same utility function gets
-reimplemented fifteen times across a codebase. The quality reviewer catches
-this. The technical writer ensures documentation stays consistent.
+**代码卫生。** 没有复审循环，同一个工具函数会在代码库里被重新实现十五遍。
+quality-reviewer 会抓到这一点。technical-writer 则确保文档保持一致。
 
-**LLM-navigable documentation.** Function docs include "use when..." triggers.
-CLAUDE.md files tell the LLM which files matter for a given task. The LLM stops
-guessing which code is relevant.
+**LLM 可导航的文档。** 函数文档带有「use when…」触发条件。CLAUDE.md 文件告诉 LLM
+哪些文件对某个任务重要。LLM 不再瞎猜哪些代码是相关的。
 
-Is it better than writing code by hand? I think so, but I cannot speak for
-everyone. This workflow is opinionated. I am a backend engineer -- the patterns
-should apply to frontend work, but I have not tested that. If you are less
-experienced with software engineering, I would like to know whether this helps
-or adds overhead.
+它比手写代码更好吗？我认为是，但我无法替所有人下结论。这套工作流很有主见。我是一
+名后端工程师——这些模式应该也适用于前端工作，但我没测试过。如果你软件工程经验尚
+浅，我很想知道它对你是帮助还是负担。
 
-If you are serious about LLM-assisted coding and want to try a structured
-approach, give it a shot. I would like to hear what works and what does not.
+如果你认真对待 LLM 辅助编程、想试试一种结构化的方式，那就上手试试。我很想听听哪
+些有用、哪些没用。
 
-## Quick Start
+## 快速开始
 
-Clone into your Claude Code configuration directory:
+克隆到你的 Claude Code 配置目录：
 
 ```bash
-# Per-project
+# 按项目
 git clone https://github.com/solatis/claude-config .claude
 
-# Global (new setup)
+# 全局（全新安装）
 git clone https://github.com/solatis/claude-config ~/.claude
 
-# Global (existing ~/.claude)
+# 全局（已有 ~/.claude）
 cd ~/.claude
 git remote add workflow https://github.com/solatis/claude-config
 git fetch workflow
 git merge workflow/main --allow-unrelated-histories
 ```
 
-## Usage
+## 使用方式
 
-The workflow for non-trivial changes: explore -> plan -> execute.
+非平凡改动的工作流：探索 -> 规划 -> 执行。
 
-**1. Explore the problem.** Understand what you are dealing with. Figure out the
-solution.
+**1. 探索问题。** 搞清楚你面对的是什么，找出解法。
 
-This is relatively free-form. If the project and/or surface area is particularly
-large, use the `codebase-analysis` skill to explore the project's code properly
-before proposing a solution.
+这一步相对自由。如果项目和/或涉及面特别大，先用 `codebase-analysis` skill 好好探
+索项目代码，再提出解法。
 
-**2. (Optional) Think it through.** I reach for `deepthink` very often, more than
-any other skill. It handles analytical questions where you do not know the answer
-structure yet -- taxonomy design, trade-offs, definitional questions, evaluative
-judgments, exploratory investigations.
+**2.（可选）想透彻。** 我非常频繁地用 `deepthink`，比任何其他 skill 都多。它处理
+那些你还不知道答案该是什么形状的分析性问题——分类法设计、权衡取舍、定义性问题、
+评价性判断、探索性调查。
 
-It auto-detects complexity. Quick mode reasons directly. Full mode launches
-parallel sub-agents with different analytical perspectives, then synthesizes
-through agreement patterns. Both self-verify.
+它会自动判断复杂度。快速模式直接推理。完整模式启动多个带不同分析视角的并行子
+agent，再通过「一致性模式」综合。两种模式都会自我验证。
 
-So, for most analytical questions, deepthink is enough. It explores your
-codebase when context is missing. Reach for specialized skills only when the
-question is clearly scoped:
+所以，对大多数分析性问题，deepthink 就够了。当缺少上下文时，它会探索你的代码库。
+只在问题边界清晰时才动用专门的 skill：
 
-- `problem-analysis`: Root cause analysis specifically
-- `decision-critic`: Stress-testing a specific decision
+- `problem-analysis`：专门做根因分析
+- `decision-critic`：对某个具体决策做压力测试
 
-**3. Write a plan.** "Use your planner skill to write a plan to
-plans/my-feature.md"
+**3. 写计划。** 「用你的 planner skill 把计划写到 plans/my-feature.md」
 
-The planner runs your plan through review cycles -- technical writer for
-clarity, quality reviewer for completeness -- until it passes.
+planner 会让你的计划过一遍复审循环——technical-writer 把关清晰度、
+quality-reviewer 把关完整性——直到通过。
 
-The planner captures all decisions, tradeoffs, and information not visible from
-the code so that this context does not get lost.
+planner 会记录所有决策、权衡，以及从代码里看不出来的信息，好让这些上下文不致丢失。
 
-**4. Clear context.** `/clear` -- start fresh. You have written everything
-needed into the plan.
+**4. 清空上下文。** `/clear`——从头开始。你需要的一切都已经写进计划里了。
 
-**5. Execute.** "Use your planner skill to execute plans/my-feature.md"
+**5. 执行。** 「用你的 planner skill 执行 plans/my-feature.md」
 
-The planner delegates to sub-agents. It never writes code directly. Each
-milestone goes through the developer, then the technical-writer and
-quality-reviewer. No milestone starts until the previous one passes review.
+planner 会把工作委派给子 agent，它自己从不直接写代码。每个里程碑先过 developer，再
+过 technical-writer 和 quality-reviewer。上一个里程碑没通过复审，下一个就不会开始。
 
-Where possible, it executes multiple tasks in parallel.
+只要有可能，它会并行执行多个任务。
 
-For detailed breakdowns of each skill, see their READMEs:
+各个 skill 的详细介绍见它们各自的 README：
 
 - [DeepThink](skills/deepthink/README.md)
 - [Codebase Analysis](skills/codebase-analysis/README.md)
@@ -196,191 +165,169 @@ For detailed breakdowns of each skill, see their READMEs:
 - [Decision Critic](skills/decision-critic/README.md)
 - [Planner](skills/planner/README.md)
 
-### In Practice
+### 实战示例
 
-I needed to migrate a legacy C# Windows Service from print-based logging to
-something that actually rotates files.
+我需要把一个老旧的 C# Windows 服务从「print 式日志」迁移到能真正轮转文件的方案。
 
-The codebase had a homegrown Log() method writing to a single file with
-File.AppendAllText. No rotation, no log levels, synchronous I/O blocking the
-thread. Six Console.WriteLine calls scattered elsewhere went nowhere when
-running as a service.
+这套代码用一个自制的 Log() 方法、靠 File.AppendAllText 往单个文件里写。没有轮转、
+没有日志级别、同步 I/O 阻塞线程。散落各处的六个 Console.WriteLine 调用，在以服务方
+式运行时根本没有输出去向。
 
-I started with exploration and analysis in a single prompt:
+我用一个 prompt 同时启动了探索和分析：
 
 ```
-Use your codebase analysis skill to briefly explore this C# project,
-with a focus on all the places where debug logs are currently emitted.
+用你的 codebase analysis skill 简要探索这个 C# 项目，
+重点关注当前所有发出 debug 日志的位置。
 
-Then use your problem analysis skill to think through an appropriate
-logging framework:
- * must work with .NET Framework 4.8.1
- * must support log rotation out of the box
- * we run multiple processes on the same machine, so it needs structured
-   multi-process support
+然后用你的 problem analysis skill 想清楚一个合适的
+日志框架：
+ * 必须兼容 .NET Framework 4.8.1
+ * 必须开箱即用地支持日志轮转
+ * 我们在同一台机器上跑多个进程，所以需要结构化的
+   多进程支持
 ```
 
-The codebase analysis found 31 call sites and the Console.WriteLine leakage. The
-problem analysis evaluated NLog, Serilog, log4net, and
-Microsoft.Extensions.Logging against my constraints.
+codebase analysis 找到了 31 处调用点和 Console.WriteLine 泄漏。problem analysis 针
+对我的约束评估了 NLog、Serilog、log4net 和 Microsoft.Extensions.Logging。
 
-The recommendation was NLog. It handles rotation and async out of the box.
-Multi-process support comes from layout variables. Serilog would work but
-requires three packages for the same functionality.
+结论是 NLog。它开箱即用地处理轮转和异步。多进程支持来自布局变量（layout
+variables）。Serilog 也能用，但实现同样功能需要三个包。
 
-I agreed with the recommendation. Not a complicated decision, so I skipped the
-`decision-critic` and moved to planning:
+我认同这个结论。这不是个复杂决策，所以我跳过了 `decision-critic`，直接进入规划：
 
 ```
-Use your planner skill to write an implementation plan to: plan-logging.md
+用你的 planner skill 把实现计划写到：plan-logging.md
 ```
 
-The planner surfaced two ambiguities:
+planner 浮现出两处歧义：
 
-1. Replace all Log() call sites, or just the implementation? Obvious to a human,
-   but worth clarifying upfront.
-2. Log rotation defaults. The planner assumed 1-day rotation, but I also need
-   size-based rotation at 1GB.
+1. 替换所有 Log() 调用点，还是只换实现？对人来说显而易见，但值得一开始就澄清。
+2. 日志轮转的默认值。planner 假设按 1 天轮转，但我还需要按 1GB 大小轮转。
 
-The plan went through review. The technical writer flagged comments that
-explained what rather than why -- the NLog.config had comments like "configures
-file target" instead of explaining the rotation strategy. The quality reviewer
-caught two issues I would have missed: no explicit LogManager.Shutdown() in the
-service's OnStop() handler, and incorrect file paths missing the src/ prefix.
+计划过了复审。technical-writer 标记出那些「解释 what 而非 why」的注释——NLog.config
+里有诸如「configures file target（配置文件目标）」这样的注释，而不是解释轮转策略。
+quality-reviewer 抓到了两个我会漏掉的问题：服务的 OnStop() 处理器里没有显式调用
+LogManager.Shutdown()，以及文件路径少了 src/ 前缀、不正确。
 
-These are the bugs that ship to production when you skip review cycles. The
-shutdown issue would have caused log loss on service restart. The path issue
-would have failed silently.
+这些正是你跳过复审循环时会带进生产环境的 bug。shutdown 那个问题会导致服务重启时丢
+日志。路径那个问题则会静默失败。
 
-After fixes, I cleared context and executed:
+修完之后，我清空上下文并执行：
 
 ```
-Use your planner skill to execute: @plan-logging.md
+用你的 planner skill 执行：@plan-logging.md
 ```
 
-The developer, debugger, technical writer, and quality reviewer run the
-implementation. Each milestone passes review before the next starts. If the
-implementation deviated from the plan, I would know.
+developer、debugger、technical-writer 和 quality-reviewer 一起跑完实现。每个里程碑
+先过复审，才轮到下一个。如果实现偏离了计划，我会知道。
 
-## Other Skills
+## 其他 skill
 
-Not every task needs the full planning workflow. These skills handle specific
-concerns.
+不是每个任务都需要完整的规划工作流。下面这些 skill 处理特定的关注点。
 
 ### DeepThink
 
-I use this skill multiple times a day -- whenever I do not know what shape the
-answer should take.
+这个 skill 我一天用好几次——只要我还不知道答案该是什么形状，就会用它。
 
-Unlike `problem-analysis` or `decision-critic`, deepthink has no fixed
-structure. It handles trade-offs, taxonomy questions, evaluative judgments --
-whatever you throw at it.
+和 `problem-analysis` 或 `decision-critic` 不同，deepthink 没有固定结构。它处理权
+衡取舍、分类法问题、评价性判断——你抛给它什么都行。
 
-So, when do I reach for it?
+那么，我什么时候会动用它？
 
-Meta-cognitive debugging. I keep making the same mistake. The LLM keeps
-misunderstanding the task. Why? Something is broken and I need to see it before
-I can fix it.
+元认知调试。我老犯同一个错。LLM 老是误解任务。为什么？有什么东西坏了，我得先看见
+它才能修。
 
-Strategy evaluation. Multiple valid approaches exist (and gut feel is not
-enough). PDF conversion: download the TeX source, parse the PDF directly, or
-let the LLM render it visually. S3 artifact versioning: timestamp paths,
-pointer files, checksums. Systematic comparison beats intuition.
+策略评估。存在多个有效的方案（而且光凭直觉不够）。PDF 转换：下载 TeX 源码、直接解
+析 PDF、还是让 LLM 用视觉方式渲染。S3 制品版本管理：时间戳路径、指针文件、校验和。
+系统性比较胜过直觉。
 
-Best practices research. What is the canonical approach? How do mature CI/CD
-systems handle artifact versioning? Industry patterns likely exist -- I just do
-not know them yet.
+最佳实践调研。规范的做法是什么？成熟的 CI/CD 系统如何处理制品版本管理？行业里多半
+已有现成模式——只是我还不知道。
 
-Architecture and design. How should these components interact? Where do the
-delegation boundaries go? I think them through before committing to code.
+架构与设计。这些组件应该如何交互？委派边界划在哪里？我会先想清楚，再投入写代码。
 
-Consolidation decisions. Should these two skills be merged? Do they serve
-distinct purposes, or am I maintaining unnecessary complexity?
+合并决策。这两个 skill 是否应该合并？它们服务于不同目的，还是我在维护不必要的复杂
+度？
 
-Two modes, auto-detected. Quick mode reasons directly. Full mode launches
-parallel sub-agents with distinct analytical perspectives, then synthesizes
-through agreement patterns.
+两种模式，自动判断。快速模式直接推理。完整模式启动多个带不同分析视角的并行子
+agent，再通过「一致性模式」综合。
 
 ```
-Use your deepthink skill to think through [question]
+用你的 deepthink skill 想清楚 [问题]
 ```
 
-For explicit mode selection:
+要显式指定模式：
 
 ```
-Use your deepthink skill (quick) to [question]
-Use your deepthink skill (full) to [question]
+用你的 deepthink skill（quick）来 [问题]
+用你的 deepthink skill（full）来 [问题]
 ```
 
 ### Refactor
 
-LLM-generated code accumulates technical debt. The LLM does not see duplication
-across files or notice god functions growing.
+LLM 生成的代码会积累技术债。LLM 看不到跨文件的重复，也注意不到巨型函数正在膨胀。
 
-The refactor skill explores multiple dimensions in parallel -- naming,
-extraction, types, errors, modules, architecture, abstraction -- validates
-findings against evidence, and outputs prioritized recommendations. It does not
-generate code; it tells you what to fix and why.
+refactor skill 在多个维度上并行探索——命名、提取、类型、错误处理、模块、架构、抽象
+——根据证据验证发现，再输出按优先级排序的建议。它不生成代码；它告诉你该修什么、为
+什么。
 
-Use it when:
+适用场景：
 
-- After LLM-generated features work but feel messy
-- Before major changes to identify friction points
-- Code review reveals structural issues
-- Simple changes require touching many files
+- LLM 生成的功能能跑、但感觉乱的时候
+- 重大改动之前，识别摩擦点
+- code review 暴露出结构性问题时
+- 简单改动却要动很多文件时
 
 ```
-Use your refactor skill on src/services/
+用你的 refactor skill 处理 src/services/
 ```
 
-With focus area:
+带聚焦方向：
 
 ```
-Use your refactor skill on src/ -- focus on refactoring the rendering engine so that it can be reused in multiple components.
+用你的 refactor skill 处理 src/ —— 聚焦于重构渲染引擎，使它能在多个组件中复用。
 ```
 
 ### Prompt Engineer
 
-This workflow consists entirely of prompts. Each can be optimized individually.
+这套工作流完全由 prompt 构成。每一个都可以单独优化。
 
-The skill analyzes prompts, proposes changes with explicit pattern attribution,
-and waits for your approval before applying anything.
+这个 skill 分析 prompt、提出改动并明确标注所依据的模式，在应用任何改动前等待你批
+准。
 
-Use it when:
+适用场景：
 
-- A sub-agent definition is not performing as expected
-- Optimizing a skill's Python script prompts
-- Reviewing a multi-prompt workflow for consistency
+- 某个子 agent 定义表现不如预期
+- 优化某个 skill 的 Python 脚本 prompt
+- 审查多 prompt 工作流的一致性
 
 ```
-Use your prompt engineer skill to optimize the system prompt for agents/developer.md
+用你的 prompt engineer skill 优化 agents/developer.md 的系统 prompt
 ```
 
-The skill was optimized using itself.
+这个 skill 是用它自己优化出来的。
 
 ### Doc Sync
 
-The CLAUDE.md/README.md hierarchy requires maintenance. The structure changes
-over time. Documentation drifts.
+CLAUDE.md/README.md 这套层级需要维护。结构会随时间变化，文档会漂移。
 
-The doc-sync skill audits and synchronizes documentation across a repository.
+doc-sync skill 审计并同步整个 repo 的文档。
 
-Use it when:
+适用场景：
 
-- Bootstrapping the workflow on an existing repository
-- After major refactors or directory restructuring
-- Periodic audits to check for documentation drift
+- 在已有 repo 上初次引入这套工作流
+- 重大重构或目录重组之后
+- 定期审计，检查文档漂移
 
-If you use the planning workflow consistently, the technical writer agent
-handles documentation as part of execution. Doc-sync is primarily for
-bootstrapping or recovery.
+如果你一直在用规划工作流，technical-writer agent 会把文档作为执行的一部分处理掉。
+doc-sync 主要用于初次引入或事后补救。
 
 ```
-Use your doc-sync skill to synchronize documentation across this repository
+用你的 doc-sync skill 同步整个 repo 的文档
 ```
 
-For targeted updates:
+要做定向更新：
 
 ```
-Use your doc-sync skill to update documentation in src/validators/
+用你的 doc-sync skill 更新 src/validators/ 里的文档
 ```

@@ -1,15 +1,15 @@
 # qr/
 
-Quality Review modules with QA state tracking integration.
+带 QA 状态追踪集成的 Quality Review 模块。
 
-## Files
+## 文件
 
-| File                   | What                                              | When to read                                      |
+| 文件                   | 内容                                              | 何时阅读                                      |
 | ---------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| `README.md`            | QR architecture, QA integration, design decisions | Understanding QR workflow, QA state tracking      |
-| `plan_completeness.py` | Plan structure and milestone validation           | Modifying plan completeness review                |
-| `plan_code.py`         | Code diff review and quality checks               | Modifying code review logic                       |
-| `plan_docs.py`         | Documentation completeness validation             | Modifying documentation review                    |
-| `post_impl_code.py`    | Post-implementation code validation               | Modifying post-implementation code review         |
-| `post_impl_doc.py`     | Post-implementation documentation review          | Modifying post-implementation documentation check |
-| `reconciliation.py`    | Plan vs implementation reconciliation             | Modifying reconciliation logic                    |
+| `README.md`            | QR 架构、QA 集成、设计决策 | 理解 QR 工作流、QA 状态追踪时      |
+| `plan_completeness.py` | 计划结构与 milestone 验证           | 修改计划完整性审查时                |
+| `plan_code.py`         | 代码 diff 审查与质量检查               | 修改代码审查逻辑时                  |
+| `plan_docs.py`         | 文档完整性验证                | 修改文档审查时                    |
+| `post_impl_code.py`    | 实现后代码验证               | 修改实现后代码审查时         |
+| `post_impl_doc.py`     | 实现后文档审查          | 修改实现后文档检查时 |
+| `reconciliation.py`    | 计划与实现的对账             | 修改对账逻辑时                    |

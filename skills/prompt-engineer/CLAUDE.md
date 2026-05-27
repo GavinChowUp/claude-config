@@ -1,17 +1,17 @@
 # prompt-engineer/
 
-Prompt optimization skill. IMMEDIATELY invoke the script -- do NOT explore or analyze first.
+Prompt 优化 skill。**立即**调用脚本——不要先探索或分析。
 
-## Files
+## 文件
 
-| File        | What             | When to read         |
+| 文件        | 内容             | 何时阅读             |
 | ----------- | ---------------- | -------------------- |
-| `SKILL.md`  | Skill invocation | Using this skill     |
-| `README.md` | Architecture     | Understanding design |
+| `SKILL.md`  | Skill 调用方式   | 使用本 skill 时      |
+| `README.md` | 架构设计         | 理解设计思路时       |
 
-## Subdirectories
+## 子目录
 
-| Directory     | What                          | When to read                |
+| 目录          | 内容                          | 何时阅读                    |
 | ------------- | ----------------------------- | --------------------------- |
-| `papers/`     | Source papers by category     | Verifying technique origins |
-| `references/` | Prompt engineering techniques | Script instructs            |
+| `papers/`     | 按类别分类的原始论文           | 验证技术来源时              |
+| `references/` | Prompt 工程技术参考            | 脚本有指示时                |

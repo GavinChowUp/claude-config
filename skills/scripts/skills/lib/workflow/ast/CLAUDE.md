@@ -1,54 +1,54 @@
 # ast/
 
-Simplified AST module for workflow XML generation.
+用于工作流 XML 生成的简化 AST 模块。
 
-## Files
+## 文件
 
-| File                   | What                                             | When to read                    |
+| 文件                   | 内容                                             | 何时阅读                    |
 | ---------------------- | ------------------------------------------------ | ------------------------------- |
-| `nodes.py`             | Node types (TextNode, CodeNode, ElementNode)     | Understanding node structure    |
-| `builder.py`           | Fluent builder API (W.el())                      | Constructing AST nodes          |
-| `renderer.py`          | XMLRenderer and render() function                | Rendering AST to XML output     |
-| `dispatch.py`          | Dispatch node types (Subagent, Template, Roster) | Subagent orchestration patterns |
-| `dispatch_renderer.py` | Render functions for dispatch nodes              | Rendering dispatch XML          |
-| `__init__.py`          | Public API exports                               | Importing AST types             |
+| `nodes.py`             | 节点类型（TextNode、CodeNode、ElementNode）     | 理解节点结构    |
+| `builder.py`           | 流式构建器 API（W.el()）                      | 构造 AST 节点          |
+| `renderer.py`          | XMLRenderer 与 render() 函数                | 将 AST 渲染为 XML 输出     |
+| `dispatch.py`          | 派发节点类型（Subagent、Template、Roster） | 子 agent 编排模式 |
+| `dispatch_renderer.py` | 派发节点的渲染函数              | 渲染派发 XML          |
+| `__init__.py`          | 公共 API 导出                               | 导入 AST 类型             |
 
-## Usage
+## 使用方式
 
 ```python
 from skills.lib.workflow.ast import W, render, XMLRenderer, TextNode
 
-# Build step header
+# 构建步骤标头
 doc = W.el("step_header", TextNode("Title"),
            script="myskill", step="1", total="5").build()
 output = render(doc, XMLRenderer())
 
-# Build current_action block
+# 构建 current_action 块
 action_nodes = [TextNode(a) for a in actions]
 doc = W.el("current_action", *action_nodes).build()
 
-# Build invoke_after
+# 构建 invoke_after
 doc = W.el("invoke_after", TextNode(next_command)).build()
 ```
 
-## Node Types
+## 节点类型
 
-| Type          | Purpose                           |
+| 类型          | 用途                           |
 | ------------- | --------------------------------- |
-| `TextNode`    | Plain text content                |
-| `CodeNode`    | Code block with optional language |
-| `ElementNode` | Generic XML element (via W.el())  |
+| `TextNode`    | 纯文本内容                |
+| `CodeNode`    | 代码块，可选语言 |
+| `ElementNode` | 通用 XML 元素（通过 W.el()）  |
 
-All specialized nodes (HeaderNode, ActionsNode, etc.) were removed. Skills use
-`W.el("tag_name", ...)` for all XML generation.
+所有专用节点（HeaderNode、ActionsNode 等）已移除。skill 统一使用
+`W.el("tag_name", ...)` 生成 XML。
 
-## Dispatch Node Types
+## 派发节点类型
 
-| Type                   | Pattern | Use case                                     |
+| 类型                   | 模式 | 使用场景                                     |
 | ---------------------- | ------- | -------------------------------------------- |
-| `SubagentDispatchNode` | Single  | Sequential workflows (plan -> dev -> QR)     |
-| `TemplateDispatchNode` | SIMD    | Same template, N targets ($var substitution) |
-| `RosterDispatchNode`   | MIMD    | Shared context, unique prompts per agent     |
+| `SubagentDispatchNode` | 单一  | 顺序工作流（plan -> dev -> QR）     |
+| `TemplateDispatchNode` | SIMD    | 同一模板对 N 个目标（$var 替换） |
+| `RosterDispatchNode`   | MIMD    | 共享上下文，每个 agent 有各自的 prompt     |
 
 ```python
 from skills.lib.workflow.ast import (
@@ -56,7 +56,7 @@ from skills.lib.workflow.ast import (
     RosterDispatchNode, render_roster_dispatch,
 )
 
-# Template dispatch: $var substituted per-target
+# 模板派发：$var 按目标替换
 node = TemplateDispatchNode(
     agent_type="general-purpose",
     template="Explore $category in $mode mode",
@@ -66,7 +66,7 @@ node = TemplateDispatchNode(
 )
 xml = render_template_dispatch(node)
 
-# Roster dispatch: unique prompts, fixed command
+# Roster 派发：各自的 prompt，固定命令
 node = RosterDispatchNode(
     agent_type="general-purpose",
     shared_context="Background...",

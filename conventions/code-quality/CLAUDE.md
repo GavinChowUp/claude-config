@@ -1,24 +1,24 @@
 # code-quality/
 
-Code quality checks for LLM-assisted development, organized by cognitive mode.
+面向 LLM 辅助开发的代码质量检查，按认知模式分类组织。
 
-## Files
+## 文件
 
-| File                               | What                                               | When to read                                                     |
-| ---------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| `README.md`                        | Format rationale, integration, invisible knowledge | Understanding document format, modifying categories              |
-| `01-naming-and-types.md`           | Names and types expressing intent                  | Understanding naming, domain modeling, type design               |
-| `02-structure-and-composition.md`  | Code structure and composition                     | Understanding function composition, control flow, error handling |
-| `03-patterns-and-idioms.md`        | Idiomatic patterns                                 | Understanding expression patterns, modern idioms, dead code      |
-| `04-repetition-and-consistency.md` | DRY and consistency                                | Understanding duplication, validation, business rules            |
-| `05-documentation-and-tests.md`    | Documentation and tests                            | Understanding docs, tests, schema coherence                      |
-| `06-module-and-dependencies.md`    | Module boundaries                                  | Understanding module structure, architecture                     |
-| `07-cross-file-consistency.md`     | Cross-file consistency                             | Understanding interface, naming, error consistency               |
-| `08-codebase-patterns.md`          | Codebase-wide patterns                             | Understanding comprehension, abstraction opportunities           |
+| 文件                               | 内容                                               | 何时阅读                                                   |
+| ---------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| `README.md`                        | 格式设计原理、集成方式、隐性知识说明               | 理解文档格式、修改分类时                                   |
+| `01-naming-and-types.md`           | 名称与类型的意图表达                               | 理解命名、领域建模、类型设计时                             |
+| `02-structure-and-composition.md`  | 代码结构与组合                                     | 理解函数组合、控制流、错误处理时                           |
+| `03-patterns-and-idioms.md`        | 惯用模式                                           | 理解表达式模式、现代语言惯用法、死代码时                   |
+| `04-repetition-and-consistency.md` | DRY 原则与一致性                                   | 理解代码重复、验证逻辑、业务规则时                         |
+| `05-documentation-and-tests.md`    | 文档与测试                                         | 理解文档规范、测试规范、schema 一致性时                    |
+| `06-module-and-dependencies.md`    | 模块边界                                           | 理解模块结构、架构设计时                                   |
+| `07-cross-file-consistency.md`     | 跨文件一致性                                       | 理解接口、命名、错误处理的跨文件一致性时                   |
+| `08-codebase-patterns.md`          | 全代码库模式                                       | 理解可理解性、抽象机会时                                   |
 
-## Applicability Quick Reference
+## 适用性速查表
 
-| Document                      | Design Review | Diff Review | Codebase Review | Refactor Design | Refactor Code |
+| 文档                          | Design Review | Diff Review | Codebase Review | Refactor Design | Refactor Code |
 | ----------------------------- | :-----------: | :---------: | :-------------: | :-------------: | :-----------: |
 | 01-naming-and-types           |      Yes      |     Yes     |       Yes       |       Yes       |      Yes      |
 | 02-structure-and-composition  |      Yes      |     Yes     |       Yes       |       Yes       |      Yes      |

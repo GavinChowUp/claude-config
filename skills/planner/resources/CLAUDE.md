@@ -1,11 +1,11 @@
 # resources/
 
-Planner-specific templates injected by scripts at runtime.
+规划器专用模板,由脚本在运行时注入。
 
-## Files
+## 文件
 
-| File                       | What                          | When to read                   |
+| 文件                       | 内容                          | 何时阅读                       |
 | -------------------------- | ----------------------------- | ------------------------------ |
-| `plan-format.md`           | Plan structure template       | Editing plan structure         |
-| `explore-output-format.md` | XML schema for explore output | Modifying exploration workflow |
-| `README.md`                | Loading mechanism             | Understanding resource loading |
+| `plan-format.md`           | 计划结构模板                  | 编辑计划结构时                 |
+| `explore-output-format.md` | 探索输出的 XML schema          | 修改探索工作流时               |
+| `README.md`                | 加载机制                      | 理解资源加载时                 |

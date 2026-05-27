@@ -1,59 +1,51 @@
 # Decision Critic
 
-Here's the problem: LLMs are sycophants. They agree with you. They validate your
-reasoning. They tell you your architectural decision is sound and well-reasoned.
-That's not what you need for important decisions -- you need stress-testing.
+问题在于:LLM 天生是奉承者。它们会同意你的观点、为你的推理背书、告诉你架构决策是合理且有据可查的。但这不是重要决策所需要的——你需要的是压力测试。
 
-The decision-critic skill forces structured adversarial analysis:
+decision-critic skill 强制执行结构化的对抗性分析:
 
-| Phase         | Actions                                                                    |
+| 阶段          | 动作                                                                       |
 | ------------- | -------------------------------------------------------------------------- |
-| Decomposition | Extract claims, assumptions, constraints; assign IDs; classify each        |
-| Verification  | Generate questions for verifiable items; answer independently; mark status |
-| Challenge     | Steel-man argument against; explore alternative framings                   |
-| Synthesis     | Verdict (STAND/REVISE/ESCALATE); summary and recommendation                |
+| 分解          | 提取主张、假设、约束条件;分配 ID;对每项分类                              |
+| 验证          | 为可验证项生成问题;独立作答;标记状态                                      |
+| 挑战          | 构建反方最强论点(steel-man);探索替代框架                                 |
+| 综合          | 裁决(STAND/REVISE/ESCALATE);提供摘要和建议                               |
 
-## When to Use
+## 适用场景
 
-Use this for decisions where you actually want criticism, not agreement:
+当你真正需要批评而非认同时使用:
 
-- Architectural choices with long-term consequences
-- Technology selection (language, framework, database)
-- Tradeoffs between competing concerns (performance vs. maintainability)
-- Decisions you're uncertain about and want stress-tested
+- 具有长期影响的架构选择
+- 技术选型(语言、框架、数据库)
+- 竞争性关切之间的权衡(性能 vs 可维护性)
+- 你不确定、希望经受压力测试的决策
 
-## Example Usage
+## 使用示例
 
 ```
-I'm considering using Redis for our session storage instead of PostgreSQL.
-My reasoning:
+我在考虑用 Redis 替代 PostgreSQL 来存储 session。
+我的理由:
 
-- Redis is faster for key-value lookups
-- Sessions are ephemeral, don't need ACID guarantees
-- We already have Redis for caching
+- Redis 的 key-value 查询更快
+- Session 是临时性的,不需要 ACID 保证
+- 我们已经用 Redis 做缓存了
 
-Use your decision critic skill to stress-test this decision.
+用你的 decision critic skill 对这个决策进行压力测试。
 ```
 
-So what happens? The skill:
+会发生什么?此 skill 将:
 
-1. **Decomposes** the decision into claims (C1: Redis is faster), assumptions
-   (A1: sessions don't need durability), constraints (K1: Redis already
-   deployed)
-2. **Verifies** each claim -- is Redis actually faster for your access pattern?
-   What's the actual latency difference?
-3. **Challenges** -- what if sessions DO need durability (shopping carts)?
-   What's the operational cost of Redis failures?
-4. **Synthesizes** -- verdict with specific failed/uncertain items
+1. **分解**决策为主张(C1: Redis 更快)、假设(A1: session 不需要持久化)、约束条件(K1: Redis 已部署)
+2. **验证**每项主张——Redis 对你的访问模式真的更快吗?实际延迟差异是多少?
+3. **挑战**——如果 session 确实需要持久化(购物车)?Redis 故障的运维成本是什么?
+4. **综合**——给出包含具体失败/不确定项的裁决
 
-## The Anti-Sycophancy Design
+## 反奉承设计
 
-I grounded this skill in three techniques:
+此 skill 基于三种技术构建:
 
-- **Chain-of-Verification** -- factored verification prevents confirmation bias
-  by answering questions independently
-- **Self-Consistency** -- multiple reasoning paths reveal disagreement
-- **Multi-Expert Prompting** -- diverse perspectives catch blind spots
+- **Chain-of-Verification**——分解验证通过独立作答防止确认偏差
+- **Self-Consistency**——多条推理路径揭示分歧之处
+- **Multi-Expert Prompting**——多元视角捕捉盲点
 
-The structure forces the LLM through adversarial phases rather than allowing it
-to immediately agree with your reasoning. That's the whole point.
+这种结构迫使 LLM 经历对抗性阶段,而非立即认同你的推理。这正是其全部意义所在。

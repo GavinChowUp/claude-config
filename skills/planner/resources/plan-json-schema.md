@@ -1,8 +1,8 @@
 # Plan JSON Schema v2
 
-JSON-IR-first architecture. `plan.json` remains authoritative until TW phase translates to Markdown.
+JSON-IR 优先架构。`plan.json` 保持权威地位,直到 TW 阶段将其转译为 Markdown。
 
-## Schema Overview
+## Schema 概览
 
 ```
 plan.json
@@ -36,7 +36,7 @@ plan.json
 
 ## Decision Log Entry
 
-Architect populates. Multi-step reasoning required.
+由 Architect 填充。需要多步推理链。
 
 ```json
 {
@@ -47,13 +47,13 @@ Architect populates. Multi-step reasoning required.
 }
 ```
 
-ID format: `DL-###` (sequential)
+ID 格式:`DL-###`(顺序递增)
 
 ---
 
 ## Rejected Alternative
 
-Link to decision that led to rejection.
+关联到导致拒绝该方案的决策。
 
 ```json
 {
@@ -95,7 +95,7 @@ Link to decision that led to rejection.
 
 ## Invisible Knowledge
 
-Knowledge that should transfer to future LLM sessions.
+应传递到未来 LLM 会话的知识。
 
 ```json
 {
@@ -158,7 +158,7 @@ Knowledge that should transfer to future LLM sessions.
 
 ## Code Intent
 
-Architect populates. Describes WHAT, not HOW.
+由 Architect 填充。描述「做什么」,不描述「怎么做」。
 
 ```json
 {
@@ -177,13 +177,13 @@ Architect populates. Describes WHAT, not HOW.
 }
 ```
 
-ID format: `CI-{milestone_id}-###`
+ID 格式:`CI-{milestone_id}-###`
 
 ---
 
 ## Code Change
 
-Developer populates. Implements a Code Intent.
+由 Developer 填充。实现一个 Code Intent。
 
 ```json
 {
@@ -205,15 +205,15 @@ Developer populates. Implements a Code Intent.
 }
 ```
 
-ID format: `CC-{milestone_id}-###`
+ID 格式:`CC-{milestone_id}-###`
 
-CRITICAL: `intent_ref` MUST reference existing `code_intent.id`
+关键:`intent_ref` 必须引用现有的 `code_intent.id`
 
 ---
 
 ## Documentation
 
-TW populates after code changes.
+由 TW 在代码变更后填充。
 
 ```json
 {
@@ -259,44 +259,44 @@ TW populates after code changes.
 
 ---
 
-## Validation Rules
+## 验证规则
 
-### Reference Integrity
+### 引用完整性
 
-1. `code_change.intent_ref` must point to existing `code_intent.id` in same milestone
-2. `why_comment.decision_ref` must point to existing `decision_log.id`
-3. `code_intent.decision_refs[]` must point to existing `decision_log.id`
-4. `rejected_alternative.decision_ref` must point to existing `decision_log.id`
-5. `known_risk.decision_ref` must point to existing `decision_log.id`
-6. `inline_comment.decision_ref` must point to existing `decision_log.id`
+1. `code_change.intent_ref` 必须指向同一里程碑中现有的 `code_intent.id`
+2. `why_comment.decision_ref` 必须指向现有的 `decision_log.id`
+3. `code_intent.decision_refs[]` 必须指向现有的 `decision_log.id`
+4. `rejected_alternative.decision_ref` 必须指向现有的 `decision_log.id`
+5. `known_risk.decision_ref` 必须指向现有的 `decision_log.id`
+6. `inline_comment.decision_ref` 必须指向现有的 `decision_log.id`
 
-### Phase Completeness
+### 阶段完整性
 
-**plan-design** (Architect):
+**plan-design(Architect)**:
 
-- `overview.title` required
-- `overview.problem` required
-- At least one milestone
-- Each milestone has at least one `code_intent`
+- `overview.title` 必填
+- `overview.problem` 必填
+- 至少一个里程碑
+- 每个里程碑至少有一个 `code_intent`
 
-**plan-code** (Developer):
+**plan-code(Developer)**:
 
-- Every `code_intent` has matching `code_change` with valid `intent_ref`
+- 每个 `code_intent` 有匹配的 `code_change`,且 `intent_ref` 有效
 
-**plan-docs** (TW):
+**plan-docs(TW)**:
 
-- Documentation populated where needed
+- 必要位置已填充文档
 
 ---
 
-## Temporal Contamination
+## 时态污染
 
-All string fields must avoid:
+所有字符串字段必须避免:
 
-1. **Change-relative**: "will be added", "new function", "modified to"
-2. **Baseline reference**: "original", "existing", "current"
-3. **Location directive**: "see below", "above section"
-4. **Planning artifact**: "TODO", "FIXME", "implement later"
-5. **Intent leakage**: "should", "needs to", "must be implemented"
+1. **变更相对时态**:"will be added"、"new function"、"modified to"
+2. **基线引用**:"original"、"existing"、"current"
+3. **位置指令**:"see below"、"above section"
+4. **规划产物**:"TODO"、"FIXME"、"implement later"
+5. **意图泄露**:"should"、"needs to"、"must be implemented"
 
-Write as if code already exists in final state.
+写作时假设代码已以最终状态存在。

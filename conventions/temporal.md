@@ -1,36 +1,22 @@
 # Temporal Contamination in Code Comments
 
-This document defines terminology for identifying comments that leak information
-about code history, change processes, or planning artifacts. Both
-@agent-technical-writer and @agent-quality-reviewer reference this
-specification.
+本文档定义了识别泄露代码历史、变更过程或规划制品信息的注释所用术语。@agent-technical-writer 和 @agent-quality-reviewer 均参考本规范。
 
 ## The Core Principle
 
-> **Timeless Present Rule**: Comments must be written from the perspective of a
-> reader encountering the code for the first time, with no knowledge of what
-> came before or how it got here. The code simply _is_.
+> **永恒现在时规则**：注释必须从一个首次接触代码、对其前身或演变一无所知的读者角度来编写。代码就是**存在**的。
 
-**Why this matters**: Change-narrative comments are an LLM artifact -- a
-category error, not merely a style issue. The change process is ephemeral and
-irrelevant to the code's ongoing existence. Humans writing comments naturally
-describe what code IS, not what they DID to create it. Referencing the change
-that created a comment is fundamentally confused about what belongs in
-documentation.
+**为什么这很重要**：变更叙事注释是 LLM 的产物——一种范畴错误，不只是风格问题。变更过程是短暂的，与代码的持续存在无关。人类自然描述代码**是什么**，而非他们**做了什么**来创建它。引用创建注释的变更，从根本上就混淆了文档应该记录什么。
 
-Think of it this way: a novel's narrator never describes the author's typing
-process. Similarly, code comments should never describe the developer's editing
-process. The code simply exists; the path to its existence is invisible.
+这样想：小说的叙述者从不描述作者的打字过程。同理，代码注释也不应描述开发者的编辑过程。代码就存在在那里；它如何到达那里是不可见的。
 
-In a plan, this means comments are written _as if the plan was already
-executed_.
+在计划中，这意味着注释**如同计划已经执行完毕**一样来编写。
 
 ## Detection Heuristic
 
-Evaluate each comment against these five questions. Signal words are examples --
-extrapolate to semantically similar constructs.
+对照以下五个问题评估每条注释。信号词只是示例——请举一反三，推断语义上类似的结构。
 
-### 1. Does it describe an action taken rather than what exists?
+### 1. 描述的是采取的行动，而非当前存在的内容？
 
 **Category**: Change-relative
 
@@ -40,10 +26,9 @@ extrapolate to semantically similar constructs.
 | `// New validation for the edge case`  | `// Rejects negative values (downstream assumes unsigned)`  |
 | `// Changed to use batch API`          | `// Batch API reduces round-trips from N to 1`              |
 
-Signal words (non-exhaustive): "Added", "Replaced", "Now uses", "Changed to",
-"New", "Updated", "Refactored"
+信号词（非穷举）：「Added」、「Replaced」、「Now uses」、「Changed to」、「New」、「Updated」、「Refactored」
 
-### 2. Does it compare to something not in the code?
+### 2. 与代码中不存在的内容进行比较？
 
 **Category**: Baseline reference
 
@@ -53,40 +38,37 @@ Signal words (non-exhaustive): "Added", "Replaced", "Now uses", "Changed to",
 | `// Unlike the old approach, this is thread-safe` | `// Thread-safe: each goroutine gets independent state`             |
 | `// Previously handled in caller`                 | `// Encapsulated here; caller should not manage lifecycle`          |
 
-Signal words (non-exhaustive): "Instead of", "Rather than", "Previously",
-"Replaces", "Unlike the old", "No longer"
+信号词（非穷举）：「Instead of」、「Rather than」、「Previously」、「Replaces」、「Unlike the old」、「No longer」
 
-### 3. Does it describe where to put code rather than what code does?
+### 3. 描述代码放在哪里，而非代码做什么？
 
 **Category**: Location directive
 
 | Contaminated                  | Timeless Present                              |
 | ----------------------------- | --------------------------------------------- |
-| `// After the SendAsync call` | _(delete -- diff structure encodes location)_ |
-| `// Insert before validation` | _(delete -- diff structure encodes location)_ |
-| `// Add this at line 425`     | _(delete -- diff structure encodes location)_ |
+| `// After the SendAsync call` | _(删除——diff 结构已编码位置)_                 |
+| `// Insert before validation` | _(删除——diff 结构已编码位置)_                 |
+| `// Add this at line 425`     | _(删除——diff 结构已编码位置)_                 |
 
-Signal words (non-exhaustive): "After", "Before", "Insert", "At line", "Here:",
-"Below", "Above"
+信号词（非穷举）：「After」、「Before」、「Insert」、「At line」、「Here:」、「Below」、「Above」
 
-**Action**: Always delete. Location is encoded in diff structure, not comments.
+**处理**：始终删除。位置已编码在 diff 结构中，不在注释里。
 
-### 4. Does it describe intent rather than behavior?
+### 4. 描述的是意图，而非行为？
 
 **Category**: Planning artifact
 
 | Contaminated                           | Timeless Present                                         |
 | -------------------------------------- | -------------------------------------------------------- |
-| `// TODO: add retry logic later`       | _(delete, or implement retry now)_                       |
-| `// Will be extended for batch mode`   | _(delete -- do not document hypothetical futures)_       |
+| `// TODO: add retry logic later`       | _(删除，或立即实现 retry)_                               |
+| `// Will be extended for batch mode`   | _(删除——不记录假设性的未来)_                             |
 | `// Temporary workaround until API v2` | `// API v1 lacks filtering; client-side filter required` |
 
-Signal words (non-exhaustive): "Will", "TODO", "Planned", "Eventually", "For
-future", "Temporary", "Workaround until"
+信号词（非穷举）：「Will」、「TODO」、「Planned」、「Eventually」、「For future」、「Temporary」、「Workaround until」
 
-**Action**: Delete, implement the feature, or reframe as current constraint.
+**处理**：删除、实现该特性，或改写为当前约束。
 
-### 5. Does it describe the author's choice rather than code behavior?
+### 5. 描述的是作者的选择，而非代码行为？
 
 **Category**: Intent leakage
 
@@ -97,39 +79,32 @@ future", "Temporary", "Workaround until"
 | `// Chose polling for reliability`         | `// Polling: 30% webhook delivery failures observed` |
 | `// We decided to cache at this layer`     | `// Cache here: reduces DB round-trips for hot path` |
 
-Signal words (non-exhaustive): "intentionally", "deliberately", "chose",
-"decided", "on purpose", "by design", "we opted"
+信号词（非穷举）：「intentionally」、「deliberately」、「chose」、「decided」、「on purpose」、「by design」、「we opted」
 
-**Action**: Extract the technical justification; discard the decision narrative.
-The reader doesn't need to know someone "decided" -- they need to know WHY this
-approach works.
+**处理**：提取技术论证，丢弃决策叙事。读者不需要知道有人「决定了」——他们需要知道**为何**这种方案可行。
 
-**The test**: Can you delete the intent word and the comment still makes sense?
-If yes, delete the intent word. If no, reframe around the technical reason.
+**测试**：删去意图词后注释是否仍有意义？若有，删去意图词。若无，围绕技术原因重写。
 
 ---
 
-**Catch-all**: If a comment only makes sense to someone who knows the code's
-history, it is temporally contaminated -- even if it does not match any category
-above.
+**兜底原则**：如果一条注释只对了解代码历史的人才有意义，它就是时间污染——即使不符合上述任何分类。
 
 ## Subtle Cases
 
-Same word, different verdict -- demonstrates that detection requires semantic
-judgment, not keyword matching.
+相同词汇，不同判断——说明检测需要语义判断，而非关键词匹配。
 
-| Comment                                | Verdict      | Reasoning                                        |
-| -------------------------------------- | ------------ | ------------------------------------------------ |
-| `// Now handles edge cases properly`   | Contaminated | "properly" implies it was improper before        |
-| `// Now blocks until connection ready` | Clean        | "now" describes runtime moment, not code history |
-| `// Fixed the null pointer issue`      | Contaminated | Describes a fix, not behavior                    |
-| `// Returns null when key not found`   | Clean        | Describes behavior                               |
+| Comment                                | Verdict      | Reasoning                                          |
+| -------------------------------------- | ------------ | -------------------------------------------------- |
+| `// Now handles edge cases properly`   | Contaminated | 「properly」暗示之前是不正确的                     |
+| `// Now blocks until connection ready` | Clean        | 「now」描述运行时时刻，而非代码历史                |
+| `// Fixed the null pointer issue`      | Contaminated | 描述修复，而非行为                                 |
+| `// Returns null when key not found`   | Clean        | 描述行为                                           |
 
 ## The Transformation Pattern
 
-> **Extract the technical justification, discard the change narrative.**
+> **提取技术论证，丢弃变更叙事。**
 
-1. What useful info is buried? (problem, behavior)
-2. Reframe as timeless present
+1. 其中隐藏了什么有用信息？（问题、行为）
+2. 改写为永恒现在时
 
-Example: "Added mutex to fix race" -> "Mutex serializes concurrent access"
+示例：「Added mutex to fix race」→「Mutex serializes concurrent access」

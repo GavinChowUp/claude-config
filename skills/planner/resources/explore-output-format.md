@@ -1,7 +1,6 @@
-# Exploration Output Schema
+# 探索输出 Schema
 
-Structure exploration findings using this XML format. Each section maps to a
-specific planning consumer step.
+使用此 XML 格式组织探索发现。每个区段对应一个特定的规划消费步骤。
 
 ```xml
 <exploration_output task="[brief task description]">
@@ -69,28 +68,28 @@ specific planning consumer step.
 </exploration_output>
 ```
 
-## Section Guidelines
+## 区段说明
 
-### approach_inputs (~500 tokens)
+### approach_inputs(约 500 token)
 
-Include patterns and constraints that affect approach selection:
+包含影响方案选择的模式和约束:
 
-- How existing code handles similar concerns
-- Architectural constraints (dependencies, interfaces, conventions)
-- Complexity factors for different implementation strategies
+- 现有代码如何处理类似关注点
+- 架构约束(依赖关系、接口、约定)
+- 不同实现策略的复杂度因素
 
-### assumption_inputs (~500 tokens)
+### assumption_inputs(约 500 token)
 
-Include ambiguities and implicit policies:
+包含歧义和隐式策略:
 
-- Things that require user confirmation before proceeding
-- Policy defaults observed (timeouts, retries, error handling)
-- Architectural choices with multiple valid options
+- 推进前需要用户确认的事项
+- 观察到的策略默认值(超时、重试、错误处理)
+- 存在多个有效选项的架构决策
 
-### milestone_inputs (~500 tokens)
+### milestone_inputs(约 500 token)
 
-Include information for milestone planning:
+包含里程碑规划所需的信息:
 
-- Files to modify with their purposes and dependencies
-- Failure modes and risks to mitigate
-- Testable behaviors and existing test coverage
+- 需要修改的文件及其用途和依赖关系
+- 需要缓解的失败模式和风险
+- 可测试的行为以及现有测试覆盖情况

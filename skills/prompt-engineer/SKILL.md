@@ -1,33 +1,32 @@
 ---
 name: prompt-engineer
-description: Invoke IMMEDIATELY via python script when user requests prompt optimization. Do NOT analyze first - invoke this skill immediately.
+description: 当用户请求 prompt 优化时，立即通过 python 脚本调用。不要先分析——立即调用本 skill。
 ---
 
 # Prompt Engineer
 
-When this skill activates, IMMEDIATELY invoke the script. The script IS the
-workflow.
+当本 skill 激活时，**立即**调用脚本。脚本本身就是工作流。
 
-## Invocation
+## 调用方式
 
-Start with step 1 (triage) to determine scope:
+从步骤 1（分流）开始，确定范围：
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.prompt_engineer.optimize --step 1" />
 
-Then continue with determined scope:
+然后按确定的范围继续：
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.prompt_engineer.optimize --step 2 --scope <scope>" />
 
-| Argument  | Required | Description                                   |
+| 参数      | 是否必填 | 说明                                          |
 | --------- | -------- | --------------------------------------------- |
-| `--step`  | Yes      | Current step (1 = triage, 2-6 = workflow)     |
-| `--scope` | For 2+   | Required for steps 2-6. Determined by step 1. |
+| `--step`  | 是       | 当前步骤（1 = 分流，2-6 = 工作流）            |
+| `--scope` | 2+ 步必填 | 步骤 2-6 必填，由步骤 1 确定。               |
 
-### Scopes
+### 范围（Scopes）
 
-- **single-prompt**: One prompt file, general optimization
-- **ecosystem**: Multiple related prompts that interact
-- **greenfield**: No existing prompt, designing from requirements
-- **problem**: Existing prompt(s) with specific issue to fix
+- **single-prompt**：单个 prompt 文件，通用优化
+- **ecosystem**：多个相互关联的 prompt
+- **greenfield**：无现有 prompt，从需求开始设计
+- **problem**：现有 prompt 存在特定需修复的问题
 
-Do NOT analyze or explore first. Run the script and follow its output.
+不要先分析或探索。运行脚本，按输出指示操作。

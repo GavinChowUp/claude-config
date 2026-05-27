@@ -1,11 +1,11 @@
 # decision-critic/
 
-Decision stress-testing skill. IMMEDIATELY invoke the script -- do NOT analyze first.
+决策压力测试 skill。立即调用脚本——不要先分析。
 
-## Files
+## 文件
 
-| File                         | What              | When to read         |
+| 文件                         | 内容              | 何时阅读         |
 | ---------------------------- | ----------------- | -------------------- |
-| `SKILL.md`                   | Skill invocation  | Using this skill     |
-| `README.md`                  | Architecture      | Understanding design |
-| `scripts/decision-critic.py` | Complete workflow | Debugging behavior   |
+| `SKILL.md`                   | Skill 调用方式    | 使用此 skill 时     |
+| `README.md`                  | 架构设计          | 理解设计思路时       |
+| `scripts/decision-critic.py` | 完整工作流        | 调试行为时           |

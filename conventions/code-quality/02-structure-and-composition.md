@@ -2,41 +2,41 @@
 
 # Structure & Composition
 
-Evaluate whether code is well-structured for comprehension and change.
+评估代码结构是否有助于理解和变更。
 
-**The core question**: Can I understand this unit in isolation? Can I change it without understanding its dependents? Structure should reveal intent and isolate concerns.
+**核心问题**：我能独立理解这个单元吗？我能在不理解其依赖方的情况下修改它吗？结构应当揭示意图并隔离关注点。
 
-**What to look for**:
+**关注点**：
 
-- Functions doing multiple things (requires "and" to describe)
-- Deep nesting obscuring control flow
-- Implicit state machines hidden in boolean flags
-- Hard-coded dependencies making code untestable
-- Component definitions scattered across multiple locations
-- Error handling that loses information
+- 做多件事的函数（描述时需要「and」）
+- 深层嵌套模糊控制流
+- 隐藏在布尔标志中的隐式状态机
+- 使代码不可测试的硬编码依赖
+- 组件定义分散在多处
+- 丢失信息的错误处理
 
-**The threshold**: Flag when structure obscures intent or when changes would ripple unnecessarily. Length alone is not a smell; unclear responsibility is.
+**门槛**：当结构模糊意图，或变更会不必要地扩散时标记。长度本身不是问题；职责不清晰才是。
 
 <design-mode>
-When evaluating Code Intent (Design Review phase):
+评估代码意图时（Design Review 阶段）：
 
-- Does the proposed function do one thing or multiple things?
-- Does the intent describe clear responsibility boundaries?
-- Does the design inject dependencies or hardcode them?
-- Is the component's definition complete in one place, or scattered across locations?
+- 提出的函数是做一件事还是多件事？
+- 意图是否描述了清晰的职责边界？
+- 设计是注入依赖还是硬编码依赖？
+- 组件定义是在一处完整，还是分散在多处？
 
-Evidence format: Quote the Code Intent description showing structural issue.
+证据格式：引用代码意图描述，指出结构问题。
 </design-mode>
 
 <code-mode>
-When evaluating actual code (Diff Review, Codebase Review, Refactor):
+评估实际代码时（Diff Review、Codebase Review、Refactor）：
 
-- Is the function too long or deeply nested?
-- Are boolean flags creating implicit state machines?
-- Is error handling preserving context?
-- Are component definitions scattered (requirements in one place, validation in another)?
+- 函数是否过长或嵌套过深？
+- 布尔标志是否创建了隐式状态机？
+- 错误处理是否保留了上下文？
+- 组件定义是否分散（需求在一处，验证在另一处）？
 
-Evidence format: Quote code with file:line showing the issue.
+证据格式：引用代码（含 file:line），指出问题所在。
 </code-mode>
 
 ---
@@ -44,234 +44,234 @@ Evidence format: Quote code with file:line showing the issue.
 ## 1. Function Composition
 
 <principle>
-A function should do one thing that can be described in a single sentence. When description requires "and", the function likely needs splitting.
+函数应只做一件可以用单句描述的事。当描述需要「and」时，函数很可能需要拆分。
 </principle>
 
-Detect: Can I describe this function's purpose in one sentence without using "and"?
+Detect: 我能用一句话（不含「and」）描述这个函数的目的吗？
 
 <grep-hints>
-Structural indicators (starting points, not definitive):
-Functions >50 lines, parameter counts >4
+结构指示词（起点，非定论）：
+函数超过 50 行，参数数量超过 4
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Responsibility diffusion
 
-- God functions (multiple unrelated responsibilities)
-- Long parameter lists (4+ params signals missing concept)
-- Any function requiring multiple sentences to describe its purpose
+- 上帝函数（多个无关职责）
+- 长参数列表（4+ 个参数说明缺少概念）
+- 任何需要多句话来描述目的的函数
 
 [medium] Structural complexity
 
-- Deep nesting (3+ levels of conditionals)
-- Mixed abstraction levels (high-level orchestration mixed with low-level details)
+- 深层嵌套（3+ 层条件）
+- 混杂抽象层次（高层编排与低层细节混在一起）
 
 [low] Interface friction
 
-- Boolean parameters that fork behavior (consider splitting into two functions)
+- 分叉行为的布尔参数（考虑拆分为两个函数）
   </violations>
 
 <exceptions>
-Long functions that do one thing linearly (e.g., state machine, parser). Nesting depth from error handling.
+线性做一件事的长函数（如状态机、解析器）。源自错误处理的嵌套深度。
 </exceptions>
 
 <threshold>
-Flag when function has multiple unrelated responsibilities. Length alone is not a smell.
+当函数有多个无关职责时标记。长度本身不是问题。
 </threshold>
 
 ## 2. Control Flow Smells
 
 <principle>
-Control flow should reveal intent, not obscure it. When following execution requires significant mental effort, the structure needs simplification.
+控制流应揭示意图，而非隐藏它。当跟踪执行需要显著的脑力时，结构需要简化。
 </principle>
 
-Detect: Is the control flow harder to follow than necessary? Would a reader need to trace through multiple branches to understand behavior?
+Detect: 控制流是否比必要的更难跟踪？读者是否需要追踪多个分支才能理解行为？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-`elif.*elif.*elif`, `switch`, `case`, `? :.*? :`, ternary chains
+模式指示词（起点，非定论）：
+`elif.*elif.*elif`, `switch`, `case`, `? :.*? :`, 三元链
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Excessive branching
 
-- Long if/elif chains (5+ branches -> lookup table or strategy pattern)
-- Any branching structure that requires tracing to understand
+- 长 if/elif 链（5+ 个分支 → 查找表或策略模式）
+- 任何需要追踪才能理解的分支结构
 
 [medium] Obscured flow
 
-- Nested ternaries (2+ levels -> extract to named variables)
-- Early-return candidates buried in nested else branches
+- 嵌套三元（2+ 层 → 提取为命名变量）
+- 早返回候选埋藏在嵌套 else 分支中
 
 [low] Hidden complexity
 
-- Conditional assignment cascades
-- Implicit else branches hiding edge cases
+- 条件赋值级联
+- 隐藏边界情形的隐式 else 分支
   </violations>
 
 <exceptions>
-Exhaustive pattern matching. State machines with explicit states.
+穷举模式匹配。带显式状态的状态机。
 </exceptions>
 
 <threshold>
-Flag when control flow obscures intent. Explicit branching for documented cases is acceptable.
+当控制流模糊意图时标记。对已记录情况的显式分支是可以接受的。
 </threshold>
 
 ## 3. State and Flags
 
 <principle>
-Boolean flags that interact create implicit state machines. When understanding state requires tracking multiple flags, make the state machine explicit.
+相互作用的布尔标志创建隐式状态机。当理解状态需要追踪多个标志时，应将状态机显式化。
 </principle>
 
-Detect: Are boolean flags creating implicit state machines? Do flags interact in ways that require mental tracking?
+Detect: 布尔标志是否在创建隐式状态机？标志是否以需要精神追踪的方式相互作用？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-`is_.*=`, `has_.*=`, `_flag`, `_state`, multiple boolean assignments
+模式指示词（起点，非定论）：
+`is_.*=`, `has_.*=`, `_flag`, `_state`, 多个布尔赋值
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Implicit state machines
 
-- Boolean flag tangles (3+ flags interacting = implicit state machine)
-- Any flag interaction requiring mental state tracking
+- 布尔标志缠结（3+ 个标志相互作用 = 隐式状态机）
+- 任何标志交互需要精神状态追踪的情况
 
 [medium] Order dependencies
 
-- Stateful conditionals depending on mutation order
+- 依赖变更顺序的有状态条件
 
 [low] Defensive complexity
 
-- Defensive null chains (e.g., x and x.y and x.y.z -> optional chaining or null object)
+- 防御性空链（如 x and x.y and x.y.z → 可选链或空对象）
   </violations>
 
 <exceptions>
-Single boolean for simple on/off state. Builder pattern flags.
+用于简单开/关状态的单个布尔值。Builder 模式标志。
 </exceptions>
 
 <threshold>
-Flag when flags interact in ways that require mental state tracking. Independent flags are fine.
+当标志以需要精神状态追踪的方式相互作用时标记。独立标志是可以的。
 </threshold>
 
 ## 4. Dependency Injection
 
 <principle>
-Business logic should be testable without network, disk, or database. Hard-coded dependencies make code untestable and tightly coupled.
+业务逻辑应在不需要网络、磁盘或数据库的情况下可测试。硬编码依赖使代码不可测试且紧耦合。
 </principle>
 
-Detect: Can I test this function in isolation without mocking infrastructure? Are dependencies injected or hard-coded?
+Detect: 我能在不 mock 基础设施的情况下独立测试这个函数吗？依赖是注入的还是硬编码的？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
+模式指示词（起点，非定论）：
 `datetime.now`, `time.time`, `os.environ`, `open(`, `requests.`, `http.`
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Untestable coupling
 
-- Hard-coded dependencies (e.g., new Date() inline -> inject clock)
-- Global state access (avoid or inject)
-- Any business logic that requires infrastructure to test
+- 硬编码依赖（如 new Date() 内联 → 注入时钟）
+- 全局状态访问（避免或注入）
+- 任何需要基础设施才能测试的业务逻辑
 
 [medium] Mixed concerns
 
-- Side effects mixed with computation (separate pure logic from effects)
-- Concrete class dependencies (depend on interface, not implementation)
+- 副作用与计算混合（将纯逻辑与副作用分离）
+- 具体类依赖（依赖接口而非实现）
 
 [low] Configuration coupling
 
-- Environment coupling (reads env vars directly -> inject config)
-- Time-dependent logic (inject clock for testability)
+- 环境耦合（直接读取环境变量 → 注入配置）
+- 时间依赖逻辑（注入时钟以便测试）
   </violations>
 
 <exceptions>
-Entry points that wire dependencies. Test utilities. Scripts meant to run directly.
+组装依赖的入口点。测试工具。直接运行的脚本。
 </exceptions>
 
 <threshold>
-Flag when untestable code is in business logic. Infrastructure code at boundaries is expected to have dependencies.
+当不可测试的代码在业务逻辑中时标记。边界处的基础设施代码有依赖是正常的。
 </threshold>
 
 ## 5. Definition Locality
 
 <principle>
-A component's definition should be complete at a single site. When understanding what a component IS -- its identity, requirements, constraints, and behavior -- demands reading multiple locations, the definition is scattered.
+组件的定义应在单一位置完整呈现。当理解组件**是什么**——其标识、需求、约束和行为——需要阅读多处时，定义就是分散的。
 </principle>
 
-Detect: To understand what this component IS, how many locations must I read? If I change what this component requires, how many files must I edit?
+Detect: 要理解这个组件**是什么**，我需要阅读多少处？如果我修改该组件的需求，需要编辑多少文件？
 
 <grep-hints>
-Structural indicators (starting points, not definitive):
-Same requirement checked in 2+ locations, component identity split across files, extraction-with-default patterns (args.get, kwargs.get, getattr with default)
+结构指示词（起点，非定论）：
+同一需求在 2 处以上检查，组件标识跨文件分散，带默认值的提取模式（args.get, kwargs.get, getattr with default）
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Scattered specification
 
-- Same requirement declared in 2+ locations (e.g., parser marks required AND handler checks if missing)
-- Component identity split across files without clear ownership
-- Definition requiring "mental reassembly" from 3+ sources
+- 同一需求在 2 处以上声明（如解析器标记为必填 AND 处理器检查是否缺失）
+- 组件标识跨文件分散且无明确所有权
+- 需要从 3+ 个来源「精神重组」的定义
 
 [medium] Split declaration/enforcement
 
-- Interface declared at one site, validated at another without shared reference
-- Defaults defined separately from schema (e.g., type in schema, default in code)
-- Same constraint checked in multiple places
+- 接口在一处声明，在另一处验证，且无共享引用
+- 默认值与 schema 分开定义（如类型在 schema 中，默认值在代码中）
+- 同一约束在多处检查
   </violations>
 
 <exceptions>
-Dependency injection (injected collaborator's definition lives with collaborator, not here -- that's runtime wiring, not scatter). Composition (A uses B; B's definition is B's concern). Inheritance (intentional decomposition). Plugin architectures (clear ownership boundaries). Registry + reference patterns (define once, reference many times -- this is the fix, not a smell).
+依赖注入（注入协作者的定义在协作者处，不在这里——这是运行时组装，不是分散）。组合（A 使用 B；B 的定义是 B 的事）。继承（有意的分解）。插件架构（明确的所有权边界）。注册表 + 引用模式（定义一次，多处引用——这是修复方案，不是问题）。
 </exceptions>
 
 <threshold>
-Flag when a component's definition is split across 2+ locations without clear ownership. Key test: who owns this fact? If ownership is unclear or duplicated, it's scatter. Common in LLM-generated code.
+当组件定义在 2 处以上分散且无明确所有权时标记。关键测试：谁拥有这个事实？若所有权不清或重复，即为分散。LLM 生成的代码中常见。
 </threshold>
 
 ## 6. Error Handling
 
 <principle>
-Errors should preserve context and reach appropriate handlers. Swallowed or generic catches lose information; errors at wrong levels confuse callers.
+错误应保留上下文并到达适当的处理者。吞掉错误或使用通用 catch 会丢失信息；错误在错误抽象层出现会使调用方困惑。
 </principle>
 
-Detect: What happens if this operation fails? Is error information preserved and routed appropriately?
+Detect: 如果这个操作失败会怎样？错误信息是否被保留并正确路由？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
+模式指示词（起点，非定论）：
 `except:`, `catch (`, `catch(`, `pass`, `# TODO`, `raise Error(`
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Information loss
 
-- Swallowed exceptions (empty catch blocks)
-- Generic catches (e.g., catch Exception -> catch specific errors)
-- Any error handling that loses diagnostic information
+- 吞掉异常（空 catch 块）
+- 通用 catch（如 catch Exception → 捕获特定错误）
+- 任何丢失诊断信息的错误处理
 
 [medium] Wrong abstraction
 
-- Errors at wrong abstraction level (low-level errors leaking to callers)
+- 错误在错误的抽象层（低层错误泄露给调用方）
 
 [low] Missing context
 
-- raise Error('failed') -> raise Error(f'order {id}: {reason}')
+- raise Error('failed') → raise Error(f'order {id}: {reason}')
   </violations>
 
 <exceptions>
-Generic catch at top-level with logging. Intentionally swallowed expected errors with comment.
+顶层带日志记录的通用 catch。有注释说明的、故意吞掉的预期错误。
 </exceptions>
 
 <threshold>
-Flag when error handling obscures or loses information. Documented catch-all with logging is acceptable.
+当错误处理掩盖或丢失信息时标记。带日志记录的文档化 catch-all 是可以接受的。
 </threshold>

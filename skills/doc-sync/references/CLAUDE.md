@@ -1,9 +1,9 @@
 # references/
 
-Reference materials for doc-sync skill.
+doc-sync skill 的参考资料。
 
-## Files
+## 文件
 
-| File                  | What                            | When to read                               |
+| 文件                  | 内容                            | 何时阅读                               |
 | --------------------- | ------------------------------- | ------------------------------------------ |
-| `trigger-patterns.md` | Examples of good index triggers | Writing "When to read" column in CLAUDE.md |
+| `trigger-patterns.md` | 良好索引触发器示例 | 编写 CLAUDE.md 中「何时阅读」列时 |

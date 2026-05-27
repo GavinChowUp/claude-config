@@ -1,39 +1,39 @@
 # tests/
 
-Test suite for skills workflow framework.
+skill 工作流框架的测试套件。
 
-## Rules
+## 规则
 
-All tests must live in `tests/` and run through pytest. No test files elsewhere in the codebase.
+所有测试必须放在 `tests/` 目录下，并通过 pytest 运行。代码库其他位置不得放置测试文件。
 
-## Files
+## 文件
 
-| File                         | What                                                 | When to read                               |
+| 文件                         | 内容                                                 | 何时阅读                               |
 | ---------------------------- | ---------------------------------------------------- | ------------------------------------------ |
-| `README.md`                  | Test framework architecture, design decisions        | Understanding test design, modifying tests |
-| `conftest.py`                | Pytest configuration, fixtures, shared utilities     | Modifying test setup, adding fixtures      |
-| `test_workflow_import.py`    | Skill module import tests                            | Debugging import failures                  |
-| `test_workflow_structure.py` | Workflow structural validation tests                 | Debugging validation failures              |
-| `test_workflow_steps.py`     | Exhaustive parametrized tests for all workflow steps | Running workflow tests, debugging failures |
-| `test_domain_types.py`       | Unit tests for BoundedInt, ChoiceSet, Constant       | Testing domain type behavior               |
-| `test_generation.py`         | Schema extraction and input generation for tests     | Modifying test case generation             |
-| `test_ast.py`                | Property-based AST node and renderer tests           | Testing AST construction and rendering     |
+| `README.md`                  | 测试框架架构、设计决策        | 理解测试设计、修改测试时 |
+| `conftest.py`                | pytest 配置、fixture、共享工具函数     | 修改测试配置、添加 fixture 时      |
+| `test_workflow_import.py`    | skill 模块导入测试                            | 调试导入失败时                  |
+| `test_workflow_structure.py` | 工作流结构验证测试                 | 调试验证失败时              |
+| `test_workflow_steps.py`     | 所有工作流步骤的穷举参数化测试 | 运行工作流测试、调试失败时 |
+| `test_domain_types.py`       | BoundedInt、ChoiceSet、Constant 的单元测试   | 测试领域类型行为时               |
+| `test_generation.py`         | 测试用例的 schema 提取与输入生成     | 修改测试用例生成逻辑时              |
+| `test_ast.py`                | AST 节点与渲染器的基于属性的测试   | 测试 AST 构造与渲染时              |
 
-## Test Execution
+## 测试执行
 
 ```bash
-# Run all tests
+# 运行所有测试
 pytest tests/ -v
 
-# Run specific test file
+# 运行指定测试文件
 pytest tests/test_workflow_steps.py -v
 
-# Run tests for specific workflow
+# 运行指定工作流的测试
 pytest tests/ -k deepthink -v
 
-# Run import tests only
+# 仅运行导入测试
 pytest tests/test_workflow_import.py -v
 
-# Run structure validation tests only
+# 仅运行结构验证测试
 pytest tests/test_workflow_structure.py -v
 ```

@@ -1,13 +1,12 @@
 # Planner Resources
 
-## Overview
+## 概述
 
-Templates injected by planner scripts at runtime. Scripts load these via direct
-Path resolution, not through `get_resource()` from `shared/resources.py`.
+由 planner 脚本在运行时注入的模板。脚本通过直接 Path 解析加载这些文件,而非使用 `shared/resources.py` 中的 `get_resource()`。
 
-## Loading Mechanism
+## 加载机制
 
-Resources are loaded inline in each script that needs them:
+各脚本按需内联加载资源:
 
 ```python
 # planner.py:168
@@ -17,5 +16,4 @@ format_path = Path(__file__).parent.parent / "resources" / "plan-format.md"
 format_path = Path(__file__).parent.parent / "resources" / "explore-output-format.md"
 ```
 
-The `get_resource()` function in `shared/resources.py` exists but is unused for
-these files. Scripts prefer inline Path resolution for explicitness.
+`shared/resources.py` 中的 `get_resource()` 函数存在但对这些文件未使用。脚本更倾向于内联 Path 解析以保持显式性。

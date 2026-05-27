@@ -1,31 +1,31 @@
 ---
 name: refactor
-description: Invoke IMMEDIATELY via python script when user requests refactoring analysis, technical debt review, or code quality improvement. Do NOT explore first - the script orchestrates exploration.
+description: 当用户请求重构分析、技术债审查或代码质量改进时，立即通过 python 脚本调用。不要先探索——脚本会编排探索过程。
 ---
 
 # Refactor
 
-When this skill activates, IMMEDIATELY invoke the script. The script IS the workflow.
+当本 skill 激活时，**立即**调用脚本。脚本本身就是工作流。
 
-## Invocation
+## 调用方式
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.refactor.refactor --step 1 --n 10" />
 
-| Argument | Required | Description                                   |
+| 参数     | 是否必填 | 说明                                          |
 | -------- | -------- | --------------------------------------------- |
-| `--step` | Yes      | Current step (starts at 1)                    |
-| `--n`    | No       | Number of categories to explore (default: 10) |
+| `--step` | 是       | 当前步骤（从 1 开始）                         |
+| `--n`    | 否       | 要探索的类别数量（默认：10）                  |
 
-Do NOT explore or analyze first. Run the script and follow its output.
+不要先探索或分析。运行脚本，按输出指示操作。
 
-## Determining N (category count)
+## 确定 N（类别数量）
 
-Default: N = 10
+默认值：N = 10
 
-Adjust based on user request scope:
+根据用户请求的范围调整：
 
-- SMALL (single file, specific concern, "quick look"): N = 5
-- MEDIUM (directory, module, standard analysis): N = 10
-- LARGE (entire codebase, "thorough", "comprehensive"): N = 25
+- 小型（单个文件、特定关注点、「快速看一下」）：N = 5
+- 中型（目录、模块、标准分析）：N = 10
+- 大型（整个代码库、「彻底」、「全面」）：N = 25
 
-The script randomly selects N categories from the 38 available code quality categories defined in conventions/code-quality/.
+脚本从 conventions/code-quality/ 中定义的 38 个代码质量类别中随机选择 N 个类别。

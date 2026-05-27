@@ -1,525 +1,425 @@
-# Reasoning Elicitation Techniques
+# 推理引出技术
 
-## Overview
+## 概述
 
-Reasoning elicitation techniques prompt LLMs to generate explicit reasoning traces
-before producing answers. Use these techniques when models skip steps, produce
-incorrect answers on multi-step problems, or fail to show their work. The core
-insight: CoT-style prompting helps primarily on mathematical and symbolic
-reasoning tasks. Meta-analysis confirms substantial gains on tasks involving
-equations, formal logic, and multi-step arithmetic—questions containing "=" signs
-are strong indicators that CoT will help. For non-symbolic tasks (commonsense
-reasoning, factual QA), gains are minimal and CoT can even hurt performance.
-Apply selectively based on task type.
+推理引出技术通过提示 LLM 在给出答案之前生成显式的推理轨迹来改善模型表现。当模型跳过步骤、在多步骤问题上给出错误答案，或没有展示推理过程时，可使用这些技术。核心洞见：CoT 式 prompting 主要对数学和符号推理任务有帮助。元分析证实，在涉及方程、形式逻辑和多步骤算术的任务上有实质性收益——包含「=」号的问题是 CoT 会有帮助的强烈指示。对于非符号任务（常识推理、事实问答），收益微乎其微，CoT 甚至可能损害性能。应根据任务类型有选择地使用。
 
 ---
 
-## Techniques
+## 技术
 
-### Zero-Shot Chain of Thought
+### 零样本链式推理（Zero-Shot CoT）
 
-**Mechanism:** Appending "Let's think step by step" before answer extraction
-elicits step-by-step reasoning without examples.
+**机制：** 在答案提取之前追加「Let's think step by step」，无需示例即可引出逐步推理。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step arithmetic or symbolic reasoning problems
-- Tasks requiring complex logical deduction across multiple steps
-- Problems where standard zero-shot prompting produces flat scaling curves
-- System-2 reasoning tasks requiring slow, deliberate thinking
+- 多步骤算术或符号推理问题
+- 需要跨多步骤复杂逻辑推导的任务
+- 标准零样本 prompting 产出扁平缩放曲线的问题
+- 需要缓慢、深思熟虑思考的 System-2 推理任务
 
-**Tradeoffs:** 2x tokens, 2 calls (reasoning extraction + answer extraction).
-Requires large-scale LLM (100B+ parameters). Underperforms Few-shot-CoT but
-vastly outperforms standard zero-shot baselines. MultiArith 17.7% -> 78.7%,
-GSM8K 10.4% -> 40.7%.
+**权衡：** 2 倍 token，2 次调用（推理提取 + 答案提取）。需要大规模 LLM（100B+ 参数）。效果不如 Few-shot-CoT，但大幅优于标准零样本基线。MultiArith 17.7% -> 78.7%，GSM8K 10.4% -> 40.7%。
 
 ---
 
-### Chain-of-Thought (Meta-Analysis)
+### 链式推理（CoT）（元分析）
 
-**Mechanism:** Instructs model to generate step-by-step reasoning traces before
-answering, effective primarily for mathematical and symbolic tasks.
+**机制：** 指示模型在回答之前生成逐步推理轨迹，主要对数学和符号任务有效。
 
-**Triggers:**
+**触发条件：**
 
-- Problem requires mathematical computation or symbolic manipulation
-- Task involves formal logic or algorithmic reasoning
-- Question contains equations or numeric operations (presence of = sign)
-- Multi-step symbolic execution needed (tracking intermediate values)
-- Problem can be grounded in well-defined formal systems
+- 问题需要数学计算或符号操作
+- 任务涉及形式逻辑或算法推理
+- 问题包含方程或数值运算（含有「=」号）
+- 需要多步骤符号执行（追踪中间值）
+- 问题可以在明确定义的形式系统中得到验证
 
-**Tradeoffs:** 2-5x tokens, 1 call. Minimal benefit on non-symbolic tasks
-(commonsense, factual QA) -- can underperform direct answering. 95% of MMLU
-gains come from questions containing "=" sign. Use tool-augmented approaches
-(PAL, SatLM) for better symbolic execution.
+**权衡：** 2-5 倍 token，1 次调用。对非符号任务（常识、事实问答）收益微乎其微——可能不如直接回答。MMLU 95% 的收益来自包含「=」号的问题。对于更好的符号执行，使用工具增强方法（PAL、SatLM）。
 
 ---
 
-### Re-Reading (Re2)
+### 重复阅读（Re2）
 
-**Mechanism:** Repeat the input question twice to enable bidirectional
-understanding in decoder-only models.
+**机制：** 在解码器-only 模型中将输入问题重复两次，以实现双向理解。
 
-**Triggers:**
+**触发条件：**
 
-- Complex multi-step reasoning requiring deep comprehension
-- Questions where later context clarifies earlier tokens
-- Arithmetic and symbolic reasoning tasks
-- Problems where bidirectional understanding aids comprehension
-- Tasks benefiting from more computational resources on input encoding
+- 需要深度理解的复杂多步骤推理
+- 后面的上下文能澄清前面 token 含义的问题
+- 算术和符号推理任务
+- 双向理解有助于理解的问题
+- 受益于在输入编码上投入更多计算的任务
 
-**Tradeoffs:** 2x input tokens, 1 call. Minimal inference time increase due to
-GPU optimizations. Performance degrades beyond 2-3 repetitions. Composable with
-other techniques. Consistent improvements across 112 experiments in original
-study.
+**权衡：** 2 倍输入 token，1 次调用。由于 GPU 优化，推理时间增加微乎其微。超过 2-3 次重复后性能下降。可与其他技术组合。原始研究中 112 次实验持续改善。
 
 ---
 
-### Question Analysis Prompting (QAP)
+### 问题分析 Prompting（QAP）
 
-**Mechanism:** Prompt LLM to explain the question in n words before solving to
-maximize understanding.
+**机制：** 提示 LLM 在求解之前用 n 个词解释问题，以最大化理解。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step arithmetic or algebraic reasoning problems
-- SAT-level math problems requiring sophisticated problem-solving
-- Hard problems where baseline prompting fails
-- Tasks where understanding the question is critical to solution
+- 多步骤算术或代数推理问题
+- 需要复杂解题的 SAT 级别数学问题
+- 基础 prompting 失败的难题
+- 理解问题对解法至关重要的任务
 
-**Tradeoffs:** 1.5-3x tokens (scales with n: 25-200 words), 1 call. Parameter
-tuning required -- QAP150 best for algebra, QAP25 best for commonsense.
-Over-explanation hurts simple questions. Best on hard problems: AQuA 52.8% ->
-59.4%, SAT Math 70.9% -> 78.6%.
+**权衡：** 1.5-3 倍 token（随 n 变化：25-200 词），1 次调用。需要参数调优——QAP150 对代数最好，QAP25 对常识最好。过度解释会损害简单问题。对难题效果最好：AQuA 52.8% -> 59.4%，SAT Math 70.9% -> 78.6%。
 
 ---
 
 ### Step-Back Prompting
 
-**Mechanism:** Generate high-level step-back question before reasoning to
-retrieve abstract concepts and principles that guide solution.
+**机制：** 先生成高层次的「退一步」问题以检索抽象概念和原则，然后利用该抽象回答原始细节问题。
 
-**Triggers:**
+**触发条件：**
 
-- Complex multi-step reasoning with many low-level details
-- Domain-specific problems requiring first principles or concepts
-- Knowledge-intensive QA with temporal or contextual constraints
-- Multi-hop reasoning requiring bridging concepts
-- Questions where direct reasoning risks losing context in intermediate steps
+- 包含过多低层次细节的复杂多步骤推理
+- 需要第一性原理或概念的领域特定问题
+- 具有时间或语境约束的知识密集型问答
+- 需要桥接概念的多跳推理
+- 直接推理可能在中间步骤中丢失上下文的问题
 
-**Tradeoffs:** 2x tokens, 2 sequential calls. Few-shot examples needed for
-abstraction step. Abstraction skill sample-efficient (1-shot sufficient). Fixes
-20-40% baseline errors while introducing 5-12% new errors. +7% MMLU Physics,
-+11% Chemistry, +27% TimeQA.
+**权衡：** 2 倍 token，2 次顺序调用。需要展示抽象步骤的少样本示例。抽象技能样本效率高（1-shot 足够）。修复 20-40% 的基线错误，同时引入 5-12% 的新错误。MMLU 物理 +7%，化学 +11%，TimeQA +27%。
 
 ---
 
-### Hint-before-Solving Prompting (HSP)
+### 提示-先-求解 Prompting（HSP）
 
-**Mechanism:** Prompt LLM to generate hints (knowledge or key ideas) before
-generating solution with reasoning steps.
+**机制：** 提示 LLM 在生成带推理步骤的解法之前先生成提示（知识或关键思路）。
 
-**Triggers:**
+**触发条件：**
 
-- LLM possesses relevant knowledge but fails to apply it accurately
-- Complex reasoning requiring activation of specific encoded knowledge
-- Multi-step mathematical problems (GSM8K, MATH, MultiArith, AQuA)
-- Commonsense reasoning tasks (StrategyQA, Date Understanding)
-- Problems requiring recall of specific concepts or formulas
+- LLM 掌握相关知识但无法准确应用
+- 需要激活特定编码知识的复杂推理
+- 多步骤数学问题（GSM8K、MATH、MultiArith、AQuA）
+- 常识推理任务（StrategyQA、日期理解）
+- 需要回忆特定概念或公式的问题
 
-**Tradeoffs:** 1.2-1.5x tokens. HSP: 1 call, HSP2: 2 calls (hint, then
-solution). Few-shot examples with hint demonstrations required. Llama2-70B-Chat
-+9.7% average. HSP2 with GPT-4 hints: Llama2-7B +12.8% average.
+**权衡：** 1.2-1.5 倍 token。HSP：1 次调用，HSP2：2 次调用（提示，然后解法）。需要带提示演示的少样本示例。Llama2-70B-Chat 平均 +9.7%。带 GPT-4 提示的 HSP2：Llama2-7B 平均 +12.8%。
 
 ---
 
-### Analogical Prompting
+### 类比 Prompting
 
-**Mechanism:** Prompt LLM to self-generate relevant problem-solution exemplars
-before solving the target problem.
+**机制：** 提示 LLM 在解决目标问题之前自我生成相关的问题-解法示例。
 
-**Triggers:**
+**触发条件：**
 
-- Task requires diverse reasoning approaches (algebra, geometry, probability)
-- Test problems span multiple subtypes within a domain
-- Labeled exemplars unavailable or costly to obtain
-- Need problem-specific guidance rather than generic instructions
-- Complex reasoning tasks like competitive programming
+- 任务需要多种推理方式（代数、几何、概率）
+- 测试问题跨越领域内的多个子类型
+- 标注示例不可用或获取成本高
+- 需要针对具体问题的指导而非通用指令
+- 竞赛编程等复杂推理任务
 
-**Tradeoffs:** 3-5x tokens (generates K=3-5 exemplars with solutions), 1 call.
-Requires stronger/larger-scale LLMs for quality exemplar generation. Explicit
-diversity instruction needed. Outperforms 0-shot CoT and manual few-shot CoT by
-avg +4%. Eliminates manual labeling and retrieval infrastructure.
+**权衡：** 3-5 倍 token（生成 K=3-5 个带解法的示例），1 次调用。需要更强/更大规模的 LLM 来生成高质量示例。需要显式的多样性指令。平均优于 0-shot CoT 和手工少样本 CoT +4%。消除手工标注和检索基础设施的需求。
 
 ---
 
-### Contrastive Chain-of-Thought
+### 对比链式推理
 
-**Mechanism:** Provides both valid and invalid reasoning demonstrations to guide
-step-by-step reasoning while reducing mistakes.
+**机制：** 提供有效和无效的推理演示，引导逐步推理同时减少错误。
 
-**Triggers:**
+**触发条件：**
 
-- Complex reasoning where intermediate steps are not well-defined
-- Tasks where mistake reduction is critical for trustworthiness
-- Situations where error propagation through reasoning steps is a concern
-- When model needs guidance on both correct steps and common faults to avoid
+- 中间步骤定义不清晰的复杂推理
+- 减少错误对可信度至关重要的任务
+- 错误通过推理步骤传播是一个问题的场景
+- 需要同时指导正确步骤和常见错误时
 
-**Tradeoffs:** 2x tokens (doubles demonstration examples with negative cases), 1
-call. Few-shot examples with valid CoT required. Automatic construction from
-existing rationales requires no additional annotation. +9.8 points on GSM-8K,
-+16.0 points on Bamboogle vs conventional CoT. Compatible with self-consistency.
+**权衡：** 2 倍 token（将演示示例翻倍，加入负面案例），1 次调用。需要带有效 CoT 的少样本示例。可从现有推理中自动构建，无需额外标注。GSM-8K +9.8 个百分点，Bamboogle 比传统 CoT +16.0 个百分点。与自洽性兼容。
 
 ---
 
-### Metacognitive Prompting
+### 元认知 Prompting
 
-**Mechanism:** Guides LLMs through five-stage self-reflection: understand,
-judge, critique, decide, and assess confidence.
+**机制：** 通过五阶段自我反思引导 LLM：理解、判断、批评、决定和评估置信度。
 
-**Triggers:**
+**触发条件：**
 
-- Task requires deep semantic understanding and contextual interpretation
-- Natural language understanding tasks with nuanced meanings
-- Domain-specific tasks requiring specialized terminology comprehension
-- Question paraphrase detection, entailment, word sense disambiguation
-- Biomedical or legal text understanding tasks
-- Tasks requiring confidence estimation alongside prediction
+- 任务需要深度语义理解和语境解读
+- 具有细微含义的自然语言理解任务
+- 需要专业术语理解的领域特定任务
+- 问题改写检测、蕴含、词义消歧
+- 生物医学或法律文本理解任务
+- 需要在预测同时进行置信度估计的任务
 
-**Tradeoffs:** 5x tokens, 1 call. Five-stage structured prompt template
-required. Manual prompt engineering per task type. Overthinking errors on simple
-tasks. Zero-shot: 4.8-6.4% improvement over CoT. EUR-LEX shows 15.0-26.9%
-improvement.
+**权衡：** 5 倍 token，1 次调用。需要针对每种任务类型手工编写的五阶段结构化 prompt 模板。过度思考会损害简单任务。零样本：比 CoT 提升 4.8-6.4%。EUR-LEX 显示 15.0-26.9% 提升。
 
 ---
 
-### Self-Explanation Prompting
+### 自我解释 Prompting
 
-**Mechanism:** Prompt model to explain each dialogue utterance sequentially
-before answering to enhance contextual comprehension.
+**机制：** 提示模型在回答之前顺序解释每段对话发言，以增强语境理解。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-turn dialogue understanding required
-- Long conversational contexts with information spread across turns
-- Task-oriented dialogue tasks (dialogue state tracking, next action prediction)
-- Information extraction from extended dialogue history
-- Time-related confusions (departure vs arrival times) in dialogue
+- 需要多轮对话理解
+- 信息分散在多个轮次的长对话上下文
+- 面向任务的对话任务（对话状态追踪、下一动作预测）
+- 从扩展对话历史中提取信息
+- 对话中的时间相关混淆（出发时间 vs 到达时间）
 
-**Tradeoffs:** 2-3x tokens, 1 call. Zero-shot, no demonstrations required. Less
-effective for emotion recognition and complex multi-step reasoning. +12.8% JGA
-on MultiWOZ vs vanilla. Outperforms 4-shot in-context learning while being
-zero-shot.
+**权衡：** 2-3 倍 token，1 次调用。零样本，无需演示。对情感识别和复杂多步骤推理效果较差。MultiWOZ JGA 比普通方法 +12.8%。零样本时优于 4-shot 上下文学习。
 
 ---
 
-### Cognitive Prompting
+### 认知 Prompting
 
-**Mechanism:** Guide LLM problem-solving through structured cognitive operations
-like goal clarification, decomposition, filtering, and pattern recognition.
+**机制：** 通过结构化认知操作（目标澄清、分解、过滤和模式识别）引导 LLM 解题。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step reasoning problems requiring structured breakdown
-- Complex mathematical word problems
-- Tasks requiring goal clarification before execution
-- Problems benefiting from pattern recognition and abstraction
-- Decision-making scenarios requiring systematic cognitive operations
+- 需要结构化分解的多步骤推理问题
+- 复杂数学文字题
+- 在执行之前需要目标澄清的任务
+- 受益于模式识别和抽象的问题
+- 需要系统性认知操作的决策场景
 
-**Tradeoffs:** 2-3x tokens, 1 call per problem. Hybrid variant requires few-shot
-examples from successful solutions. More complex than CoT. Greater proportional
-gain for mid-size models. 95% solve rate on LLaMA 70B with H-CP variant on
-GSM8K.
+**权衡：** 2-3 倍 token，每个问题 1 次调用。混合变体需要来自成功解法的少样本示例。比 CoT 更复杂。中等规模模型的比例收益更大。H-CP 变体在 GSM8K 上 LLaMA 70B 的解决率达 95%。
 
 ---
 
-### Symbolic Chain-of-Thought
+### 符号链式推理
 
-**Mechanism:** Translates natural language to symbolic format, plans steps,
-solves with logic rules, verifies translation and reasoning.
+**机制：** 将自然语言翻译为符号格式，规划步骤，用逻辑规则求解，验证翻译和推理。
 
-**Triggers:**
+**触发条件：**
 
-- Logical reasoning problems requiring symbolic expressions (FOL, constraint
-  optimization)
-- Multi-step deductive reasoning with explicit logical rules (modus ponens,
-  modus tollens)
-- Tasks where natural language CoT produces logical fallacies
-- Complex logical reasoning requiring rigid deducing rules
-- Problems where external symbolic solvers fail due to translation errors
+- 需要符号表达式的逻辑推理问题（FOL、约束优化）
+- 具有显式逻辑规则的多步骤演绎推理（假言推理、拒取律）
+- 自然语言 CoT 产生逻辑谬误的任务
+- 需要严格演绎规则的复杂逻辑推理
+- 由于翻译错误导致外部符号求解器失败的问题
 
-**Tradeoffs:** 4x tokens, 4 sequential calls (Translator, Planner, Solver,
-Verifier). Symbolic logic knowledge required. Requires baseline planning
-capability. 100% symbolic syntax execution success vs Logic-LM failures. GPT-4:
-+7.88% over Logic-LM on FOL tasks.
+**权衡：** 4 倍 token，4 次顺序调用（翻译器、规划器、求解器、验证器）。需要符号逻辑知识。需要基线规划能力。符号语法执行成功率 100% vs Logic-LM 的失败率。GPT-4：FOL 任务比 Logic-LM +7.88%。
 
 ---
 
-### Thought Propagation
+### 思维传播
 
-**Mechanism:** Solves analogous problems and propagates their solutions/plans to
-refine the input problem solution.
+**机制：** 解决类似问题，并将其解法/规划传播到目标问题以精炼解法。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step problems where intermediate errors accumulate
-- Optimization problems requiring search over large solution spaces
-- Tasks where similar problem patterns can provide reusable insights
-- Long-trial planning tasks requiring knowledge-intensive plans
-- Problems where reasoning from scratch consistently fails
+- 中间错误累积的多步骤问题
+- 需要在大解法空间中搜索的优化问题
+- 类似问题模式可提供可复用洞见的任务
+- 知识密集型规划所需的长期任务规划
+- 从零开始推理持续失败的问题
 
-**Tradeoffs:** Similar to ToT for 1-layer, 2-3x for 2-layer TP. k+1 analogous
-problems solved plus aggregation (typically 2-5 analogous problems). Compatible
-base method required (IO, CoT, ToT, ReAct). Token overhead increases
-exponentially with layer depth, diminishing returns beyond 2 layers. 12-15%
-improvement over baselines.
+**权衡：** 单层类似 ToT，双层为 2-3 倍。k+1 个类似问题被解决加聚合（通常 2-5 个类似问题）。需要兼容的基础方法（IO、CoT、ToT、ReAct）。Token 开销随层深度指数增长，超过 2 层后收益递减。比基线提升 12-15%。
 
 ---
 
-### Socratic Method Prompting
+### 苏格拉底式 Prompting
 
-**Mechanism:** Multi-turn dialogue using definition, elenchus, dialectic,
-maieutics, and counterfactual reasoning to elicit reasoning traces and verify
-outputs.
+**机制：** 使用定义、反驳、辩证、助产和反事实推理的多轮对话，引出推理轨迹并验证输出。
 
-**Triggers:**
+**触发条件：**
 
-- Critical reading or evaluation of arguments required
-- Need to verify credibility of information sources
-- Exploring counterarguments or alternative perspectives
-- Creative writing requiring guided exploration of "what if" scenarios
-- Complex reasoning requiring clarification of definitions and terms
-- Cross-examination of claims and supporting evidence needed
+- 需要批判性阅读或评估论点
+- 需要验证信息来源的可信度
+- 探索反论证或替代视角
+- 需要引导探索「如果...怎样」场景的创意写作
+- 需要澄清定义和术语的复杂推理
+- 需要对声明及其支持证据进行交叉检验
 
-**Tradeoffs:** 3-10x tokens depending on depth, 5-15+ sequential calls for full
-CRIT template. Higher latency but significantly improved accuracy and
-credibility assessment. Multi-turn only, not single-turn applicable.
+**权衡：** 根据深度 3-10 倍 token，完整 CRIT 模板需要 5-15 次以上顺序调用。延迟更高但准确率和可信度评估显著改善。仅限多轮，不适用于单轮。
 
 ---
 
-### Proactive Chain-of-Thought
+### 主动链式推理
 
-**Mechanism:** Augments LLMs with goal planning via descriptive reasoning chains
-before action selection in proactive dialogues.
+**机制：** 通过描述性推理链在动作选择之前增强 LLM 的目标规划能力，用于主动对话。
 
-**Triggers:**
+**触发条件：**
 
-- Dialogue system needs to ask clarification questions for ambiguous queries
-- System must proactively guide conversation toward designated target topic
-- Non-collaborative dialogue where system and user have conflicting goals
-- Dialogue requires strategic planning and goal-directed initiative
+- 对话系统需要为模糊查询提问澄清问题
+- 系统必须主动引导对话走向指定目标话题
+- 用户和系统目标冲突的非协作对话
+- 对话需要策略性规划和以目标为导向的主动性
 
-**Tradeoffs:** 2-3x tokens, 1 call per turn with extended generation. Few-shot
-examples required. Falls short on domain-specific problems requiring specialized
-knowledge and strategic optimization. Multi-turn dialogue only.
+**权衡：** 2-3 倍 token，每轮扩展生成 1 次调用。需要少样本示例。在需要专业知识和策略优化的领域特定问题上效果不佳。仅限多轮对话。
 
 ---
 
-### AlignedCoT (Native-Style Demonstration Generation)
+### AlignedCoT（原生风格演示生成）
 
-**Mechanism:** Generate few-shot demonstrations by probing the LLM's own zero-shot
-reasoning style, then refining and formatting those outputs to create "native-style"
-exemplars that match how the model naturally reasons.
+**机制：** 通过探测 LLM 自身的零样本推理风格来生成少样本演示，然后精炼和格式化这些输出，创建与模型自然推理方式匹配的「原生风格」示例。
 
-**The process:**
+**流程：**
 ```
-Step 1 (Probe): For each example in your few-shot prompt, query the LLM in
-        zero-shot mode using "Let's think step by step" to generate its
-        native reasoning style.
+步骤 1（探测）：对少样本 prompt 中的每个示例，用「Let's think step by step」
+        以零样本模式查询 LLM，生成其原生推理风格。
 
-Step 2 (Refine): Check each generated CoT against ground truth. If errors exist,
-        identify the first error, correct it, then prompt the LLM to complete
-        the reasoning from that corrected point forward.
+步骤 2（精炼）：对照真实答案检查每个生成的 CoT。若存在错误，
+        识别第一个错误，纠正它，然后提示 LLM 从纠正点继续推理。
 
-Step 3 (Format): Unify the format of all generated CoTs (standardize answer
-        format, step numbering, solution structure).
+步骤 3（格式化）：统一所有生成的 CoT 的格式（标准化答案格式、步骤编号、解法结构）。
 
-Step 4 (Use): Replace human-crafted demonstrations with these native-style
-        CoTs in your few-shot prompt.
+步骤 4（使用）：用这些原生风格 CoT 替换少样本 prompt 中的人工编写演示。
 ```
 
-**Why this works:** LLMs perform better when prompted with demonstrations matching
-their own generation style rather than imitating human-written examples. Native-style
-CoTs reduce the style gap between training and inference, requiring less
-generalization capability from the model.
+**为何有效：** 用与模型自身生成风格匹配的演示提示时，LLM 表现更好，而非模仿人工编写的示例。原生风格 CoT 减少了训练和推理之间的风格差距，降低了模型所需的泛化能力。
 
-**Triggers:**
+**触发条件：**
 
-- Few-shot CoT underperforming expectations despite correct exemplars
-- Model appears to mechanically copy demonstration format without genuine reasoning
-- Task requires diverse reasoning approaches where manual exemplar crafting is costly
-- Need to bootstrap better demonstrations without human annotation effort
+- 尽管示例正确，Few-shot CoT 仍低于预期
+- 模型似乎在机械地复制演示格式而非真正推理
+- 任务需要多样化推理方式，手工编写示例成本高
+- 需要在不付出人工标注努力的情况下引导更好的演示
 
-**Tradeoffs:** Initial setup requires n zero-shot queries plus refinement iterations
-(one per error in generated CoTs). Once created, native-style demonstrations are
-reusable. Single call at inference time. Refinement step requires ground truth
-answers for verification.
+**权衡：** 初始设置需要 n 次零样本查询加精炼迭代（每个生成的 CoT 错误一次）。一旦创建，原生风格演示可复用。推理时单次调用。精炼步骤需要真实答案用于验证。
 
-**CORRECT:**
+**正确做法：**
 ```
-# Generate native-style demonstration
-User: [Question from training set]
-Assistant: Let's think step by step.
-[LLM generates its natural reasoning style]
-[Human verifies: if error at step 3, correct step 3, re-prompt to continue]
-[Final native-style CoT used as demonstration]
+# 生成原生风格演示
+用户：[训练集中的问题]
+助手：让我一步步思考。
+[LLM 生成其自然推理风格]
+[人工验证：若步骤 3 出错，纠正步骤 3，重新提示继续]
+[最终原生风格 CoT 用作演示]
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Using raw human-written demonstrations
-User: [Question]
-Here's how to solve it: First, identify the variables. Second, set up equations.
-Third, solve algebraically. The answer is X.
-[LLM copies this rigid format without engaging its own reasoning]
+# 使用原始人工编写演示
+用户：[问题]
+以下是解法：首先，识别变量。其次，建立方程。
+第三，代数求解。答案是 X。
+[LLM 复制这个僵化格式，而非激活自身推理]
 ```
 
-The human-written style forces imitation rather than genuine reasoning activation.
+人工编写风格强制模仿而非激活真正的推理。
 
-**Stacking note:** AlignedCoT produces demonstrations for use with standard few-shot
-CoT. Compatible with self-consistency (sample multiple outputs). Can be combined
-with retrieval-augmented generation by aligning retrieved exemplars to native style.
+**组合说明：** AlignedCoT 为标准少样本 CoT 生成演示。与自洽性兼容（多次采样输出）。可与检索增强生成结合，将检索到的示例对齐为原生风格。
 
 ---
 
-### Instance-Adaptive Prompting (IAP)
+### 实例自适应 Prompting（IAP）
 
-**Mechanism:** Select the optimal zero-shot CoT prompt for each instance by analyzing
-information flow saliency between question, prompt, and rationale rather than using
-a single task-level prompt for all problems.
+**机制：** 通过分析问题、prompt 和推理之间的信息流显著性，为每个实例选择最优的零样本 CoT prompt，而非对所有问题使用单一的任务级 prompt。
 
-**The process:**
+**流程：**
 ```
-Given: A pool of candidate prompts (e.g., "Let's think step by step",
-       "Take a deep breath and work on this step by step", etc.)
+给定：候选 prompt 池（如「Let's think step by step」、
+       「Take a deep breath and work on this step by step」等）
 
-For each test instance:
-  1. Compute saliency scores measuring information flow:
-     - Question → Prompt (does prompt absorb question semantics?)
-     - Question → Rationale (does rationale attend to question?)
-     - Prompt → Rationale (does rationale follow prompt guidance?)
+对每个测试实例：
+  1. 计算显著性分数，衡量信息流：
+     - 问题 → Prompt（prompt 是否吸收了问题语义？）
+     - 问题 → 推理（推理是否关注问题？）
+     - Prompt → 推理（推理是否遵循 prompt 指导？）
 
-  2. Select prompt using one of two strategies:
-     - Sequential Substitution (IAP-ss): Test prompts in order until one
-       exceeds saliency thresholds, then use that prompt's answer.
-     - Majority Vote (IAP-mv): Compute scores for all prompts, select top-k
-       by combined saliency, take majority vote among their answers.
+  2. 使用以下策略之一选择 prompt：
+     - 顺序替换（IAP-ss）：按顺序测试 prompt，直到一个超过显著性阈值，然后使用该 prompt 的答案。
+     - 多数投票（IAP-mv）：计算所有 prompt 的分数，选择综合显著性最高的前 k 个，对其答案进行多数投票。
 ```
 
-**Why this works:** Task-level optimal prompts can fail on individual instances
-where a different prompt would succeed. Good reasoning requires: (1) the prompt
-absorbs semantic information from the question, then (2) the rationale gathers
-information from both the question directly and via the prompt. Saliency analysis
-detects when this information flow is adequate.
+**为何有效：** 任务级最优 prompt 可能对某些实例失败，而不同的 prompt 会成功。良好的推理需要：（1）prompt 从问题中吸收语义信息，然后（2）推理直接从问题和通过 prompt 两条路径都获取信息。显著性分析检测这种信息流是否充分。
 
-**Triggers:**
+**触发条件：**
 
-- Zero-shot CoT shows high variance across similar problems
-- Some instances consistently fail with "best" task-level prompt
-- Need to maximize per-instance accuracy without fine-tuning
-- Computational budget allows evaluating multiple prompt candidates
+- 零样本 CoT 在相似问题上方差较高
+- 某些实例在「最优」任务级 prompt 下持续失败
+- 需要在不微调的情况下最大化每实例准确率
+- 计算预算允许评估多个候选 prompt
 
-**Tradeoffs:** IAP-ss: 1-N calls depending on when threshold met (efficient early
-termination). IAP-mv: N calls for N candidate prompts (more robust but higher cost).
-Requires implementation of saliency score computation (attention weight analysis).
-Most beneficial for smaller/mid-size models where prompt sensitivity is higher.
+**权衡：** IAP-ss：1-N 次调用，取决于何时满足阈值（高效的早期终止）。IAP-mv：N 个候选 prompt 对应 N 次调用（更健壮但成本更高）。需要实现显著性分数计算（注意力权重分析）。对中小型模型（prompt 敏感性更高）最有益。
 
-**CORRECT:**
+**正确做法：**
 ```
-# Instance-adaptive selection
-Question: "A train travels 60 mph for 2 hours. How far does it go?"
+# 实例自适应选择
+问题：「一列火车以 60 英里/小时的速度行驶 2 小时。走了多远？」
 
-Prompt candidates evaluated:
-- "Let's think step by step" → saliency: Q→P=0.72, Q→R=0.81 ✓ (exceeds threshold)
-[Use this prompt, return answer: 120 miles]
+评估候选 prompt：
+- 「Let's think step by step」→ 显著性：Q→P=0.72, Q→R=0.81 ✓（超过阈值）
+[使用此 prompt，返回答案：120 英里]
 ```
 
-**INCORRECT:**
+**错误做法：**
 ```
-# Fixed task-level prompt for all instances
-Always use "Let's think step by step" regardless of instance characteristics.
-[Some instances fail because this prompt doesn't activate appropriate reasoning
-for their specific structure]
+# 对所有实例使用固定的任务级 prompt
+无论实例特征如何，始终使用「Let's think step by step」。
+[某些实例失败，因为该 prompt 不能为其特定结构激活合适的推理]
 ```
 
-Using a single prompt ignores instance-level variation in what triggers good reasoning.
+使用单一 prompt 忽略了什么能触发良好推理方面的实例级差异。
 
-**Stacking note:** IAP operates at the prompt selection layer, compatible with any
-base zero-shot CoT technique. Can be combined with self-consistency by applying
-IAP selection first, then sampling multiple outputs from the chosen prompt.
+**组合说明：** IAP 在 prompt 选择层运作，与任意基础零样本 CoT 技术兼容。可通过先进行 IAP 选择，然后对选定 prompt 进行多次采样，与自洽性结合。
 
 ---
 
-## Decision Guidance
+## 决策指引
 
-1. **First, identify task type:**
-   - Mathematical/symbolic reasoning -> CoT techniques highly effective
-   - Commonsense/factual QA -> CoT provides minimal benefit, often skip
-   - Dialogue understanding -> Self-Explanation or Proactive CoT
-   - Knowledge-intensive QA -> Step-Back Prompting
+1. **首先，识别任务类型：**
+   - 数学/符号推理 -> CoT 技术高效
+   - 常识/事实问答 -> CoT 收益极小，通常跳过
+   - 对话理解 -> 自我解释或主动 CoT
+   - 知识密集型问答 -> Step-Back Prompting
 
-2. **Check for symbolic indicators:**
-   - Equations, "=" signs, numeric operations -> use CoT
-   - Formal logic requirements -> Symbolic CoT
-   - No formal system -> consider skipping CoT entirely
+2. **检查符号指示器：**
+   - 方程、「=」号、数值运算 -> 使用 CoT
+   - 形式逻辑要求 -> 符号 CoT
+   - 无形式系统 -> 考虑完全跳过 CoT
 
-3. **Consider model capability:**
-   - Large models (100B+) -> Zero-shot CoT viable
-   - Mid-size models -> Cognitive Prompting, few-shot techniques
-   - Small models -> HSP2 with stronger model hints
+3. **考虑模型能力：**
+   - 大型模型（100B+）-> 零样本 CoT 可行
+   - 中等规模模型 -> 认知 Prompting、少样本技术
+   - 小型模型 -> 带更强模型提示的 HSP2
 
-4. **Evaluate cost constraints:**
-   - Single call needed -> Re2, QAP, Contrastive CoT
-   - Multiple calls acceptable -> Step-Back, Symbolic CoT, Socratic
-   - Minimal overhead -> Re2 (2x input only)
+4. **评估成本约束：**
+   - 需要单次调用 -> Re2、QAP、对比 CoT
+   - 可接受多次调用 -> Step-Back、符号 CoT、苏格拉底式
+   - 最小开销 -> Re2（仅 2 倍输入）
 
-5. **Optimize prompt selection:**
-   - High variance across instances -> IAP (instance-adaptive selection)
-   - Few-shot demos underperforming -> AlignedCoT (native-style generation)
-   - Fixed prompt works well -> Use standard zero-shot or few-shot CoT
-
----
-
-## Composability Notes
-
-**Orthogonal combinations (additive benefits):**
-
-- Re2 + CoT: Re-reading composes with any reasoning technique
-- Contrastive CoT + Self-consistency: Further gains from sampling
-- HSP + CoT: Hint generation before standard CoT
-- Step-Back + CoT: Abstraction then detailed reasoning
-- AlignedCoT + Self-consistency: Native-style demos with multiple sampling
-- IAP + Self-consistency: Instance-adaptive selection then multiple samples
-
-**Conflicts/redundancy:**
-
-- Self-Explanation conflicts with standard CoT (different output structure)
-- Multiple elicitation techniques in sequence: diminishing returns
-- Symbolic CoT vs natural language CoT: choose one based on task
-- AlignedCoT vs manual few-shot: use one or the other, not both
-
-**Build-on relationships:**
-
-- Contrastive CoT builds on CoT (adds negative examples)
-- Step-Back builds on CoT (adds abstraction layer)
-- Thought Propagation works with IO, CoT, ToT, or ReAct as base method
-- Cognitive Prompting extends CoT with structured operations
-- AlignedCoT produces demonstrations for few-shot CoT
-- IAP selects prompts for any zero-shot CoT variant
+5. **优化 prompt 选择：**
+   - 跨实例方差高 -> IAP（实例自适应选择）
+   - 少样本演示效果不佳 -> AlignedCoT（原生风格生成）
+   - 固定 prompt 效果好 -> 使用标准零样本或少样本 CoT
 
 ---
 
-## Cautionary Notes
+## 可组合性说明
 
-**CoT Bias and Toxicity:** Zero-shot CoT increases bias and toxicity on
-socially-sensitive contexts. Tasks involving stereotypes, marginalized groups,
-or ethical considerations should AVOID CoT prompting. Effect worsens with model
-scale but improves with RLHF alignment.
+**正交组合（加法收益）：**
 
-**When NOT to use CoT:**
+- Re2 + CoT：重复阅读可与任意推理技术组合
+- 对比 CoT + 自洽性：采样带来进一步收益
+- HSP + CoT：在标准 CoT 之前提示生成
+- Step-Back + CoT：先抽象再详细推理
+- AlignedCoT + 自洽性：原生风格演示加多次采样
+- IAP + 自洽性：实例自适应选择然后多次采样
 
-- Single-step problems (no multi-step reasoning needed)
-- Commonsense questions (minimal to no improvement)
-- Smaller models (<100B parameters for zero-shot)
-- Socially-sensitive topics (amplifies bias)
-- Time-critical applications (latency overhead)
+**冲突/冗余：**
+
+- 自我解释与标准 CoT 冲突（不同输出结构）
+- 多种引出技术顺序使用：收益递减
+- 符号 CoT vs 自然语言 CoT：根据任务选一个
+- AlignedCoT vs 手工少样本：二选一，不同时用
+
+**构建关系：**
+
+- 对比 CoT 建立在 CoT 基础上（添加负面示例）
+- Step-Back 建立在 CoT 基础上（添加抽象层）
+- 思维传播以 IO、CoT、ToT 或 ReAct 作为基础方法
+- 认知 Prompting 用结构化操作扩展 CoT
+- AlignedCoT 为少样本 CoT 生成演示
+- IAP 为任意零样本 CoT 变体选择 prompt
+
+---
+
+## 注意事项
+
+**CoT 偏见与毒性：** 零样本 CoT 在社会敏感上下文中会增加偏见和毒性。涉及刻板印象、边缘化群体或伦理考量的任务应**避免** CoT prompting。该效应随模型规模增大而加剧，但随 RLHF 对齐而改善。
+
+**不应使用 CoT 的场景：**
+
+- 单步骤问题（不需要多步推理）
+- 常识问题（收益极小到无）
+- 较小模型（零样本 <100B 参数）
+- 社会敏感话题（放大偏见）
+- 时间紧迫的应用（延迟开销）

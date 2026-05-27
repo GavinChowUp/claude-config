@@ -1,44 +1,42 @@
-# Reference Selection Guide
+# 参考资料选择指南
 
-These reference documents contain research-backed prompt engineering techniques
-organized by problem type. Each file synthesizes findings from multiple papers
-into actionable guidance.
+这些参考文档包含基于研究的 prompt 工程技术，按问题类型组织。每份文件将多篇论文的研究成果综合提炼为可直接使用的指导建议。
 
-## Decision Tree
+## 决策树
 
 ```
-What is your PRIMARY problem?
+你的主要问题是什么？
 |
-+-> INPUT issues (context too long/noisy/missing)?
-|   YES -> context/reframing.md or context/augmentation.md
++-> 输入问题（上下文过长/有噪声/信息缺失）？
+|   是 -> context/reframing.md 或 context/augmentation.md
 |
-+-> OUTPUT issues:
++-> 输出问题：
     |
-    +-> Model can't reason through problem -> reasoning/*.md
-    +-> Model reasons but wrong answers   -> correctness/*.md
-    +-> Output too verbose/expensive      -> efficiency.md
-    +-> Need specific format              -> structure.md
+    +-> 模型无法推理完成问题          -> reasoning/*.md
+    +-> 模型能推理但答案错误           -> correctness/*.md
+    +-> 输出过于冗长或成本过高         -> efficiency.md
+    +-> 需要特定格式                   -> structure.md
 ```
 
-## Navigation Anti-patterns
+## 导航反模式
 
-Avoid reading these directly:
+避免直接阅读以下内容：
 
-- `papers/**/*.md` - Source paper summaries, too granular for optimization workflow
-- `papers/**/*.yaml` - Paper metadata, not actionable guidance
-- `papers/**/*.pdf` - Original papers, not consumable
+- `papers/**/*.md` - 原始论文摘要，粒度过细，不适合优化工作流
+- `papers/**/*.yaml` - 论文元数据，不可直接使用
+- `papers/**/*.pdf` - 原始论文，无法直接消费
 
-The reference files here synthesize those papers into actionable techniques.
+这里的参考文件已将这些论文综合整理为可操作的技术指南。
 
-## Usage in Prompt Optimization Workflow
+## 在 Prompt 优化工作流中的使用方式
 
-The optimize.py script selects references based on diagnosed problem:
+optimize.py 脚本会根据诊断出的问题选择对应的参考资料：
 
-1. **Triage** determines scope (single-prompt, ecosystem, greenfield, problem)
-2. **Assess/Diagnose** identifies the specific failure mode
-3. **Plan/Design** reads relevant references based on failure mode:
-   - Reasoning failures -> reasoning/\*.md
-   - Consistency failures -> correctness/\*.md
-   - Context issues -> context/\*.md
-   - Verbosity issues -> efficiency.md
-   - Format issues -> structure.md
+1. **分流（Triage）**：确定范围（single-prompt、ecosystem、greenfield、problem）
+2. **评估/诊断（Assess/Diagnose）**：识别具体的失败模式
+3. **规划/设计（Plan/Design）**：根据失败模式读取相关参考：
+   - 推理失败 -> reasoning/\*.md
+   - 一致性失败 -> correctness/\*.md
+   - 上下文问题 -> context/\*.md
+   - 冗长问题 -> efficiency.md
+   - 格式问题 -> structure.md

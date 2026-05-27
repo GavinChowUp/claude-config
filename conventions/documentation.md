@@ -1,29 +1,20 @@
-# Documentation Conventions
+# 文档规范
 
-This is the authoritative documentation conventions file. All code-adjacent
-documentation (CLAUDE.md, README.md) must follow these principles.
+本文件是权威的文档规范。所有代码附属文档（CLAUDE.md、README.md）必须遵循以下原则。
 
-## Core Principles
+## 核心原则
 
-**Self-contained documentation**: All code-adjacent documentation (CLAUDE.md,
-README.md) must be self-contained. Do NOT reference external authoritative
-sources (doc/ directories, wikis, external documentation). If knowledge exists
-in an authoritative source, it must be summarized locally. Duplication is
-acceptable; the maintenance burden is the cost of locality.
+**自包含文档**：所有代码附属文档（CLAUDE.md、README.md）必须自包含。不得引用外部权威来源（doc/ 目录、wiki、外部文档）。如果知识存在于权威来源中，必须在本地做摘要。允许重复；维护成本是局部化的代价。
 
-**CLAUDE.md = pure index**: CLAUDE.md files are navigation aids only. They
-contain WHAT is in the directory and WHEN to read each file. All explanatory
-content (architecture, decisions, invariants) belongs in README.md.
+**CLAUDE.md = 纯索引**：CLAUDE.md 文件只是导航辅助工具，包含目录中**有什么**内容以及**何时**阅读每个文件。所有解释性内容（架构、决策、不变量）属于 README.md。
 
-**README.md = invisible knowledge**: README.md files capture knowledge NOT
-visible from reading source code. If ANY invisible knowledge exists for a
-directory, README.md is required.
+**README.md = 隐性知识**：README.md 文件记录从阅读源代码**无法获得**的知识。若某目录存在任何隐性知识，则必须有 README.md。
 
-## CLAUDE.md Format Specification
+## CLAUDE.md 格式规范
 
-### Index Format
+### 索引格式
 
-Use tabular format with What and When columns:
+使用含 What 和 When 列的表格格式：
 
 ```markdown
 ## Files
@@ -41,45 +32,41 @@ Use tabular format with What and When columns:
 | `handlers/` | HTTP request handlers         | Adding endpoints, modifying request flow  |
 ```
 
-### Column Guidelines
+### 列说明
 
-- **File/Directory**: Use backticks around names: `cache.rs`, `config/`
-- **What**: Factual description of contents (nouns, not actions)
-- **When to read**: Task-oriented triggers using action verbs (implementing,
-  debugging, modifying, adding, understanding)
-- At least one column must have content; empty cells use `-`
+- **File/Directory**：名称加反引号：`cache.rs`、`config/`
+- **What**：内容的事实描述（名词，非动作）
+- **When to read**：以动作动词引导的任务触发条件（implementing, debugging, modifying, adding, understanding）
+- 至少一列必须有内容；空单元格用 `-`
 
-### Trigger Quality Test
+### 触发质量测试
 
-Given task "add a new validation rule", can an LLM scan the "When to read"
-column and identify the right file?
+给定任务「添加新的验证规则」，LLM 能否扫描「When to read」列并识别出正确文件？
 
-### Generated and Vendored Code
+### 生成代码与 vendor 代码
 
-CLAUDE.md MUST flag files/directories that should not be manually edited:
+CLAUDE.md **必须**标记不应手动编辑的文件/目录：
 
-| Directory      | What                              | When to read        |
+| 目录           | 内容                              | 何时阅读            |
 | -------------- | --------------------------------- | ------------------- |
 | `proto/gen/`   | Generated from proto/. Run `make` | Never edit directly |
 | `vendor/`      | Vendored deps, upstream: go.mod   | Never edit directly |
 | `third_party/` | Copied from github.com/foo v1.2.3 | Never edit directly |
 
-The "When to read" column should indicate these are not editable. Include
-regeneration commands in the "What" column or in a dedicated Regenerate section.
+「When to read」列应说明这些文件不可编辑。在「What」列或专门的 Regenerate 节中注明重新生成命令。
 
-This prevents LLMs from wasting effort analyzing or "improving" auto-generated
-code, and prevents edits that will be overwritten or cause merge conflicts.
+这可防止 LLM 浪费精力分析或「改进」自动生成的代码，也防止手动编辑被覆写或引发合并冲突。
 
-See also: conventions/code-quality/baseline.md "Generated and Vendored Code Awareness".
+另见：conventions/code-quality/baseline.md「Generated and Vendored Code Awareness」。
 
-### ROOT vs SUBDIRECTORY CLAUDE.md
+### 根目录 vs 子目录 CLAUDE.md
 
-**ROOT CLAUDE.md:**
+**ROOT CLAUDE.md：**
 
 ```markdown
 # [Project Name]
 
-[One sentence: what this is]
+[一句话：这是什么]
 
 ## Files
 
@@ -93,18 +80,18 @@ See also: conventions/code-quality/baseline.md "Generated and Vendored Code Awar
 
 ## Build
 
-[Copy-pasteable command]
+[可直接粘贴的命令]
 
 ## Test
 
-[Copy-pasteable command]
+[可直接粘贴的命令]
 
 ## Development
 
-[Setup instructions, environment requirements, workflow notes]
+[安装说明、环境要求、工作流注意事项]
 ```
 
-**SUBDIRECTORY CLAUDE.md:**
+**SUBDIRECTORY CLAUDE.md：**
 
 ```markdown
 # [directory-name]/
@@ -120,121 +107,113 @@ See also: conventions/code-quality/baseline.md "Generated and Vendored Code Awar
 | --------- | ---- | ------------ |
 ```
 
-**Critical constraint:** CLAUDE.md files are navigation aids, not explanatory
-documents. They contain:
+**关键约束：** CLAUDE.md 是导航辅助工具，不是解释性文档。其内容包含：
 
-- File/directory index (REQUIRED): tabular format with What/When columns
-- One-sentence overview (OPTIONAL): what this directory is
-- Operational sections (OPTIONAL): Build, Test, Regenerate, Deploy, or similar
-  commands specific to this directory's artifacts
+- 文件/目录索引（必须）：含 What/When 列的表格格式
+- 一句话概述（可选）：该目录是什么
+- 操作节（可选）：Build、Test、Regenerate、Deploy 等该目录特定制品的命令
 
-They do NOT contain:
+不包含：
 
-- Architectural explanations (-> README.md)
-- Design decisions or rationale (-> README.md)
-- Invariants or constraints (-> README.md)
-- Multi-paragraph prose (-> README.md)
+- 架构解释（→ README.md）
+- 设计决策或原理（→ README.md）
+- 不变量或约束（→ README.md）
+- 多段落散文（→ README.md）
 
-Operational sections must be copy-pasteable commands with minimal context, not
-explanatory prose about why the build works a certain way.
+操作节必须是可直接粘贴的命令，附最少上下文，不是关于构建方式的解释性散文。
 
-## README.md Specification
+## README.md 规范
 
-### Creation Criteria (Invisible Knowledge Test)
+### 创建标准（隐性知识测试）
 
-Create README.md when the directory contains ANY invisible knowledge --
-knowledge NOT visible from reading the code:
+当目录包含**任何**隐性知识时创建 README.md——即无法通过阅读代码获得的知识：
 
-- Planning decisions (from Decision Log during implementation)
-- Business context (why the product works this way)
-- Architectural rationale (why this structure)
-- Trade-offs made (what was sacrificed for what)
-- Invariants (rules that must hold but aren't in types)
-- Historical context (why not alternatives)
-- Performance characteristics (non-obvious efficiency properties)
-- Multiple components interact through non-obvious contracts
-- The directory's structure encodes domain knowledge
-- Failure modes or edge cases aren't apparent from reading individual files
-- "Rules" developers must follow that aren't enforced by compiler/linter
+- 规划决策（实现期间决策日志中的内容）
+- 业务背景（产品为何这样工作）
+- 架构原理（为何采用这种结构）
+- 取舍（牺牲了什么换取了什么）
+- 不变量（必须保持但未在类型中体现的规则）
+- 历史背景（为何不选用替代方案）
+- 性能特性（非显而易见的效率属性）
+- 多个组件通过非显然的契约交互
+- 目录结构本身编码了领域知识
+- 故障模式或边界情况无法从读取单个文件中看出
+- 开发者必须遵守但编译器/linter 不强制的「规则」
 
-**README.md is required if ANY of the above exist.** The trigger is semantic
-(presence of invisible knowledge), not structural (file count, complexity).
+**以上任意一条存在，则 README.md 为必须。** 触发条件是语义性的（隐性知识的存在），而非结构性的（文件数量、复杂度）。
 
-**DO NOT create README.md when:**
+**不要创建 README.md 的情况：**
 
-- The directory is purely organizational with no decisions behind its structure
-- All knowledge is visible from reading source code
-- You'd only be restating what code already shows
+- 目录纯粹是组织性的，其结构背后没有决策
+- 所有知识均可从源代码中获得
+- 只是在复述代码已经展示的内容
 
-### Content Test
+### 内容测试
 
-For each sentence in README.md, ask: "Could a developer learn this by reading
-the source files?"
+对 README.md 中的每一句话问：「开发者能通过阅读源文件学到这一点吗？」
 
-- If YES: delete the sentence
-- If NO: keep it
+- 如果是：删除该句
+- 如果否：保留
 
-README.md earns its tokens by providing INVISIBLE knowledge: the reasoning
-behind the code, not descriptions of the code.
+README.md 通过提供**隐性**知识来赚取其 token 预算：即代码背后的推理，而非对代码的描述。
 
-### README.md Structure
+### README.md 结构
 
 ```markdown
 # [Component Name]
 
 ## Overview
 
-[One paragraph: what problem this solves, high-level approach]
+[一段话：解决什么问题、高层次方案]
 
 ## Architecture
 
-[How sub-components interact; data flow; key abstractions]
+[子组件如何交互；数据流；核心抽象]
 
 ## Design Decisions
 
-[Tradeoffs made and why; alternatives considered]
+[取舍及原因；考虑过的替代方案]
 
 ## Invariants
 
-[Rules that must be maintained; constraints not enforced by code]
+[必须维护的规则；代码未强制的约束]
 ```
 
-## Architecture Documentation
+## 架构文档
 
-For cross-cutting concerns and system-wide relationships that span multiple
-directories, create dedicated architecture documentation.
+对于跨越多个目录的横切关注点和系统级关系，创建专门的架构文档。
 
-### Structure
+### 结构
 
 ```markdown
 # Architecture: [System/Feature Name]
 
 ## Overview
 
-[One paragraph: problem and high-level approach]
+[一段话：问题与高层次方案]
 
 ## Components
 
-[Each component with its single responsibility and boundaries]
+[每个组件的单一职责及边界]
 
 ## Data Flow
 
-[Critical paths - prefer diagrams for complex flows]
+[关键路径——复杂流程优先使用图表]
 
 ## Design Decisions
 
-[Key tradeoffs and rationale]
+[核心取舍与原理]
 
 ## Boundaries
 
-[What this system does NOT do; where responsibility ends]
+[该系统不做什么；职责边界在哪里]
 ```
 
-### Quality Standard
+### 质量标准
 
-Components must explain relationships, not just list responsibilities.
+组件说明必须阐释关系，而非仅列出职责。
 
-Wrong -- lists without relationships:
+错误——只列清单，没有关系：
 
 ```markdown
 ## Components
@@ -244,7 +223,7 @@ Wrong -- lists without relationships:
 - Database: Stores data
 ```
 
-Right -- explains boundaries and flow:
+正确——阐释边界和数据流：
 
 ```markdown
 ## Components
@@ -258,22 +237,19 @@ Right -- explains boundaries and flow:
 Flow: Request -> AuthService (validate) -> UserService (logic) -> Database
 ```
 
-Prefer diagrams over prose for relationships.
+优先使用图表而非散文来描述关系。
 
-## In-Code Documentation
+## 代码内文档
 
-Code-level documentation captures knowledge at the point where it is most useful.
-The principle: knowledge belongs as close as possible to the code it describes.
-Cross-cutting knowledge that cannot be localized belongs in README.md.
+代码级文档在最接近所描述代码的位置捕获知识。原则：知识应尽可能靠近其描述的代码。无法局部化的横切知识属于 README.md。
 
-### Tier 1: Inline Comments
+### 第一层：行内注释
 
-Above statements or expressions where the choice is non-obvious.
+位于语句或表达式上方，适用于选择不显而易见的地方。
 
-Document *why* this approach, never *what* the code does. The reader can see what
-the code does: they cannot see why it was chosen over alternatives.
+记录*为什么*选择此方案，永远不记录代码*做了什么*。读者能看到代码做什么；他们看不到为何选择而非替代方案。
 
-Good:
+好：
 
 ```python
 # Polling: 30% webhook delivery failures observed in production
@@ -283,7 +259,7 @@ result = poll_endpoint(url, interval=30)
 counter.fetch_add(1, Ordering::Relaxed)
 ```
 
-Bad:
+差：
 
 ```python
 # Poll the endpoint
@@ -293,16 +269,13 @@ result = poll_endpoint(url, interval=30)
 counter.fetch_add(1, Ordering::Relaxed)
 ```
 
-When a decision log entry exists, reference it: `# DL-003: Polling over webhooks`
+若存在决策日志条目，引用它：`# DL-003: Polling over webhooks`
 
-### Tier 2: Function-Level Explanation Blocks
+### 第二层：函数级说明块
 
-Near the top of non-trivial functions (after signature, before body logic).
-Required when a function has >3 distinct transformation steps, coordinates
-multiple subsystems, or implements a non-obvious algorithm.
+位于非平凡函数顶部（签名之后、主体逻辑之前）。当函数有超过 3 个不同的转换步骤、协调多个子系统，或实现非显然算法时必须添加。
 
-Content: what the function does, how it does it, how it fits in the overall
-architecture, what problem it solves.
+内容：函数做什么、如何做、在整体架构中的位置、解决什么问题。
 
 ```python
 def reconcile_state(local, remote):
@@ -317,20 +290,18 @@ def reconcile_state(local, remote):
     ...
 ```
 
-Skip for CRUD operations and standard patterns where the code speaks for itself.
+CRUD 操作和标准模式中，代码本身已足够清晰的可跳过。
 
-### Tier 3: Docstrings
+### 第三层：Docstring
 
-**Private functions**: One-line summary + trigger clause (when to call).
+**私有函数**：一行摘要 + 触发子句（何时调用）。
 
 ```python
 def _normalize_key(k):
     """Strip whitespace and lowercase. Use before cache lookup."""
 ```
 
-**Public functions**: Summary + trigger clause + parameter semantics + example.
-Optimized for LLM consumption -- trigger clauses and examples enable accurate
-tool selection.
+**公共函数**：摘要 + 触发子句 + 参数语义 + 示例。为 LLM 使用优化——触发子句和示例使工具选择更准确。
 
 ```python
 def validate_config(path, strict=False):
@@ -351,10 +322,9 @@ def validate_config(path, strict=False):
     """
 ```
 
-### Tier 4: Module Documentation
+### 第四层：模块文档
 
-Top-of-file comment or module docstring. Documents what the module contains and
-why it exists as a separate unit.
+文件顶部注释或模块 docstring。记录模块包含什么以及为何作为独立单元存在。
 
 ```python
 """Rate limiting using sliding window counters.
@@ -366,37 +336,30 @@ projected scale (>100k concurrent clients).
 """
 ```
 
-### Tier 5: Invisible Knowledge Placement
+### 第五层：隐性知识放置
 
-Invisible knowledge is knowledge not visible from reading the code: business
-context, architectural rationale, tradeoffs, constraints, rejected alternatives.
+隐性知识是无法通过阅读代码获得的知识：业务背景、架构原理、取舍、约束、被否决的替代方案。
 
-**Placement hierarchy** (closest viable location wins):
+**位置层级**（选最近的可行位置）：
 
-1. **Inline comment**: When knowledge applies to a specific statement
-2. **Function-level block**: When knowledge applies to an entire function's
-   approach or algorithm
-3. **Module docstring**: When knowledge applies to why this module exists or
-   its overall design
-4. **README.md**: When knowledge is cross-cutting (spans multiple files/modules)
-   or cannot be localized to a single code point
+1. **行内注释**：知识适用于特定语句时
+2. **函数级块**：知识适用于整个函数的方案或算法时
+3. **模块 docstring**：知识适用于该模块为何存在或其整体设计时
+4. **README.md**：知识横切多个文件/模块，或无法局部化到单个代码点时
 
-What is NOT acceptable: invisible knowledge captured only in planning artifacts
-(decision logs, plan documents, conversation history) that are not carried
-forward into the codebase. Every decision, constraint, and tradeoff must land
-in code or README.md.
+不可接受的做法：隐性知识只存在于规划制品（决策日志、计划文档、对话历史）中，而未带入代码库。每个决策、约束和取舍必须落入代码或 README.md。
 
-### Priority Order
+### 优先级顺序
 
-When deciding what to document, prioritize by uncertainty:
+决定记录什么时，按不确定性排序：
 
-| Priority | Code Pattern                 | WHY Question           |
+| 优先级   | 代码模式                     | 为什么问题             |
 | -------- | ---------------------------- | ---------------------- |
-| HIGH     | Multiple valid approaches    | Why this approach?     |
-| HIGH     | Thresholds, timeouts, limits | Why these values?      |
-| HIGH     | Error handling paths         | Recovery strategy?     |
-| HIGH     | External system interactions | What assumptions?      |
-| MEDIUM   | Non-standard pattern usage   | Why deviate from norm? |
-| MEDIUM   | Performance-critical paths   | Why this optimization? |
-| LOW      | Boilerplate/established      | Skip unless unusual    |
-| LOW      | Simple CRUD operations       | Skip unless unusual    |
+| HIGH     | 多种有效方案                 | 为何选择这种？         |
+| HIGH     | 阈值、超时、限制             | 为何是这些值？         |
+| HIGH     | 错误处理路径                 | 恢复策略？             |
+| HIGH     | 外部系统交互                 | 依赖了哪些假设？       |
+| MEDIUM   | 非标准模式用法               | 为何偏离规范？         |
+| MEDIUM   | 性能关键路径                 | 为何做此优化？         |
+| LOW      | 样板/既定模式                | 非异常情况可跳过       |
+| LOW      | 简单 CRUD 操作               | 非异常情况可跳过       |

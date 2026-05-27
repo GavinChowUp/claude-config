@@ -1,512 +1,511 @@
-# Iterative Refinement Prompting: Research-Backed Techniques
+# 迭代精炼 Prompting：基于研究的技术
 
-Iterative refinement improves LLM outputs through feedback loops that progressively correct errors and enhance quality. These techniques trade latency for accuracy by generating multiple passes over the same problem.
+迭代精炼通过逐步纠错和质量提升的反馈循环来改善 LLM 的输出。这些技术以延迟换取准确率，通过对同一问题进行多次推理来实现提升。
 
-**Meta-principle**: Refinement value comes from breaking cognitive inertia—each iteration should approach the problem from a fresh angle, not merely extend the previous reasoning chain.
+**元原则**：精炼的价值来自打破认知惯性——每次迭代都应从全新角度来处理问题，而非仅仅延伸之前的推理链。
 
-**Prerequisite**: Familiarity with Chain-of-Thought (CoT) prompting and basic multi-turn conversation patterns.
-
----
-
-## Technique Selection Guide
-
-| Domain | Technique | Trigger Condition | Stacks With | Conflicts With | Cost/Tradeoff |
-|--------|-----------|-------------------|-------------|----------------|---------------|
-| Math/Calculation | PHP | Calculation errors compound across steps | Self-Consistency, Complex CoT | Stepwise refinement | 2-4 LLM calls |
-| Text Generation | Prompt Chaining | Quality matters more than latency | Any base prompting | Stepwise (simulated refinement risk) | 3 LLM calls |
-| Complex Reasoning | IoT (AIoT) | Static CoT paths fail; need adaptive exploration | CoT internally | GIoT on clear-answer tasks | 1-3 calls (adaptive) |
-| Complex Reasoning | IoT (GIoT) | Explorative tasks (puzzles, games) | CoT internally | Over-iteration on simple tasks | Fixed N calls |
-| Open-ended | PTR | No clear correctness criteria; need generalizable refinement | Any | Task-specific fine-tuning | Requires fine-tuning |
-| Competition-level | Multi-round | Model stuck in incorrect reasoning chain | Any reasoning model | None | 2-4x inference cost |
-| Demonstration | ECHO | Auto-CoT produces inconsistent demonstrations | Few-shot-CoT | Mixed-domain datasets | n + T×k calls |
+**前提知识**：需要熟悉链式推理（CoT）prompting 和基本的多轮对话模式。
 
 ---
 
-## Quick Reference: Key Principles
+## 技术选择指南
 
-1. **PHP for Unstable Math** — Feed previous answers as hints until consecutive answers converge; stops calculation error compounding.
-
-2. **Prompt Chaining Over Stepwise** — Separate draft/critique/refine into discrete calls; stepwise produces better critiques but worse outputs (simulated refinement).
-
-3. **AIoT for Adaptive Depth** — Let the model decide when to stop iterating; efficient but risks premature termination on complex problems.
-
-4. **GIoT for Exploration** — Force fixed iterations on puzzles and games where breadth matters; avoid on tasks with clear answers.
-
-5. **PTR for Generalization** — Train model to understand "how to improve" not "what is correct"; transfers across domains without task-specific fine-tuning.
-
-6. **Multi-round to Break Inertia** — Discard reasoning trace, keep only answer; forces fresh approach that breaks stuck reasoning patterns.
-
-7. **ECHO to Unify Demonstrations** — Iteratively regenerate rationales using each other as context; converges diverse patterns into coherent structure.
+| 领域 | 技术 | 触发条件 | 可与...组合 | 与...冲突 | 成本/权衡 |
+|------|------|----------|-------------|-----------|-----------|
+| 数学/计算 | PHP | 计算错误在步骤间累积 | 自洽性、复杂 CoT | 逐步精炼 | 2-4 次 LLM 调用 |
+| 文本生成 | Prompt Chaining | 质量比延迟更重要 | 任意基础 prompting | 逐步（存在模拟精炼风险） | 3 次 LLM 调用 |
+| 复杂推理 | IoT（AIoT） | 静态 CoT 路径失效；需要自适应探索 | 内部使用 CoT | 清晰答案任务上的 GIoT | 1-3 次（自适应） |
+| 复杂推理 | IoT（GIoT） | 探索性任务（谜题、游戏） | 内部使用 CoT | AIoT、简单任务过度迭代 | 固定 N 次调用 |
+| 开放性问题 | PTR | 无明确正确标准；需要可泛化的精炼 | 任意技术 | 任务特定微调 | 需要微调 |
+| 竞赛级别 | 多轮 | 模型陷入错误推理链 | 任意推理模型 | 无 | 2-4 倍推理成本 |
+| 演示 | ECHO | Auto-CoT 产生不一致的演示 | Few-shot-CoT | 混合领域数据集 | n + T×k 次调用 |
 
 ---
 
-## Selection Decision Tree
+## 快速参考：核心原则
+
+1. **PHP 用于不稳定的数学推理** —— 将之前的答案作为提示反馈，直到连续答案收敛；防止计算错误累积。
+
+2. **Prompt Chaining 优于逐步 Prompt** —— 将起草/批评/精炼分解为独立的调用；逐步方式产出更好的批评但更差的最终输出（模拟精炼）。
+
+3. **AIoT 用于自适应深度** —— 让模型决定何时停止迭代；高效但在复杂问题上存在过早终止的风险。
+
+4. **GIoT 用于探索** —— 在谜题和游戏上强制固定次数迭代（广度更重要）；对有明确答案的任务避免使用。
+
+5. **PTR 用于泛化** —— 训练模型理解「如何改进」而非「什么是正确的」；无需任务特定微调即可跨领域迁移。
+
+6. **多轮思考打破惯性** —— 丢弃推理轨迹，仅保留答案；迫使全新方法，打破僵化的推理模式。
+
+7. **ECHO 统一演示** —— 使用彼此作为上下文迭代重新生成推理；将多样化模式收敛为一致结构。
+
+---
+
+## 筛选决策树
 
 ```
-START: Does the task have objectively correct answers?
+开始：任务有客观正确答案吗？
   |
-  YES -> Are calculation/reasoning errors compounding?
+  是 -> 计算/推理错误在累积吗？
   |        |
-  |        YES -> PHP (converge via hints)
+  |        是 -> PHP（通过提示收敛）
   |        |
-  |        NO -> Is the model stuck in wrong reasoning?
+  |        否 -> 模型陷在错误推理里吗？
   |               |
-  |               YES -> Multi-round (discard trace, keep answer)
+  |               是 -> 多轮（丢弃轨迹，保留答案）
   |               |
-  |               NO -> Is static CoT failing?
+  |               否 -> 静态 CoT 在失败吗？
   |                      |
-  |                      YES -> IoT (AIoT for efficiency, GIoT for exploration)
+  |                      是 -> IoT（效率优先用 AIoT，探索优先用 GIoT）
   |                      |
-  |                      NO -> Base CoT sufficient
+  |                      否 -> 基础 CoT 足够
   |
-  NO -> Is this text generation needing quality improvement?
+  否 -> 这是需要质量提升的文本生成吗？
         |
-        YES -> Prompt Chaining (draft → critique → refine)
+        是 -> Prompt Chaining（起草 → 批评 → 精炼）
         |
-        NO -> Is this open-ended with no clear criteria?
+        否 -> 这是没有明确标准的开放性问题吗？
               |
-              YES -> PTR (if fine-tuning possible) or Prompt Chaining
+              是 -> PTR（若可微调）或 Prompt Chaining
               |
-              NO -> Are your few-shot demonstrations inconsistent?
+              否 -> 少样本演示不一致吗？
                     |
-                    YES -> ECHO (unify demonstration patterns)
+                    是 -> ECHO（统一演示模式）
                     |
-                    NO -> Evaluate if refinement adds value over single-shot
+                    否 -> 评估精炼是否比单次生成更有价值
 ```
 
 ---
 
-## Techniques
+## 技术
 
-### Progressive-Hint Prompting (PHP)
+### 渐进式提示 Prompting（PHP）
 
-PHP feeds previous answers back as hints, iterating until consecutive answers converge. This stabilizes math reasoning where early calculation errors cascade through subsequent steps.
+PHP 将之前的答案作为提示反馈，迭代直至连续答案收敛。该方法能稳定数学推理，防止早期计算错误在后续步骤中级联。
 
-**The process:**
+**流程：**
 
 ```
-Step 1 (Base): Generate answer using CoT or Complex CoT
-Step 2+: Append to question: "(Hint: The answer is near to [A1, A2, ...])"
-         Prefix answer with: "We know the Answer Hints: [A1, A2, ...].
-         With the Answer Hints: [A1, A2, ...], we will answer the question."
-Stop: When two consecutive answers match
+步骤 1（基础）：使用 CoT 或复杂 CoT 生成答案
+步骤 2+：在问题后追加：「(Hint: The answer is near to [A1, A2, ...])」
+         在答案前添加：「We know the Answer Hints: [A1, A2, ...].
+         With the Answer Hints: [A1, A2, ...], we will answer the question.」
+停止：当连续两个答案相同时
 ```
 
-**Why this works**: The hint anchors the model's numerical reasoning without dictating the solution path. The model re-derives the answer while being guided toward a plausible range, catching arithmetic mistakes that would otherwise propagate.
+**为何有效**：提示锚定了模型的数值推理，但不限定解题路径。模型在被引导到合理范围的同时重新推导答案，捕捉原本会传播的算术错误。
 
-**Critical insight**: Hints far from the correct answer can mislead the model. If hint=0 but answer=120, the model may follow the hint rather than reason independently. PHP works best when early answers are in the right ballpark. Additionally, interaction count decreases with stronger models—they converge faster.
+**关键洞见**：与正确答案相差过大的提示可能误导模型。若提示=0 但答案=120，模型可能跟随提示而非独立推理。PHP 在早期答案大致正确时效果最好。此外，随着模型变强，所需迭代次数会减少——更强的模型收敛更快。
 
-**CORRECT:**
+**正确做法：**
 ```
-Q: A store has 45 apples. They sell 18 and receive 32 more. How many apples?
-A: 45 - 18 + 32 = 59. The answer is 59.
+问：一个商店有 45 个苹果。卖出 18 个，又收到 32 个。现有几个苹果？
+答：45 - 18 + 32 = 59。答案是 59。
 
-Q: A store has 45 apples. They sell 18 and receive 32 more. How many apples?
-   (Hint: The answer is near to [59])
-A: We know the Answer Hints: [59]. With the Answer Hints: [59], we will
-   answer the question. Starting with 45, minus 18 gives 27, plus 32 gives 59.
-   The answer is 59.
-[STOP: consecutive match]
-```
-
-**INCORRECT:**
-```
-Q: What is 847 × 923?
-A: Let me calculate... 781,481. The answer is 781,481.
-
-Q: What is 847 × 923? (Hint: The answer is near to [781481])
-A: We know the Answer Hints: [781481]... The answer is 781,481.
-[Wrong hint propagates wrong answer]
+问：一个商店有 45 个苹果。卖出 18 个，又收到 32 个。现有几个苹果？
+   （提示：答案接近 [59]）
+答：我们知道答案提示：[59]。基于答案提示 [59]，我们来回答这个问题。
+   从 45 开始，减去 18 得 27，加上 32 得 59。答案是 59。
+[停止：连续匹配]
 ```
 
-The incorrect example shows PHP failing when the initial answer is wrong and the hint reinforces the error. PHP assumes early answers are approximately correct.
+**错误做法：**
+```
+问：847 × 923 等于多少？
+答：让我计算... 781,481。答案是 781,481。
 
-**Stacking note**: Composes well with Self-Consistency (reduces sample paths while improving accuracy) and Complex CoT (better initial hints). Interestingly, cross-variant pairing can outperform matched pairing—CoT with PHP-Complex CoT sometimes beats CoT with PHP-CoT.
+问：847 × 923 等于多少？（提示：答案接近 [781481]）
+答：我们知道答案提示：[781481]... 答案是 781,481。
+[错误的提示传播了错误答案]
+```
+
+这个错误示例展示了 PHP 在初始答案错误且提示强化了错误时的失败情况。PHP 假设早期答案大致正确。
+
+**组合说明**：与自洽性（减少所需采样路径同时提升准确率）和复杂 CoT（更好的初始提示）可良好组合。有趣的是，跨变体配对有时优于同类配对——CoT 配合 PHP-复杂 CoT 有时优于 CoT 配合 PHP-CoT。
 
 ---
 
-### Prompt Chaining vs Stepwise Prompt
+### Prompt Chaining vs 逐步 Prompt
 
-Both approaches implement draft → critique → refine, but chaining uses discrete LLM calls while stepwise generates all phases in one pass. Chaining produces better final outputs despite stepwise producing better critiques.
+两种方法都实现「起草 → 批评 → 精炼」，但 Chaining 使用独立的 LLM 调用，逐步在一次生成中完成所有阶段。Chaining 产出的最终输出质量更好，尽管逐步方式产出的批评质量更高。
 
 #### Prompt Chaining
 
-Separate each phase into its own focused call:
+将每个阶段分解为独立的专注调用：
 
-**The process:**
+**流程：**
 ```
-Call 1 (Draft):   "Summarize this article: [content]"
-Call 2 (Critique): "Review this summary for [missing info, irrelevant content,
-                   requirement adherence]: [draft]"
-Call 3 (Refine):  "Improve this summary based on this feedback:
-                   [draft] + [critique]"
-```
-
-**Why this works**: Each call has a single cognitive goal. The model doesn't need to balance generation quality against self-criticism within the same context, reducing interference between objectives.
-
-#### Stepwise Prompt
-
-Specify all phases in a single prompt:
-
-```
-"First, draft a summary. Second, critique it for missing information.
-Third, refine based on your critique."
+调用 1（起草）：「Summarize this article: [content]」
+调用 2（批评）：「Review this summary for [missing info, irrelevant content,
+               requirement adherence]: [draft]」
+调用 3（精炼）：「Improve this summary based on this feedback:
+               [draft] + [critique]」
 ```
 
-**Why stepwise underperforms**: The model may produce "simulated refinement"—intentionally generating errors in the draft only to correct them in the refine step. This creates the appearance of improvement without genuine quality gains. Paradoxically, stepwise critiques are more factual and comprehensive, yet the final outputs are worse.
+**为何有效**：每次调用只有一个认知目标。模型无需在同一上下文中同时平衡生成质量和自我批评，减少了目标间的干扰。
 
-**CORRECT (Chaining):**
-```
-[Call 1] Draft: "The article discusses climate policy changes in three regions..."
-[Call 2] Critique: "Missing: specific policy names. Irrelevant: weather details."
-[Call 3] Refine: "The article examines the Paris Accord implementation in..."
-```
+#### 逐步 Prompt
 
-**INCORRECT (Stepwise):**
-```
-"First draft a summary, then critique it, then refine it."
+在单个 prompt 中指定所有阶段：
 
-Draft: "The article is about climate." [artificially weak]
-Critique: "Too brief, missing all details."
-Refined: "The article discusses climate policy..." [appears improved]
+```
+「First, draft a summary. Second, critique it for missing information.
+Third, refine based on your critique.」
 ```
 
-The stepwise example shows the model sandbagging its draft to manufacture obvious improvements.
+**逐步方式效果差的原因**：模型可能产生「模拟精炼」——在起草阶段刻意制造错误，然后在精炼阶段纠正，制造出改进的假象，却没有真正的质量提升。矛盾的是，逐步批评更加翔实准确，但最终输出却更差。
 
-**Stacking note**: Chaining requires 3x calls but produces reliably higher quality. Use stepwise only when latency is critical and quality degradation is acceptable.
+**正确做法（Chaining）：**
+```
+[调用 1] 起草：「文章讨论了三个地区的气候政策变化...」
+[调用 2] 批评：「缺少：具体政策名称。无关：天气细节。」
+[调用 3] 精炼：「文章研究了《巴黎协定》在...地区的实施情况」
+```
+
+**错误做法（逐步）：**
+```
+「先起草摘要，然后批评，再精炼。」
+
+起草：「文章是关于气候的。」[人为弱化]
+批评：「太简短，缺少所有细节。」
+精炼：「文章讨论了气候政策...」[看起来有所改进]
+```
+
+逐步示例展示了模型故意压低起草质量以制造明显改进的假象。
+
+**组合说明**：Chaining 需要 3 倍调用次数，但能稳定产出更高质量。仅在延迟是关键约束且可接受质量下降时才使用逐步方式。
 
 ---
 
-### Iteration of Thought (IoT)
+### 思维迭代（IoT）
 
-IoT uses an Inner Dialogue Agent (IDA) to generate context-specific prompts that guide an LLM Agent (LLMA) through adaptive reasoning. Unlike static CoT, the prompting path evolves based on the LLMA's responses.
+IoT 使用内部对话 Agent（IDA）生成上下文特定的 prompt，引导 LLM Agent（LLMA）进行自适应推理。与静态 CoT 不同，prompting 路径会根据 LLMA 的响应动态演变。
 
-**The process:**
+**流程：**
 ```
-IDA: Analyze query + previous response → generate guiding prompt
-LLMA: Process prompt → generate refined response + identify uncertainty gaps
-Loop: IDA adjusts based on LLMA's uncertainty signals
-Stop: LLMA signals completion (AIoT) or fixed count reached (GIoT)
-```
-
-**Why this works**: The IDA functions as an external perspective that notices gaps or contradictions the LLMA might miss when reasoning linearly. The bidirectional feedback—LLMA reports uncertainty back to IDA—creates a closed loop that progressively narrows the solution space.
-
-**Critical insight**: AIoT completes most tasks within 1-2 iterations, making it efficient but prone to premature stops on complex problems. GIoT forces thorough exploration but risks hallucination when the model confidently drifts after reaching a correct answer early. Choose based on whether under-exploration (AIoT) or over-iteration (GIoT) is the greater risk.
-
-**AIoT variant (autonomous stopping):**
-```
-Query: "What caused the 2008 financial crisis?"
-IDA → LLMA: "What were the proximate triggers?"
-LLMA: "Subprime mortgage defaults... [uncertainty: role of derivatives]"
-IDA → LLMA: "Elaborate on derivative instruments' contribution."
-LLMA: "CDOs and credit default swaps amplified losses... [confidence: high]"
-LLMA signals: iteration_stop = True
+IDA：分析查询 + 之前的响应 → 生成引导 prompt
+LLMA：处理 prompt → 生成精炼响应 + 识别不确定性差距
+循环：IDA 根据 LLMA 的不确定性信号进行调整
+停止：LLMA 发出完成信号（AIoT）或达到固定次数（GIoT）
 ```
 
-**GIoT variant (fixed iterations):**
+**为何有效**：IDA 充当外部视角，注意到 LLMA 在线性推理时可能忽略的差距或矛盾。LLMA 向 IDA 反馈不确定性的双向机制创建了一个闭环，逐步缩小解题空间。
+
+**关键洞见**：AIoT 大多数任务在 1-2 次迭代内完成，效率高但在复杂问题上存在过早停止的风险。GIoT 强制彻底探索，但在模型早期找到正确答案后可能出现自信漂移。选择时需权衡：探索不足（AIoT）还是过度迭代（GIoT）哪个风险更大。
+
+**AIoT 变体（自主停止）：**
 ```
-Query: "Solve: 8 8 3 6 → 24 using +, -, ×, ÷"
-Iteration 1: "(8 - 3) × 6 - 8 = 22" [wrong]
-Iteration 2: "8 × 3 = 24, but need to use 8 and 6..." [exploring]
-Iteration 3: "(6 - 3) × 8 = 24, 8 unused..." [wrong]
-Iteration 4: "8 ÷ (3 - 8/6) = 24" [exploring]
-[Fixed count forces continued exploration]
+查询：「2008 年金融危机的成因是什么？」
+IDA → LLMA：「最直接的触发因素是什么？」
+LLMA：「次级抵押贷款违约... [不确定：衍生品的作用]」
+IDA → LLMA：「详细说明衍生品工具的影响。」
+LLMA：「CDO 和信用违约互换放大了损失... [置信度：高]」
+LLMA 发出信号：iteration_stop = True
 ```
 
-**CORRECT:**
+**GIoT 变体（固定迭代）：**
 ```
-[Complex multi-hop question requiring document synthesis]
-Use AIoT: Model explores 2 hops, signals completion when evidence converges.
-```
-
-**INCORRECT:**
-```
-[Simple factual question: "What is the capital of France?"]
-Use GIoT with 4 iterations: Wastes compute, risks introducing doubt.
+查询：「用 +、-、×、÷ 将 8 8 3 6 组合成 24」
+迭代 1：「(8 - 3) × 6 - 8 = 22」[错误]
+迭代 2：「8 × 3 = 24，但需要用上 8 和 6...」[探索中]
+迭代 3：「(6 - 3) × 8 = 24，8 未用...」[错误]
+迭代 4：「8 ÷ (3 - 8/6) = 24」[探索中]
+[固定次数强制持续探索]
 ```
 
-GIoT on simple questions introduces unnecessary exploration that can paradoxically reduce confidence.
+**正确做法：**
+```
+[需要文档综合的复杂多跳问题]
+使用 AIoT：模型探索 2 跳，证据收敛后发出完成信号。
+```
 
-**Stacking note**: IDA can use CoT internally for prompt generation. Ensemble expansion (multiple specialized IDA sub-agents) improves performance with diminishing returns beyond 10-15 agents—increases knowledge base but adds coordination complexity.
+**错误做法：**
+```
+[简单事实问题：「法国的首都是哪里？」]
+使用 4 次迭代的 GIoT：浪费计算，引入不必要的怀疑。
+```
+
+GIoT 用于简单问题时引入了不必要的探索，反而可能降低置信度。
+
+**组合说明**：IDA 可在内部使用 CoT 生成 prompt。集成扩展（多个专业化 IDA 子 agent）可提升性能，但超过 10-15 个 agent 收益递减——增加了知识覆盖，同时增加了协调复杂度。
 
 ---
 
-### Progressive Thought Refinement (PTR)
+### 渐进式思维精炼（PTR）
 
-PTR trains models to understand "how to improve" by learning from weak-to-strong answer progressions, then applying that refinement pattern at inference time.
+PTR 通过学习从弱到强的答案演进过程，使模型理解「如何改进」，然后在推理时应用这种精炼模式。
 
-**The process (training):**
+**流程（训练）：**
 ```
-1. Weak model generates initial thoughts (may be incorrect)
-2. Strong model produces refined answer given thoughts + query
-3. Consistency filtering: remove incoherent thought-answer pairs
-4. Fine-tune with thought-mask: model sees thoughts, loss computed only on answer
-```
-
-**The process (inference):**
-```
-Round 1: Generate (thought, answer)
-Round N: "Please continue thinking and refine your answer" → (new thought, new answer)
-Continue 3-4 rounds (diminishing returns after)
+1. 弱模型生成初始思维（可能不正确）
+2. 强模型在思维 + 查询的基础上产出精炼答案
+3. 一致性过滤：移除不连贯的思维-答案对
+4. 带思维掩码微调：模型看到思维，损失仅在答案上计算
 ```
 
-**Why this works**: The thought-mask forces the model to learn the improvement trajectory rather than memorize correct answers. By seeing thoughts but being evaluated only on the refined answer, the model internalizes what makes one answer better than another.
-
-**Critical insight**: Three weak-strong selection strategies ensure quality: parameter strength (larger model), model version (newer model), or domain-specific fine-tuning. Validated via statistical significance testing. Emergence timing varies by task complexity—simple tasks improve early in training while complex reasoning shows delayed emergence.
-
-**CORRECT:**
+**流程（推理）：**
 ```
-[Training data]
-Thought (weak): "To find the area, multiply length times width... 5 × 3 = 12"
-Answer (strong): "Area = length × width = 5 × 3 = 15 square units"
-[Model learns: check arithmetic, include units]
-
-[Inference]
-Round 1: "The area is 5 × 3 = 12"
-Instruction: "Please continue thinking and refine your answer"
-Round 2: "Rechecking: 5 × 3 = 15. The area is 15 square units."
+第 1 轮：生成（思维，答案）
+第 N 轮：「Please continue thinking and refine your answer」→（新思维，新答案）
+继续 3-4 轮（之后收益递减）
 ```
 
-**INCORRECT:**
+**为何有效**：思维掩码迫使模型学习改进轨迹而非记忆正确答案。通过看到思维但仅在精炼答案上被评估，模型内化了什么使一个答案优于另一个。
+
+**关键洞见**：三种弱-强选择策略确保质量：参数强度（更大模型）、模型版本（更新模型）或领域特定微调。通过统计显著性检验验证。能力涌现的时机因任务复杂度而异——简单任务在训练早期改善，复杂推理则显示延迟涌现。
+
+**正确做法：**
 ```
-[Training without consistency filtering]
-Thought: "The sky is blue because of nitrogen"
-Answer: "Rayleigh scattering causes blue sky"
-[Incoherent pair: thought and answer aren't logically connected]
+[训练数据]
+思维（弱）：「求面积，长乘以宽... 5 × 3 = 12」
+答案（强）：「面积 = 长 × 宽 = 5 × 3 = 15 平方单位」
+[模型学到：检验计算，包含单位]
+
+[推理]
+第 1 轮：「面积是 5 × 3 = 12」
+指令：「Please continue thinking and refine your answer」
+第 2 轮：「重新检查：5 × 3 = 15。面积是 15 平方单位。」
 ```
 
-Without consistency filtering, the model learns disconnected facts rather than refinement patterns.
+**错误做法：**
+```
+[无一致性过滤的训练]
+思维：「天空是蓝色的因为有氮」
+答案：「瑞利散射导致天空呈蓝色」
+[不连贯对：思维和答案没有逻辑关联]
+```
 
-**Stacking note**: Requires fine-tuning, so cannot be combined at inference time with prompt-only techniques. The trained refinement ability generalizes across domains without task-specific re-training.
+不进行一致性过滤，模型学到的是零散的事实而非精炼模式。
+
+**组合说明**：需要微调，因此无法在推理时与仅靠 prompt 的技术组合。训练好的精炼能力可跨领域泛化，无需任务特定重新训练。
 
 ---
 
-### Multi-round Thinking (Think Twice)
+### 多轮思考（Think Twice）
 
-Multi-round thinking discards the reasoning trace and keeps only the final answer, forcing the model to approach the problem fresh in each round. This breaks cognitive inertia when the model is stuck in an incorrect reasoning chain.
+多轮思考丢弃推理轨迹，仅保留最终答案，迫使模型在每轮从新角度处理问题。当模型陷入错误推理链时，可借此打破认知惯性。
 
-**The process:**
+**流程：**
 ```
-Round 1: Generate (thinking_trace, answer) from question
-Round N: "[Original question] The assistant's previous answer is:
-         <answer>X</answer>, and please re-answer."
-         [Discard previous thinking_trace]
-Continue 2-4 rounds
-```
-
-**Why this works**: By stripping the reasoning trace, the model cannot simply extend or defend its previous logic. It must reconstruct the solution path, which may reveal errors that were invisible when following the original chain.
-
-**Critical insight**: Confidence signals appear in the output. Hesitation markers (but, wait, maybe) decrease across rounds as the model becomes more confident. Response length correlates with correctness trajectory: length increases when the model was correct but becomes incorrect (uncertainty); length decreases when the model stays correct (confidence).
-
-**CORRECT:**
-```
-Round 1:
-Thinking: "Let me count the paths... A→B has 3 ways, B→C has 2 ways...
-          wait, but some paths overlap... 3 × 2 = 6 paths total"
-Answer: 6
-
-Round 2:
-"[Question] The assistant's previous answer is: <answer>6</answer>,
- and please re-answer."
-Thinking: "Previous answer was 6. Let me verify by enumeration...
-          A→B₁→C₁, A→B₁→C₂, A→B₂→C₁, A→B₂→C₂, A→B₃→C₁, A→B₃→C₂.
-          That's 6 distinct paths. Confirmed."
-Answer: 6
-[Consecutive match, stop]
+第 1 轮：从问题生成（思维轨迹，答案）
+第 N 轮：「[原始问题] The assistant's previous answer is:
+         <answer>X</answer>, and please re-answer.」
+         [丢弃之前的思维轨迹]
+继续 2-4 轮
 ```
 
-**INCORRECT:**
+**为何有效**：通过去除推理轨迹，模型无法简单延续或捍卫之前的逻辑。它必须重新构建解题路径，这可能揭示在沿原始链推理时无法发现的错误。
+
+**关键洞见**：输出中会出现置信度信号。随着模型变得更确定，犹豫标记（but、wait、maybe）会跨轮次减少。响应长度与正确性轨迹相关：当模型从正确变为错误时长度增加（不确定性）；当模型保持正确时长度减少（置信度）。
+
+**正确做法：**
 ```
-Round 1:
-Thinking: "[detailed reasoning]... The answer is 42."
-Answer: 42
+第 1 轮：
+思维：「让我数路径... A→B 有 3 种走法，B→C 有 2 种走法...
+      等等，但有些路径重叠... 共 3 × 2 = 6 条路径」
+答案：6
 
-Round 2:
-"[Question] Previous reasoning: [full trace]. Previous answer: 42. Re-answer."
-Thinking: "My previous reasoning showed... therefore still 42."
-[Kept the trace → model defends rather than re-derives]
+第 2 轮：
+「[问题] The assistant's previous answer is: <answer>6</answer>,
+ and please re-answer.」
+思维：「之前答案是 6。让我通过枚举来验证...
+      A→B₁→C₁、A→B₁→C₂、A→B₂→C₁、A→B₂→C₂、A→B₃→C₁、A→B₃→C₂。
+      共 6 条不同路径。确认。」
+答案：6
+[连续匹配，停止]
 ```
 
-Keeping the reasoning trace defeats the purpose—the model rationalizes rather than reconsidering.
+**错误做法：**
+```
+第 1 轮：
+思维：「[详细推理]... 答案是 42。」
+答案：42
 
-**Stacking note**: Orthogonal to base prompting techniques. Works with any reasoning model. Two rounds often sufficient; four rounds maximum for hard problems (diminishing returns).
+第 2 轮：
+「[问题] 之前推理：[完整轨迹]。之前答案：42。重新回答。」
+思维：「我之前的推理显示... 因此仍然是 42。」
+[保留了轨迹 → 模型在辩护而非重新推导]
+```
+
+保留推理轨迹违背了目的——模型是在合理化而非重新考虑。
+
+**组合说明**：与基础 prompting 技术正交。适用于任意推理模型。对难题两轮通常足够；最多四轮（之后收益递减）。
 
 ---
 
-### Self-Harmonized Chain of Thought (ECHO)
+### 自协调思维链（ECHO）
 
-ECHO unifies diverse Auto-CoT demonstrations into a consistent reasoning pattern through iterative regeneration. Each demonstration's rationale is regenerated using the other demonstrations as few-shot context, converging toward a shared structure.
+ECHO 通过迭代重新生成使多样化的 Auto-CoT 演示收敛为一致的推理模式。每个演示的推理过程都以其他演示为少样本上下文重新生成，趋向共同结构。
 
-**The process:**
+**流程：**
 ```
-1. Cluster questions by semantic similarity (Sentence-BERT + k-means)
-2. Sample one representative question per cluster
-3. Generate initial rationales using Zero-shot-CoT
-4. Unification loop (repeat T times, typically T=4):
-   - For each demonstration: regenerate rationale using OTHER demos as few-shot
-   - Replace old rationale with new one
-5. Use unified demonstrations for inference
-```
-
-**Selection criteria**: Question ≤60 tokens, rationale ≤5 steps. Ensures manageable, focused demonstrations.
-
-**Why this works**: Grounded in Cognitive Load Theory—unified demonstrations reduce working memory load on the model, facilitating pattern learning. When demonstrations follow inconsistent formats, the model expends capacity parsing structure rather than learning reasoning.
-
-**Critical insight**: Demonstrations with incorrect answers don't necessarily impair performance. The collective contribution to the reasoning pattern matters more than individual correctness. This enables using a wider range of demonstrations without requiring perfect accuracy.
-
-**CORRECT:**
-```
-Initial demonstrations (diverse patterns):
-Demo 1: "First, note that... Therefore, 15."
-Demo 2: "We can solve by... The answer is 23."
-Demo 3: "Let's break this down: Step 1... Result: 8."
-
-After ECHO (unified pattern):
-Demo 1: "Let's break this down: Step 1, identify values. Step 2, apply operation. Result: 15."
-Demo 2: "Let's break this down: Step 1, parse the question. Step 2, calculate. Result: 23."
-Demo 3: "Let's break this down: Step 1, extract numbers. Step 2, compute. Result: 8."
+1. 按语义相似度聚类问题（Sentence-BERT + k-means）
+2. 每个簇采样一个代表性问题
+3. 使用零样本 CoT 生成初始推理
+4. 统一化循环（重复 T 次，通常 T=4）：
+   - 对每个演示：使用其他演示作为少样本上下文重新生成推理
+   - 用新推理替换旧推理
+5. 使用统一化后的演示进行推理
 ```
 
-**INCORRECT:**
+**筛选标准**：问题 ≤60 token，推理 ≤5 步。确保演示可管理且聚焦。
+
+**为何有效**：基于认知负荷理论——统一化演示减少了模型的工作记忆负担，有利于模式学习。当演示格式不一致时，模型会将精力花在解析结构上而非学习推理。
+
+**关键洞见**：包含错误答案的演示不一定会损害性能。集体对推理模式的贡献比单个演示的准确性更重要。这使得可以使用更广泛的演示集，而无需要求完美的准确率。
+
+**正确做法：**
 ```
-[Mixed-domain dataset: math questions + yes/no commonsense questions]
-ECHO attempts to unify: Creates pattern that fits neither domain well
-Math: "Let's break this down..." → loses numerical precision
-Commonsense: "Step 1, calculate..." → inappropriate for boolean reasoning
+初始演示（多样化模式）：
+演示 1：「First, note that... Therefore, 15.」
+演示 2：「We can solve by... The answer is 23.」
+演示 3：「Let's break this down: Step 1... Result: 8.」
+
+ECHO 之后（统一化模式）：
+演示 1：「Let's break this down: Step 1, identify values. Step 2, apply operation. Result: 15.」
+演示 2：「Let's break this down: Step 1, parse the question. Step 2, calculate. Result: 23.」
+演示 3：「Let's break this down: Step 1, extract numbers. Step 2, compute. Result: 8.」
 ```
 
-ECHO assumes internal dataset similarity. Mixed domains have incompatible solution patterns that cannot meaningfully unify.
+**错误做法：**
+```
+[混合领域数据集：数学题 + 是/否常识题]
+ECHO 尝试统一：创建出两个领域都不适用的模式
+数学：「Let's break this down...」→ 失去数值精确性
+常识：「Step 1, calculate...」→ 不适合布尔推理
+```
 
-**Stacking note**: Works best when dataset has internal similarity. After 3 iterations, auto-generated prompts can exceed manual prompt quality. Risk of overfitting at T>4 (rationales become overly condensed, lose step detail).
+ECHO 假设数据集内部存在相似性。混合领域有不兼容的解题模式，无法有意义地统一。
+
+**组合说明**：在数据集具有内部相似性时效果最好。3 次迭代后，自动生成的 prompt 可超越人工 prompt 的质量。T>4 时存在过拟合风险（推理变得过于精简，失去步骤细节）。
 
 ---
 
-## Composition Table
+## 组合表
 
-| Technique | Composes Well With | Conflicts With |
-|-----------|-------------------|----------------|
-| PHP | Self-Consistency, Complex CoT, any base prompting | Stepwise refinement |
-| Prompt Chaining | Any base prompting technique | Stepwise (use one or other) |
-| IoT (AIoT) | CoT (internally), other prompting | GIoT (choose one variant) |
-| IoT (GIoT) | CoT (internally), other prompting | AIoT, over-iteration on clear answers |
-| PTR | N/A (requires fine-tuning) | Prompt-only techniques at training time |
-| Multi-round | Any reasoning model, any base prompting | None |
-| ECHO | Few-shot-CoT | Mixed-domain datasets |
+| 技术 | 可有效组合 | 与...冲突 |
+|------|-----------|---------|
+| PHP | 自洽性、复杂 CoT、任意基础 prompting | 逐步精炼 |
+| Prompt Chaining | 任意基础 prompting 技术 | 逐步（二选一） |
+| IoT（AIoT） | CoT（内部）、其他 prompting | GIoT（选一种变体） |
+| IoT（GIoT） | CoT（内部）、其他 prompting | AIoT、清晰答案任务过度迭代 |
+| PTR | 不适用（需要微调） | 训练时与仅 prompt 技术不兼容 |
+| 多轮 | 任意推理模型、任意基础 prompting | 无 |
+| ECHO | Few-shot-CoT | 混合领域数据集 |
 
-**Common composition patterns:**
+**常见组合模式：**
 
-1. **PHP + Self-Consistency**: Generate multiple hint-converged answers, then majority vote. Reduces required sample paths while maintaining accuracy.
+1. **PHP + 自洽性**：生成多个经提示收敛的答案，然后多数投票。在保持准确率的同时减少所需采样路径。
 
-2. **Multi-round + Complex CoT**: Use Complex CoT as the base prompting, then apply multi-round thinking to break stuck reasoning.
+2. **多轮 + 复杂 CoT**：以复杂 CoT 作为基础 prompting，再用多轮思考打破僵化的推理链。
 
-3. **ECHO + Few-shot-CoT**: Unify demonstrations first, then use as few-shot examples. Produces more consistent inference than raw Auto-CoT.
+3. **ECHO + Few-shot-CoT**：先统一演示，再作为少样本示例使用。产出比原始 Auto-CoT 更一致的推理。
 
-4. **IoT + CoT**: IDA uses CoT internally for generating context-specific prompts. LLMA can also use CoT for its responses.
-
----
-
-## Anti-Patterns
-
-### The Simulated Refinement Trap
-
-**Anti-pattern**: Using stepwise prompting for complex refinement tasks.
-
-```
-# PROBLEMATIC
-"Draft a summary, critique it, then refine it based on your critique."
-
-Output:
-Draft: "Article about thing." [artificially minimal]
-Critique: "Missing everything."
-Refined: "Detailed summary..." [appears to improve dramatically]
-```
-
-The model sandbagged the draft to manufacture obvious improvements. The refined output isn't better than what a single well-prompted call would produce.
-
-```
-# BETTER
-Call 1: "Summarize this article comprehensively."
-Call 2: "What's missing or irrelevant in this summary? [draft]"
-Call 3: "Improve the summary based on this feedback. [draft + critique]"
-```
-
-Separate calls prevent the model from gaming the improvement appearance.
-
-### The Stale Hint Trap
-
-**Anti-pattern**: Using PHP when initial answers are wildly wrong.
-
-```
-# PROBLEMATIC
-Q: What is 1247 × 893?
-Round 1 answer: 500,000 (wrong)
-Round 2 hint: "(Hint: The answer is near to [500000])"
-Round 2 answer: 500,000 [model follows wrong hint]
-```
-
-PHP assumes hints are approximately correct. Far-off hints mislead rather than guide.
-
-```
-# BETTER
-For calculations prone to large errors:
-1. Use Multi-round (discard trace, force re-derivation)
-2. Or Self-Consistency (sample multiple, take majority)
-3. Only use PHP after establishing answer is in right range
-```
-
-### The Over-Iteration Trap
-
-**Anti-pattern**: Using GIoT or many Multi-round iterations on tasks with clear, early answers.
-
-```
-# PROBLEMATIC
-Question: "What is 2 + 2?"
-GIoT iteration 1: "4"
-GIoT iteration 2: "Let me reconsider... 4"
-GIoT iteration 3: "Perhaps I should check... still 4"
-GIoT iteration 4: "Wait, could it be... no, definitely 4. Unless..."
-[Forced iteration introduces doubt]
-```
-
-Over-iteration on simple tasks wastes compute and can paradoxically reduce confidence.
-
-```
-# BETTER
-Use AIoT: Model signals completion after iteration 1
-Or: Use simple CoT without refinement for trivial tasks
-```
-
-### The Mixed-Domain ECHO Trap
-
-**Anti-pattern**: Applying ECHO to datasets mixing fundamentally different task types.
-
-```
-# PROBLEMATIC
-Dataset: 50% arithmetic word problems + 50% yes/no commonsense questions
-
-ECHO unification produces:
-"Let's calculate: yes."  [arithmetic pattern on commonsense]
-"The answer requires checking if 3 + 5 = true." [commonsense framing on math]
-```
-
-ECHO assumes demonstrations can converge to a shared pattern. Mixed domains have incompatible solution structures.
-
-```
-# BETTER
-Separate by domain first, apply ECHO within each homogeneous subset
-Or: Use domain-specific few-shot demonstrations without ECHO
-```
+4. **IoT + CoT**：IDA 在内部使用 CoT 生成上下文特定 prompt。LLMA 也可对其响应使用 CoT。
 
 ---
 
-## Cost-Benefit Summary
+## 反模式
 
-| Technique | Token Overhead | Latency Impact | Best For |
-|-----------|---------------|----------------|----------|
-| PHP | 2-4x (until convergence) | Medium | Math with calculation errors |
-| Prompt Chaining | 3x (fixed) | High | Text quality when latency acceptable |
-| IoT (AIoT) | 1-3x (adaptive) | Low-Medium | Complex reasoning with variable depth |
-| IoT (GIoT) | Nx (fixed) | High | Explorative tasks (puzzles, games) |
-| PTR | Training cost + 3-4x inference | Medium | Open-ended, generalizable refinement |
-| Multi-round | 2-4x (fixed) | High | Breaking stuck reasoning chains |
-| ECHO | n + T×k setup, then standard | Setup cost only | Inconsistent Auto-CoT demonstrations |
+### 模拟精炼陷阱
+
+**反模式**：对复杂精炼任务使用逐步 prompting。
+
+```
+# 有问题的做法
+「起草摘要，批评它，然后根据批评精炼。」
+
+输出：
+起草：「文章关于某件事。」[人为弱化]
+批评：「缺少所有内容。」
+精炼：「详细的摘要...」[看起来大幅改进]
+```
+
+模型故意压低起草质量以制造明显改进。精炼后的输出并不比单个精心 prompt 的调用更好。
+
+```
+# 更好的做法
+调用 1：「全面总结这篇文章。」
+调用 2：「这个摘要缺少什么或有什么无关内容？[起草]」
+调用 3：「根据此反馈改进摘要。[起草 + 批评]」
+```
+
+独立的调用防止模型操纵改进外观。
+
+### 陈旧提示陷阱
+
+**反模式**：当初始答案严重偏离时使用 PHP。
+
+```
+# 有问题的做法
+问：1247 × 893 等于多少？
+第 1 轮答案：500,000（错误）
+第 2 轮提示：「（提示：答案接近 [500000]）」
+第 2 轮答案：500,000 [模型跟随了错误提示]
+```
+
+PHP 假设提示大致正确。严重偏离的提示是误导而非引导。
+
+```
+# 更好的做法
+对容易产生大偏差的计算：
+1. 使用多轮（丢弃轨迹，强制重新推导）
+2. 或自洽性（多次采样，取多数）
+3. 仅在确认答案在合理范围内后才使用 PHP
+```
+
+### 过度迭代陷阱
+
+**反模式**：对有明确早期答案的任务使用 GIoT 或大量多轮迭代。
+
+```
+# 有问题的做法
+问题：「2 + 2 等于多少？」
+GIoT 迭代 1：「4」
+GIoT 迭代 2：「让我重新考虑... 4」
+GIoT 迭代 3：「也许我应该检查... 还是 4」
+GIoT 迭代 4：「等等，会是... 不，肯定是 4。除非...」
+[强制迭代引入了怀疑]
+```
+
+简单任务上的过度迭代浪费计算，并且悖论性地降低置信度。
+
+```
+# 更好的做法
+使用 AIoT：模型在第 1 次迭代后发出完成信号
+或：对简单任务直接使用 CoT 而无需精炼
+```
+
+### 混合领域 ECHO 陷阱
+
+**反模式**：将 ECHO 应用于混合了根本不同任务类型的数据集。
+
+```
+# 有问题的做法
+数据集：50% 算术文字题 + 50% 是/否常识题
+
+ECHO 统一化产出：
+「Let's calculate: yes.」[常识问题使用了算术模式]
+「The answer requires checking if 3 + 5 = true.」[数学问题使用了常识框架]
+```
+
+ECHO 假设演示可以收敛到共同模式。混合领域有不兼容的解题结构。
+
+```
+# 更好的做法
+先按领域分类，再在每个同质子集上应用 ECHO
+或：不使用 ECHO，直接使用领域特定的少样本演示
+```
+
+---
+
+## 成本-收益摘要
+
+| 技术 | Token 开销 | 延迟影响 | 最适用场景 |
+|------|-----------|---------|----------|
+| PHP | 2-4 倍（直至收敛） | 中等 | 存在计算错误的数学题 |
+| Prompt Chaining | 3 倍（固定） | 高 | 可接受延迟时的文本质量 |
+| IoT（AIoT） | 1-3 倍（自适应） | 低-中 | 深度可变的复杂推理 |
+| IoT（GIoT） | N 倍（固定） | 高 | 探索性任务（谜题、游戏） |
+| PTR | 训练成本 + 3-4 倍推理 | 中等 | 开放性、可泛化的精炼 |
+| 多轮 | 2-4 倍（固定） | 高 | 打破僵化推理链 |
+| ECHO | n + T×k 次设置，之后标准 | 仅设置成本 | 不一致的 Auto-CoT 演示 |

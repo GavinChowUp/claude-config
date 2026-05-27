@@ -2,37 +2,37 @@
 
 # Cross-File Consistency
 
-Evaluate whether patterns are consistent across files.
+评估文件间模式是否一致。
 
-**The core question**: Is this consistent across files? Similar APIs should behave similarly. The same concept should have one name throughout the codebase. Error handling should be predictable at each abstraction level. Feature flags should be evaluated consistently.
+**核心问题**：跨文件是否一致？相似的 API 应当行为相似。同一概念在整个代码库中应只有一个名称。错误处理在每个抽象层应当是可预期的。功能标志应当以一致的逻辑判断。
 
-**What to look for**:
+**关注点**：
 
-- Cross-module naming drift (userId/uid/id for same concept)
-- Incompatible signatures for similar operations across modules
-- Cross-abstraction-level error pattern inconsistency
-- Feature flags checked with different logic in different places
+- 跨模块命名漂移（同一概念用 userId/uid/id）
+- 跨模块相似操作的不兼容签名
+- 跨抽象层的错误模式不一致
+- 同一功能标志在不同地方以不同逻辑判断
 
-**The threshold**: Flag when inconsistency creates confusion or unpredictability for consumers. Flag when same concept has multiple names across modules AND causes integration confusion. This group requires seeing multiple files to detect patterns.
+**门槛**：当不一致对使用者造成困惑或不可预测时标记。当同一概念在跨模块有多个名称**且**导致集成困惑时标记。此组需要同时查看多个文件才能检测到模式。
 
 <design-mode>
-When evaluating Code Intent (Design Review phase):
+评估代码意图时（Design Review 阶段）：
 
-- Does the proposed API match existing similar APIs?
-- Does it introduce a new name for an existing concept?
-- Would error handling match other components at this level?
+- 提出的 API 是否与现有类似 API 一致？
+- 是否为已有概念引入了新名称？
+- 错误处理是否与该层级的其他组件一致？
 
-Evidence format: Quote the Code Intent description showing inconsistency.
+证据格式：引用代码意图描述，指出不一致之处。
 </design-mode>
 
 <code-mode>
-When evaluating actual code (Codebase Review, Refactor):
+评估实际代码时（Codebase Review、Refactor）：
 
-- Are similar operations using different conventions?
-- Is the same concept named differently across modules?
-- Do similar errors get handled differently at the same level?
+- 类似操作是否使用不同约定？
+- 同一概念是否在不同模块有不同名称？
+- 类似错误是否在同一层级以不同方式处理？
 
-Evidence format: Quote code from multiple files showing the inconsistency.
+证据格式：引用来自多个文件的代码，指出不一致之处。
 </code-mode>
 
 ---
@@ -40,149 +40,149 @@ Evidence format: Quote code from multiple files showing the inconsistency.
 ## 1. Interface Consistency
 
 <principle>
-Similar APIs should have consistent signatures. When similar functions surprise users with different conventions, they cause bugs.
+相似的 API 应有一致的签名。当类似函数以不同约定使用者，会导致 bug。
 </principle>
 
-Detect: Would a user of these APIs be surprised by inconsistency? Do similar operations have incompatible signatures?
+Detect: 这些 API 的使用者是否会因不一致而感到惊讶？类似操作是否有不兼容的签名？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-Similar function signatures with different parameter orders, CRUD operation patterns, service method signatures
+模式指示词（起点，非定论）：
+参数顺序不同的相似函数签名，CRUD 操作模式，服务方法签名
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Signature inconsistency
 
-- APIs with similar purposes have incompatible signatures AND share consumers
-- Any API inconsistency causing caller confusion
+- 目的相似的 API 有不兼容的签名**且**共享使用者
+- 任何导致调用方困惑的 API 不一致
 
 [medium] Naming inconsistency
 
-- Inconsistent naming conventions across related functions
+- 相关函数间不一致的命名约定
 
 [low] Pattern inconsistency
 
-- Mixed sync/async for similar operations without clear reason
+- 类似操作混用同步/异步而无明确原因
   </violations>
 
 <exceptions>
-Intentional API differences. Domain-specific conventions. Versioned APIs. Overloads with clear distinct purpose.
+有意的 API 差异。领域特定约定。版本化 API。目的明确不同的重载。
 </exceptions>
 
 <threshold>
-Flag when 2+ similar functions have different parameter orders (file scope) or 3+ APIs have incompatible signatures (codebase scope) AND confusion impacts consumers.
+当 2 个以上相似函数有不同参数顺序（文件范围）或 3 个以上 API 有不兼容签名（代码库范围）**且**困惑影响使用者时标记。
 </threshold>
 
 ## 2. Naming Consistency (Cross-File Scope)
 
 <principle>
-A concept should have one name throughout the codebase. Multiple names for the same thing create confusion about whether they're actually the same.
+一个概念在整个代码库中应只有一个名称。同一事物有多个名称会让人困惑：它们究竟是不是同一个东西？
 </principle>
 
-Detect: Are there multiple names for the same concept across modules? Would a reader wonder if userId and uid refer to the same entity?
+Detect: 是否有多个名称在跨模块指向同一概念？读者是否会疑惑 userId 和 uid 是否指同一实体？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-Synonyms as variable prefixes across modules (user/account/customer, config/settings/options, id/uid/identifier)
+模式指示词（起点，非定论）：
+跨模块作为变量前缀的同义词（user/account/customer，config/settings/options，id/uid/identifier）
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Semantic confusion
 
-- Synonym drift causing confusion at integration points
-- Any naming inconsistency causing doubt about identity across modules
+- 同义词漂移导致集成点产生困惑
+- 任何导致跨模块对身份产生疑问的命名不一致
 
 [medium] Inconsistent conventions
 
-- Inconsistent abbreviations across modules (e.g., userId vs uid vs id)
+- 跨模块缩写不一致（如 userId vs uid vs id）
 
 [low] Style drift
 
-- Style inconsistency without semantic confusion
+- 无语义混乱的风格不一致
   </violations>
 
 <exceptions>
-Different names for genuinely different concepts. External API naming conventions. Domain-specific terminology. Legacy compatibility aliases in bounded migration.
+真正不同概念的不同名称。外部 API 命名约定。领域特定术语。有界迁移中的遗留兼容别名。
 </exceptions>
 
 <threshold>
-Flag when same semantic concept has 3+ different names across modules AND causes confusion about whether they refer to the same thing.
+当同一语义概念在 3 个以上模块有不同名称**且**导致对其是否指同一事物产生困惑时标记。
 </threshold>
 
 ## 3. Error Pattern Consistency (Cross-File Scope)
 
 <principle>
-Error handling should be consistent within an abstraction level. Mixed patterns create confusion about how errors propagate and should be handled.
+同一抽象层内的错误处理应当一致。混用模式会导致调用方对错误如何传播和应如何处理产生困惑。
 </principle>
 
-Detect: Is error handling consistent across components at the same abstraction level? Would a caller know what to expect from similar operations?
+Detect: 同一抽象层的组件间错误处理是否一致？调用方能否预期类似操作的行为？
 
 <grep-hints>
-Pattern indicators (starting points, not definitive):
-Mixed exception/return-code patterns, inconsistent error message formats, varying error context across modules
+模式指示词（起点，非定论）：
+混用异常/返回码模式，跨模块不一致的错误消息格式，变化的错误上下文
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Incompatible patterns
 
-- Incompatible error patterns for similar operations across components
-- Any error handling creating caller confusion at integration boundaries
+- 跨组件类似操作使用不兼容的错误模式
+- 任何在集成边界造成调用方困惑的错误处理
 
 [medium] Inconsistent hierarchy
 
-- Inconsistent exception hierarchies at same abstraction level
+- 同一抽象层不一致的异常层级
 
 [low] Missing convention
 
-- No standard for error context/wrapping across modules
+- 跨模块错误上下文/包装没有标准
   </violations>
 
 <exceptions>
-Different patterns for different abstraction levels (domain vs API vs infra). Wrapper functions translating between error styles. Legacy code under active migration.
+不同抽象层使用不同模式（领域 vs API vs 基础设施）。在错误风格间转换的包装函数。处于积极迁移中的遗留代码。
 </exceptions>
 
 <threshold>
-Flag when same abstraction level uses 3+ incompatible error patterns across files for similar operations AND no migration plan exists.
+当同一抽象层在文件间对类似操作使用 3 种以上不兼容的错误模式**且**没有迁移计划时标记。
 </threshold>
 
 ## 4. Feature Flag Sprawl
 
 <principle>
-Feature flags should be checked consistently. When the same flag is evaluated with different logic in different places, behavior becomes unpredictable.
+功能标志应当以一致的方式判断。当同一标志在不同地方以不同逻辑评估时，行为变得不可预测。
 </principle>
 
-Detect: How are feature flags checked across the codebase? Is the same flag evaluated consistently everywhere?
+Detect: 功能标志在整个代码库中如何判断？同一标志在所有地方的评估是否一致？
 
 <grep-hints>
-Structural indicators (starting points, not definitive):
-Feature flag checks, toggle patterns, conditional feature code
+结构指示词（起点，非定论）：
+功能标志检查，toggle 模式，条件特性代码
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Inconsistent evaluation
 
-- Feature flags checked inconsistently (different conditions for same flag)
-- Any flag with divergent evaluation logic across locations
+- 功能标志判断不一致（同一标志使用不同条件）
+- 任何跨位置评估逻辑出现分歧的标志
 
 [medium] Undocumented dependencies
 
-- Flag dependencies not documented (flag A requires flag B)
+- 标志依赖未记录（标志 A 需要标志 B）
   </violations>
 
 <exceptions>
-Flags with intentionally different behavior per context. A/B test variations. Gradual rollout logic.
+有意在不同上下文中行为不同的标志。A/B 测试变体。逐步上线逻辑。
 </exceptions>
 
 <threshold>
-Flag when same feature flag is checked with different logic in different places AND the difference is unintentional.
+当同一功能标志在不同地方以不同逻辑判断**且**差异是无意的时标记。
 </threshold>
 
-Note: Dead flags (feature shipped, never removed) are covered in 08-codebase-patterns.md Zombie Code (Codebase Scope).
+注意：死标志（特性已上线但标志从未移除）在 08-codebase-patterns.md Zombie Code（Codebase Scope）中处理。

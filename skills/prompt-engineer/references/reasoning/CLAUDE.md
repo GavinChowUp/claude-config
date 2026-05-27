@@ -1,10 +1,10 @@
 # reasoning/
 
-Synthesized guidance for reasoning problems.
+推理问题的综合指导。
 
-## Files
+## 文件
 
-| File               | What                             | When to read                             |
+| 文件               | 内容                             | 何时阅读                                 |
 | ------------------ | -------------------------------- | ---------------------------------------- |
-| `decomposition.md` | Problem decomposition techniques | Model can't handle multi-step complexity |
-| `elicitation.md`   | Reasoning trace elicitation      | Model skips steps, doesn't show work     |
+| `decomposition.md` | 问题分解技术                     | 模型无法处理多步骤复杂性时               |
+| `elicitation.md`   | 推理轨迹引出                     | 模型跳过步骤或不展示推理过程时           |

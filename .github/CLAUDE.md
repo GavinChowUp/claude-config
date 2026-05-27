@@ -1,9 +1,9 @@
 # .github/
 
-GitHub configuration and CI/CD workflows.
+GitHub 配置和 CI/CD 工作流。
 
-## Subdirectories
+## 子目录
 
-| Directory    | What                  | When to read                                |
-| ------------ | --------------------- | ------------------------------------------- |
-| `workflows/` | GitHub Actions CI/CD  | Adding CI jobs, debugging workflow failures |
+| 目录           | 内容                   | 何时阅读                                |
+| -------------- | ---------------------- | --------------------------------------- |
+| `workflows/`   | GitHub Actions CI/CD   | 添加 CI 任务、调试工作流失败时          |

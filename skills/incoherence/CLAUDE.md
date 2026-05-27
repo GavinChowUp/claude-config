@@ -1,10 +1,10 @@
 # incoherence/
 
-Incoherence detection skill using parallel agents. IMMEDIATELY invoke the script -- do NOT explore first.
+使用并行 agent 的一致性检测 skill。立即调用脚本——不要先探索。
 
-## Files
+## 文件
 
-| File                     | What              | When to read       |
+| 文件                     | 内容              | 何时阅读       |
 | ------------------------ | ----------------- | ------------------ |
-| `SKILL.md`               | Skill invocation  | Using this skill   |
-| `scripts/incoherence.py` | Complete workflow | Debugging behavior |
+| `SKILL.md`               | Skill 调用方式  | 使用本 skill   |
+| `scripts/incoherence.py` | 完整工作流 | 调试行为 |

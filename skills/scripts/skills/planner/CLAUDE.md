@@ -1,43 +1,43 @@
 # planner/
 
-Planning and execution workflows with QR gates, TW passes, and Dev execution. State files managed by LLM agents for session continuity.
+带 QR gate、TW 阶段与 Dev 执行的规划与执行工作流。状态文件由 LLM agent 管理，用于会话连续性。
 
-## Files
+## 文件
 
-| File        | What                                                | When to read                                     |
+| 文件        | 内容                                                | 何时阅读                                     |
 | ----------- | --------------------------------------------------- | ------------------------------------------------ |
-| `README.md` | Architecture, data flow, QR gates, design decisions | Understanding planner architecture, QR workflows |
+| `README.md` | 架构、数据流、QR gate、设计决策 | 理解 planner 架构、QR 工作流时 |
 
-## Shared Files
+## 共享文件
 
-| File                    | What                                           | When to read                         |
+| 文件                    | 内容                                           | 何时阅读                         |
 | ----------------------- | ---------------------------------------------- | ------------------------------------ |
-| `shared/schema.py`      | Pydantic schemas (context, plan, qr) and       | Understanding state file schemas,    |
-|                         | validate_state() function                      | modifying schema definitions         |
-| `shared/constraints.py` | Orchestrator constraint AST builders               | Building planner/executor prompts,   |
-|                         | (`build_orchestrator_constraint`,                  | composing reusable constraint blocks |
-|                         | `build_step_header`, `build_state_banner`)         |                                      |
-| `shared/gates.py`       | Unified gate output builder                    | Understanding QR gate logic,         |
-|                         | (`build_gate_output`)                          | modifying gate behavior              |
+| `shared/schema.py`      | Pydantic schema（context、plan、qr）及       | 理解状态文件 schema、    |
+|                         | validate_state() 函数                      | 修改 schema 定义时         |
+| `shared/constraints.py` | 编排器约束 AST 构建器               | 构建 planner/executor prompt、   |
+|                         | （`build_orchestrator_constraint`、                  | 组合可复用约束块时 |
+|                         | `build_step_header`、`build_state_banner`）         |                                      |
+| `shared/gates.py`       | 统一 gate 输出构建器                    | 理解 QR gate 逻辑、         |
+|                         | （`build_gate_output`）                          | 修改 gate 行为时            |
 
-## Subdirectories
+## 子目录
 
-| Directory           | What                                   | When to read                               |
+| 目录                | 内容                                   | 何时阅读                               |
 | ------------------- | -------------------------------------- | ------------------------------------------ |
-| `orchestrator/`     | Main workflows (planner, executor)     | Creating/executing plans                   |
-| `architect/`        | Plan design sub-agent                  | Understanding planning workflow            |
-| `developer/`        | Code filling and implementation        | Dev execution, diff creation               |
-| `technical_writer/` | Documentation scrubbing and generation | TW passes, temporal cleanup                |
-| `quality_reviewer/` | QR modules for all phases              | QR logic, validation, understanding gates  |
-| `shared/`           | Shared resources, schemas, conventions | Accessing conventions, resource management |
+| `orchestrator/`     | 主工作流（planner、executor）     | 创建/执行计划时                   |
+| `architect/`        | 计划设计子 agent                  | 理解规划工作流时            |
+| `developer/`        | 代码填充与实现        | Dev 执行、生成 diff 时           |
+| `technical_writer/` | 文档清理与生成 | TW 阶段、时态清理时     |
+| `quality_reviewer/` | 所有阶段的 QR 模块              | QR 逻辑、验证、理解 gate 时  |
+| `shared/`           | 共享资源、schema、约定 | 访问约定、资源管理时 |
 
-## State Files
+## 状态文件
 
-All plan state lives in plan.json. Context captured separately in context.json. See README.md for full schemas.
+所有计划状态存储在 plan.json 中，上下文单独存入 context.json。完整 schema 见 README.md。
 
-| File              | What                                    | Mutability          | When to read                   |
+| 文件              | 内容                                    | 可变性              | 何时阅读                   |
 | ----------------- | --------------------------------------- | ------------------- | ------------------------------ |
-| `plan.json`       | Complete plan state (milestones, diffs, | mutable -> frozen   | All planning phases            |
-|                   | code_intents, code_changes, docs)       |                     |                                |
-| `context.json`    | User-provided planning context          | frozen after step 2 | Sub-agent context handover     |
-| `qr-{phase}.json` | QA items for specific phase (ephemeral) | ephemeral           | QA decomposition, verification |
+| `plan.json`       | 完整计划状态（milestones、diffs、 | 可变 -> 冻结   | 所有规划阶段            |
+|                   | code_intents、code_changes、docs）       |                     |                                |
+| `context.json`    | 用户提供的规划上下文          | 步骤 2 后冻结 | 子 agent 上下文交接     |
+| `qr-{phase}.json` | 特定阶段的 QA 条目（临时） | 临时性           | QA 拆解、验证时 |

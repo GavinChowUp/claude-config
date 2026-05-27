@@ -1,146 +1,146 @@
-# Claude Code History Analysis
+# Claude Code 历史分析
 
-Reference documentation for analyzing Claude Code conversation history files. This skill provides query patterns and structural knowledge for extracting insights from JSONL conversation logs.
+分析 Claude Code 对话历史文件的参考文档。本 skill 提供查询模式和结构性知识，用于从 JSONL 对话日志中提取洞察。
 
-## When to Use
+## 适用场景
 
-- Analyzing token usage patterns in past conversations
-- Finding conversations by date, content, or skill usage
-- Understanding main-agent/sub-agent interaction patterns
-- Debugging why a conversation grew large or behaved unexpectedly
-- Extracting specific messages or tool invocations from history
+- 分析历史对话中的 token 用量模式
+- 按日期、内容或 skill 使用情况查找对话
+- 理解主 agent/子 agent 交互模式
+- 调试对话为何变大或行为异常
+- 从历史记录中提取特定消息或工具调用
 
-## When NOT to Use
+## 不适用场景
 
-- Real-time conversation analysis (use current context instead)
-- Modifying conversation history (files are append-only logs)
-- Cross-project analysis (each project has separate history)
+- 实时对话分析（使用当前上下文代替）
+- 修改对话历史（文件是只追加的日志）
+- 跨项目分析（每个项目有独立的历史记录）
 
-## Architecture
+## 架构
 
-Claude Code stores conversation history in `~/.claude/projects/` with directories named after encoded working directory paths.
+Claude Code 将对话历史存储在 `~/.claude/projects/` 中，目录名为工作目录路径的编码形式。
 
 ```
 ~/.claude/projects/
   |-- -Users-leon--claude/              # /Users/leon/.claude
-  |   |-- {session-uuid}.jsonl          # Main conversation
+  |   |-- {session-uuid}.jsonl          # 主对话
   |   |-- {session-uuid}/
   |       |-- subagents/
-  |       |   |-- agent-{hash}.jsonl    # Subagent conversations
-  |       |-- tool-results/             # Large tool outputs
+  |       |   |-- agent-{hash}.jsonl    # 子 agent 对话
+  |       |-- tool-results/             # 大型工具输出
   |-- -Users-leon-git-myproject/        # /Users/leon/git/myproject
       |-- ...
 ```
 
-### Path Encoding
+### 路径编码
 
-Working directory paths are encoded:
+工作目录路径的编码规则：
 
-| Original       | Encoded        | Rule                |
+| 原始路径       | 编码结果       | 规则                |
 | -------------- | -------------- | ------------------- |
-| `/Users/leon`  | `-Users-leon`  | Leading `/` -> `-`  |
-| `/git/project` | `-git-project` | Internal `/` -> `-` |
+| `/Users/leon`  | `-Users-leon`  | 首 `/` -> `-`  |
+| `/git/project` | `-git-project` | 内部 `/` -> `-` |
 | `/.claude`     | `--claude`     | `/.` -> `--`        |
 
-### Message Format
+### 消息格式
 
-Each line in a JSONL file is a self-contained message with:
+JSONL 文件中每一行是一条独立消息，包含：
 
-- `type`: Message type (user, assistant, system, queue-operation)
-- `uuid`: Unique identifier for this message
-- `parentUuid`: Links to predecessor message (forms conversation chain)
-- `timestamp`: ISO 8601 timestamp
-- `message`: Payload containing role, content, and usage statistics
+- `type`：消息类型（user、assistant、system、queue-operation）
+- `uuid`：此消息的唯一标识符
+- `parentUuid`：链接到前驱消息（构成对话链）
+- `timestamp`：ISO 8601 时间戳
+- `message`：包含角色、内容和用量统计的载荷
 
-Assistant messages have structured content blocks:
+assistant 消息有结构化的内容块：
 
-- Thinking blocks: Internal reasoning (signature-protected)
-- Tool use blocks: Tool invocations with name and input
-- Text blocks: Response text shown to user
+- thinking 块：内部推理（签名保护）
+- tool use 块：工具调用，包含名称和输入
+- text 块：展示给用户的响应文本
 
-## Invisible Knowledge
+## 隐性知识
 
-### Why Documentation-Only (No Python Scripts)
+### 为何只有文档（没有 Python 脚本）
 
-Shell commands + jq compose better than custom tooling for this use case:
+Shell 命令 + jq 比自定义工具更适合此用途：
 
-1. **Format is stable**: JSONL with consistent schema
-2. **Queries are ad-hoc**: No two analyses are identical
-3. **jq is powerful**: Handles all JSON transformations needed
-4. **Maintenance burden**: Python code requires updates when format changes
+1. **格式稳定**：JSONL 具有一致的 schema
+2. **查询即席**：没有两次分析是完全相同的
+3. **jq 足够强大**：能处理所需的所有 JSON 转换
+4. **维护负担**：格式变化时 Python 代码需要更新
 
-The documentation approach lets the LLM compose queries on demand rather than learning a custom API.
+文档方式让 LLM 能按需组合查询，而无需学习自定义 API。
 
-### Skill Recognition Pattern
+### Skill 识别模式
 
-Skills are invoked via bash with pattern `python3 -m skills.{name}.{module}`. This pattern is general enough to capture all skills without enumeration:
+Skill 通过 bash 调用，模式为 `python3 -m skills.{name}.{module}`。该模式足够通用，无需枚举即可捕获所有 skill：
 
 ```regex
 python3 -m skills\.([a-z_]+)\.
 ```
 
-Capture group 1 extracts the skill name. No need to maintain a list of valid skill names.
+捕获组 1 提取 skill 名称。无需维护有效 skill 名称列表。
 
-### Subagent Correlation Challenge
+### 子 agent 关联挑战
 
-Subagent files are named `agent-{hash}.jsonl` but the hash is not stored in the parent conversation's Task tool call. Correlation requires:
+子 agent 文件命名为 `agent-{hash}.jsonl`，但哈希值不存储在父对话的 Task 工具调用中。关联需要：
 
-1. List all subagent files for the session
-2. Read each subagent's first user message (contains task description)
-3. Match description text to Task tool_use inputs in parent
+1. 列出该会话下的所有子 agent 文件
+2. 读取每个子 agent 的第一条用户消息（包含任务描述）
+3. 将描述文本与父对话中的 Task tool_use 输入匹配
 
-This is mildly inconvenient but not worth building tooling for -- it's a rare operation.
+这略有不便，但不值得为此构建专用工具——这是很少发生的操作。
 
-### Token Usage Fields
+### Token 用量字段
 
-The `usage` object in assistant messages contains:
+assistant 消息中的 `usage` 对象包含：
 
-- `input_tokens`: Tokens in prompt (excluding cache)
-- `output_tokens`: Tokens in response
-- `cache_read_input_tokens`: Tokens read from cache
-- `cache_creation_input_tokens`: Tokens written to cache
+- `input_tokens`：prompt 中的 token 数（不含缓存）
+- `output_tokens`：响应中的 token 数
+- `cache_read_input_tokens`：从缓存读取的 token 数
+- `cache_creation_input_tokens`：写入缓存的 token 数
 
-Total billable input = `input_tokens + cache_creation_input_tokens` (cache reads are cheaper).
+总计费输入 = `input_tokens + cache_creation_input_tokens`（缓存读取更便宜）。
 
-## Example Usage
+## 使用示例
 
-### Find Large Conversations
+### 查找大型对话
 
 ```bash
-# Find conversations over 1MB
+# 查找超过 1MB 的对话
 find "$PROJECT_DIR" -name "*.jsonl" -size +1M
 
-# Get token totals for each
+# 获取每个对话的 token 总量
 for f in "$PROJECT_DIR"/*.jsonl; do
   tokens=$(jq -s '[.[].message.usage? | select(.) | .input_tokens] | add' "$f")
   echo "$tokens $f"
 done | sort -rn | head -10
 ```
 
-### Analyze Skill Usage
+### 分析 Skill 使用情况
 
 ```bash
-# Which skills were used in a conversation?
+# 某对话中使用了哪些 skill？
 grep -oE "python3 -m skills\.[a-z_]+" file.jsonl | \
   sed 's/python3 -m skills\.//' | \
   cut -d. -f1 | \
   sort -u
 
-# Find all planner skill conversations
+# 查找所有使用 planner skill 的对话
 grep -l "python3 -m skills\.planner\." "$PROJECT_DIR"/*.jsonl
 ```
 
-### Token Growth Analysis
+### Token 增长分析
 
 ```bash
-# Show token progression (identify where context grew)
+# 显示 token 增长进程（识别上下文在哪里膨胀）
 jq -c 'select(.type=="assistant" and .message.usage.input_tokens > 50000) |
   {ts: .timestamp[11:19], tokens: .message.usage.input_tokens}' file.jsonl
 ```
 
-## Related Skills
+## 相关 Skill
 
-This skill provides the structural knowledge for history analysis. For analyzing specific patterns:
+本 skill 提供历史分析的结构性知识。针对特定模式的分析：
 
-- **refactor**: Use when analyzing code quality patterns in past sessions
-- **problem-analysis**: Use when investigating root causes of issues found in history
+- **refactor**：分析历史会话中的代码质量模式时使用
+- **problem-analysis**：调查历史记录中发现的问题根因时使用

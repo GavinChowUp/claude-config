@@ -1,46 +1,38 @@
 # Doc Sync
 
-The CLAUDE.md/README.md hierarchy is central to context hygiene. CLAUDE.md files
-are pure indexes -- tabular navigation with "What" and "When to read" columns
-that help LLMs (and humans) find relevant files without loading everything.
-README.md files capture invisible knowledge: architecture decisions, design
-tradeoffs, and invariants that are not apparent from reading code.
+CLAUDE.md/README.md 层级是上下文卫生的核心。CLAUDE.md 文件是纯索引——带有「内容」和「何时阅读」两列的表格式导航，帮助 LLM（和人类）在不加载所有文件的情况下找到相关文件。README.md 文件捕获隐性知识：架构决策、设计权衡，以及从阅读代码中无法直接看出的不变量。
 
-The doc-sync skill audits and synchronizes this hierarchy across a repository.
+doc-sync skill 负责审计并同步整个 repo 中的这一层级结构。
 
-## How It Works
+## 工作原理
 
-The skill operates in five phases:
+本 skill 分五个阶段运行：
 
-1. **Discovery** -- Maps all directories, identifies missing or outdated
-   CLAUDE.md files
-2. **Audit** -- Checks for drift (files added/removed but not indexed),
-   misplaced content (architecture docs in CLAUDE.md instead of README.md)
-3. **Migration** -- Moves architectural content from CLAUDE.md to README.md
-4. **Update** -- Creates/updates indexes with proper tabular format
-5. **Verification** -- Confirms complete coverage and correct structure
+1. **发现** —— 映射所有目录，识别缺失或过时的 CLAUDE.md 文件
+2. **审计** —— 检查漂移（文件增删但未更新索引）、内容错位（架构文档写进了 CLAUDE.md 而非 README.md）
+3. **迁移** —— 将架构内容从 CLAUDE.md 移到 README.md
+4. **更新** —— 用正确的表格格式创建/更新索引
+5. **验证** —— 确认覆盖完整且结构正确
 
-## When to Use
+## 适用场景
 
-Use this skill for:
+适合以下情况：
 
-- **Bootstrapping** -- Adopting this workflow on an existing repository
-- **After bulk changes** -- Major refactors, directory restructuring
-- **Periodic audits** -- Checking for documentation drift
-- **Onboarding** -- Before starting work on an unfamiliar codebase
+- **初始化** —— 在已有 repo 上采用此工作流
+- **批量改动后** —— 大规模重构、目录重组
+- **定期审计** —— 检查文档漂移
+- **上手前** —— 开始在不熟悉的代码库上工作之前
 
-If you use the planning workflow consistently, the technical writer agent
-maintains documentation as part of execution. As such, doc-sync is primarily for
-bootstrapping or recovery -- not routine use.
+如果你一直在使用规划工作流，technical-writer agent 会在执行过程中维护文档。因此 doc-sync 主要用于初始化或恢复——而非常规使用。
 
-## Example Usage
+## 用法示例
 
 ```
-Use your doc-sync skill to synchronize documentation across this repository
+用你的 doc-sync skill 同步本 repo 的文档
 ```
 
-For targeted updates:
+针对特定目录：
 
 ```
-Use your doc-sync skill to update documentation in src/validators/
+用你的 doc-sync skill 更新 src/validators/ 中的文档
 ```

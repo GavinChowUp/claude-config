@@ -1,14 +1,14 @@
 ---
 name: deepthink
-description: Invoke IMMEDIATELY via python script when user requests structured reasoning for open-ended analytical questions. Do NOT explore first - the script orchestrates the thinking workflow.
+description: 当用户请求对开放性分析问题进行结构化 reasoning 时，立即通过 python 脚本调用。不要先探索——脚本负责编排整个思考工作流。
 ---
 
 # DeepThink
 
-When this skill activates, IMMEDIATELY invoke the script. The script IS the workflow.
+此 skill 激活时，立即调用脚本。脚本本身就是工作流。
 
-Invoke:
+调用方式:
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.deepthink.think --step 1" />
 
-Do NOT explore or analyze first. Run the script and follow its output.
+不要先探索或分析。运行脚本并跟随其输出执行。

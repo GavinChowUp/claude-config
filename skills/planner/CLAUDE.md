@@ -1,32 +1,32 @@
 # planner/
 
-Planning and execution skill with quality review gates.
+带质量门的规划与执行 skill。
 
-## Files
+## 文件
 
-| File        | What                               | When to read                 |
+| 文件        | 内容                               | 何时阅读                     |
 | ----------- | ---------------------------------- | ---------------------------- |
-| `SKILL.md`  | Skill activation and invocation    | Using the planner skill      |
-| `INTENT.md` | Authoritative design specification | Understanding system design  |
-| `README.md` | Architecture, workflows, rationale | Understanding planner design |
+| `SKILL.md`  | Skill 激活与调用方式               | 使用 planner skill 时        |
+| `INTENT.md` | 权威设计规范                       | 理解系统设计时               |
+| `README.md` | 架构、工作流、设计理由             | 理解 planner 设计时          |
 
-## Subdirectories
+## 子目录
 
-| Directory    | What                   | When to read                        |
+| 目录         | 内容                   | 何时阅读                            |
 | ------------ | ---------------------- | ----------------------------------- |
-| `resources/` | Plan format, diff spec | Editing plan structure, diff format |
-| `architect/` | Plan design sub-agent  | Understanding planning workflow     |
+| `resources/` | 计划格式、diff 规范    | 编辑计划结构或 diff 格式时          |
+| `architect/` | 计划设计子 agent       | 理解规划工作流时                    |
 
-Python code: `scripts/skills/planner/` (planner.py, executor.py, explore.py, qr/, tw/, dev/)
+Python 代码:`scripts/skills/planner/`(planner.py、executor.py、explore.py、qr/、tw/、dev/)
 
-## Universal Conventions
+## 通用约定
 
-Scripts reference these conventions from `.claude/conventions/`:
+脚本从 `.claude/conventions/` 读取以下约定:
 
-| Convention          | When to read                                 |
-| ------------------- | -------------------------------------------- |
-| `documentation.md`  | Understanding CLAUDE.md/README.md format     |
-| `structural.md`     | Updating QR RULE 2 or planner decision audit |
-| `temporal.md`       | Updating TW/QR temporal contamination logic  |
-| `severity.md`       | Understanding QR severity levels             |
-| `intent-markers.md` | Understanding :PERF:/:UNSAFE: markers        |
+| 约定文件            | 何时阅读                                         |
+| ------------------- | ------------------------------------------------ |
+| `documentation.md`  | 理解 CLAUDE.md/README.md 格式时                  |
+| `structural.md`     | 更新 QR RULE 2 或 planner 决策审计时             |
+| `temporal.md`       | 更新 TW/QR 时态污染逻辑时                        |
+| `severity.md`       | 理解 QR 严重级别时                               |
+| `intent-markers.md` | 理解 `:PERF:`/`:UNSAFE:` 标记时                  |

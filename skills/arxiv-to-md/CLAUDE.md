@@ -1,23 +1,22 @@
 # arxiv-to-md/
 
-Convert arXiv papers to LLM-consumable markdown. IMMEDIATELY invoke the script
-when user provides an arXiv ID or URL. Do NOT explore first.
+将 arXiv 论文转换为 LLM 可消费的 Markdown。当用户提供 arXiv ID 或 URL 时，立即调用脚本，不要先探索。
 
-## Files
+## 文件
 
-| File        | What                              | When to read                 |
+| 文件        | 内容                              | 何时阅读                 |
 | ----------- | --------------------------------- | ---------------------------- |
-| `SKILL.md`  | Skill invocation                  | Using this skill             |
-| `README.md` | Architecture, invisible knowledge | Understanding design choices |
+| `SKILL.md`  | Skill 调用方式                   | 使用本 skill             |
+| `README.md` | 架构、隐性知识 | 理解设计选择 |
 
-Python code in `scripts/skills/arxiv_to_md/`:
+Python 代码位于 `scripts/skills/arxiv_to_md/`：
 
-| File           | What                              |
+| 文件           | 内容                              |
 | -------------- | --------------------------------- |
-| `main.py`      | Orchestrator (discover, dispatch) |
-| `sub_agent.py` | Worker (single paper conversion)  |
-| `tex_utils.py` | TeX preprocessing utilities       |
+| `main.py`      | 编排器（发现、派发） |
+| `sub_agent.py` | 工作器（单篇论文转换）  |
+| `tex_utils.py` | TeX 预处理工具       |
 
-## Prerequisites
+## 前提条件
 
-- pandoc binary installed
+- 已安装 pandoc 二进制

@@ -1,6 +1,6 @@
-# Plan Format
+# 计划格式
 
-Write your plan using this structure:
+使用此结构编写计划:
 
 ```markdown
 # [Plan Title]

@@ -1,29 +1,29 @@
 # Planner
 
-Planning and execution workflows with QR (Quality Review) gates, TW (Technical Writer) passes, and Dev (Developer) execution phases.
+带 QR（Quality Review）gate、TW（Technical Writer）阶段与 Dev（Developer）执行阶段的规划与执行工作流。
 
-This document is authoritative for the planner skill architecture.
+本文档是 planner skill 架构的权威说明。
 
-## Architecture: Python Scripts vs LLM
+## 架构：Python 脚本 vs LLM
 
-Python scripts emit workflow prompts and routing. The LLM operates BETWEEN script invocations:
+Python 脚本输出工作流 prompt 和路由指令。LLM 在两次脚本调用之间运行：
 
-1. Script outputs prompt/guidance for current step
-2. LLM reads prompt, performs reasoning/assessment
-3. LLM decides outcome (e.g., QR PASS/FAIL)
-4. LLM invokes next script based on outcome
+1. 脚本为当前步骤输出 prompt/指引
+2. LLM 读取 prompt，执行推理/评估
+3. LLM 决定结果（如 QR PASS/FAIL）
+4. LLM 根据结果调用下一个脚本
 
-QR PASS/FAIL is determined by LLM reading QR output, not Python. Gate routing is LLM's decision based on QR outcome. Python scripts provide structure; LLM provides intelligence.
+QR PASS/FAIL 由读取 QR 输出的 LLM 决定，而非 Python。Gate 路由是 LLM 基于 QR 结果的决策。Python 脚本提供结构，LLM 提供智能。
 
-## State Files
+## 状态文件
 
-All state mutations (except initial context.json) happen via Python CLI commands. State directory created via `tempfile.mkdtemp()` in `/tmp`.
+除初始 context.json 外，所有状态修改均通过 Python CLI 命令完成。状态目录通过 `tempfile.mkdtemp()` 在 `/tmp` 下创建。
 
-| File              | Schema         | Created     | Mutated By     | Lifecycle              |
+| 文件              | Schema         | 创建者     | 修改者     | 生命周期              |
 | ----------------- | -------------- | ----------- | -------------- | ---------------------- |
-| `plan.json`       | Pydantic v2    | Step 1 init | CLI commands   | mutable -> frozen      |
-| `context.json`    | Loose JSON     | Step 2      | LLM Write tool | frozen after step 2    |
-| `qr-{phase}.json` | QA item schema | QR dispatch | LLM during QR  | ephemeral per QR cycle |
+| `plan.json`       | Pydantic v2    | 步骤 1 初始化 | CLI 命令   | 可变 -> 冻结      |
+| `context.json`    | 宽松 JSON     | 步骤 2      | LLM Write 工具 | 步骤 2 后冻结    |
+| `qr-{phase}.json` | QA 条目 schema | QR 派发 | QR 期间的 LLM  | 每个 QR 周期临时存在 |
 
 ### plan.json Schema
 
@@ -61,11 +61,11 @@ Plan
     waves[]: wave number, milestones[]
 ```
 
-Reference integrity: code_change.intent_ref -> code_intent.id, decision_refs -> decision_log.id
+引用完整性：code_change.intent_ref -> code_intent.id，decision_refs -> decision_log.id
 
 ### context.json Schema
 
-User-provided context captured during planning:
+规划期间捕获的用户提供上下文：
 
 ```json
 {
@@ -82,7 +82,7 @@ User-provided context captured during planning:
 
 ### qr-{phase}.json Schema
 
-Phases: `qr-plan-design`, `qr-plan-code`, `qr-plan-docs`, `qr-impl-code`, `qr-impl-docs`
+阶段：`qr-plan-design`、`qr-plan-code`、`qr-plan-docs`、`qr-impl-code`、`qr-impl-docs`
 
 ```json
 {
@@ -100,14 +100,14 @@ Phases: `qr-plan-design`, `qr-plan-code`, `qr-plan-docs`, `qr-impl-code`, `qr-im
 }
 ```
 
-## Workflow Phases and Mutations
+## 工作流阶段与修改
 
-### Planner Workflow (11 steps)
+### Planner 工作流（11 步）
 
-| Step | Name                | Pattern Function          | Mutates              | Agent        |
+| 步骤 | 名称                | 模式函数          | 修改内容              | Agent        |
 | ---- | ------------------- | ------------------------- | -------------------- | ------------ |
-| 1    | plan-init           | `init_step()`             | Creates plan.json    | Orchestrator |
-| 2    | context-verify      | `verify_step()`           | Creates context.json | Orchestrator |
+| 1    | plan-init           | `init_step()`             | 创建 plan.json    | Orchestrator |
+| 2    | context-verify      | `verify_step()`           | 创建 context.json | Orchestrator |
 | 3    | plan-design-execute | `execute_dispatch_step()` | plan.json            | Architect    |
 | 4    | plan-design-qr      | `qr_dispatch_step()`      | qr-plan-design.json  | QR           |
 | 5    | plan-design-qr-gate | `qr_gate_step()`          | -                    | Orchestrator |
@@ -116,95 +116,95 @@ Phases: `qr-plan-design`, `qr-plan-code`, `qr-plan-docs`, `qr-impl-code`, `qr-im
 | 8    | plan-code-qr-gate   | `qr_gate_step()`          | -                    | Orchestrator |
 | 9    | plan-docs-execute   | `execute_dispatch_step()` | plan.json            | TW           |
 | 10   | plan-docs-qr        | `qr_dispatch_step()`      | qr-plan-docs.json    | QR           |
-| 11   | plan-docs-qr-gate   | `qr_gate_step()`          | Sets frozen_at       | Orchestrator |
+| 11   | plan-docs-qr-gate   | `qr_gate_step()`          | 设置 frozen_at       | Orchestrator |
 
-**Mutation details**:
+**修改详情**：
 
-- Step 3 (Architect): Populates planning_context, milestones[], code_intents[], invisible_knowledge
-- Step 6 (Developer): Populates code_changes[] per milestone
-- Step 9 (TW): Populates documentation[] per milestone, creates plan.md
+- 步骤 3（Architect）：填充 planning_context、milestones[]、code_intents[]、invisible_knowledge
+- 步骤 6（Developer）：按 milestone 填充 code_changes[]
+- 步骤 9（TW）：按 milestone 填充 documentation[]，创建 plan.md
 
-### Executor Workflow (9 steps)
+### Executor 工作流（9 步）
 
-| Step | Name              | Mutates           | Agent        |
+| 步骤 | 名称              | 修改内容           | Agent        |
 | ---- | ----------------- | ----------------- | ------------ |
 | 1    | init              | -                 | Orchestrator |
 | 2    | load-verify       | -                 | Orchestrator |
-| 3    | impl-execute      | Codebase files    | Developer    |
+| 3    | impl-execute      | 代码库文件    | Developer    |
 | 4    | impl-code-qr      | qr-impl-code.json | QR           |
 | 5    | impl-code-qr-gate | -                 | Orchestrator |
-| 6    | impl-docs-execute | Codebase docs     | TW           |
+| 6    | impl-docs-execute | 代码库文档     | TW           |
 | 7    | impl-docs-qr      | qr-impl-docs.json | QR           |
 | 8    | impl-docs-qr-gate | -                 | Orchestrator |
 | 9    | reconcile         | -                 | QR           |
 
-## Components
+## 组件
 
 ```
 orchestrator/
-  planner.py      11-step planning workflow
-  executor.py     9-step execution workflow
+  planner.py      11 步规划工作流
+  executor.py     9 步执行工作流
 
 architect/
-  plan_design.py  Plan creation (exploration, milestones, code_intents)
+  plan_design.py  计划创建（探索、milestones、code_intents）
 
 developer/
-  plan_code.py    Code Intent -> Code Changes (unified diffs)
-  exec_implement.py  Wave-aware implementation
+  plan_code.py    Code Intent -> Code Changes（unified diff）
+  exec_implement.py  波次感知的实现
 
 technical_writer/
-  plan_docs.py    Documentation planning (WHY comments, temporal cleanup)
-  exec_docs.py    Post-implementation docs (CLAUDE.md, README.md)
+  plan_docs.py    文档规划（WHY 注释、时态清理）
+  exec_docs.py    实现后文档（CLAUDE.md、README.md）
 
 quality_reviewer/
-  plan_design_qr.py   Plan completeness validation
-  plan_code_qr.py     Code diff validation
-  plan_docs_qr.py     Documentation quality
-  impl_code_qr.py     Post-impl code review
-  impl_docs_qr.py     Post-impl doc review
-  exec_reconcile.py   Plan vs implementation reconciliation
+  plan_design_qr.py   计划完整性验证
+  plan_code_qr.py     代码 diff 验证
+  plan_docs_qr.py     文档质量
+  impl_code_qr.py     实现后代码审查
+  impl_docs_qr.py     实现后文档审查
+  exec_reconcile.py   计划与实现对账
 
 shared/
-  resources.py    Path derivation, context loading
-  builders.py     XML output builders
-  constraints.py  Orchestrator constraint AST builders
-  qr/             QR utilities (types, constants, utils, schema)
+  resources.py    路径推导、上下文加载
+  builders.py     XML 输出构建器
+  constraints.py  编排器约束 AST 构建器
+  qr/             QR 工具（类型、常量、工具函数、schema）
 
 state/
-  models.py       Pydantic v2 schemas for plan.json
-  validator.py    Validation functions
-  decisions.py    Decision lifecycle enum (reserved for future use)
+  models.py       plan.json 的 Pydantic v2 schema
+  validator.py    验证函数
+  decisions.py    决策生命周期枚举（保留供未来使用）
 
 cli/
-  plan.py         plan.json manipulation commands
+  plan.py         plan.json 操作命令
 ```
 
-## QR Gate Mechanics
+## QR Gate 机制
 
-QR gates use LoopState enum: INITIAL -> RETRY -> COMPLETE
+QR gate 使用 LoopState 枚举追踪迭代进度：INITIAL -> RETRY -> COMPLETE
 
 ```
-INITIAL -> PASS -> COMPLETE (terminal)
-INITIAL -> FAIL -> RETRY (iteration++)
-RETRY   -> FAIL -> RETRY (iteration++)
-RETRY   -> PASS -> COMPLETE (terminal)
+INITIAL -> PASS -> COMPLETE（终止）
+INITIAL -> FAIL -> RETRY（iteration++）
+RETRY   -> FAIL -> RETRY（iteration++）
+RETRY   -> PASS -> COMPLETE（终止）
 ```
 
-Blocking severity by iteration:
+按迭代次数的阻塞严重性：
 
-| Iteration | Blocks              |
+| 迭代次数  | 阻塞              |
 | --------- | ------------------- |
-| 1-2       | MUST, SHOULD, COULD |
-| 3-4       | MUST, SHOULD        |
-| 5+        | MUST only           |
+| 1–2       | MUST、SHOULD、COULD |
+| 3–4       | MUST、SHOULD        |
+| 5+        | 仅 MUST           |
 
-## Step Handler Architecture
+## 步骤 Handler 架构
 
-Closures capture static config, handlers receive dynamic state:
+闭包捕获静态配置，handler 接收动态状态：
 
 ```python
 def execute_dispatch_step(title, agent, script, ...):
-    def handler(ctx):  # Receives state_dir, qr, qr_fail
+    def handler(ctx):  # 接收 state_dir、qr、qr_fail
         return {"title": ..., "actions": ..., "next": ...}
     return handler
 
@@ -216,25 +216,25 @@ STEPS = {
 }
 ```
 
-## Design Decisions
+## 设计决策
 
-**Closure-based step dispatch**: STEPS dict maps step numbers to handler closures. Pattern functions capture static config (title, agent, script), handlers receive dynamic state via ctx. Replaces magic keys with explicit patterns.
+**基于闭包的步骤派发**：STEPS dict 将步骤编号映射到 handler 闭包。模式函数捕获静态配置（title、agent、script），handler 通过 ctx 接收动态状态。用显式模式替代魔法键。
 
-**Convention-based paths**: Sub-agents receive --state-dir, derive file paths via get_context_path(). Changing context.json location requires only updating resources.py.
+**基于约定的路径**：子 agent 接收 --state-dir，通过 get_context_path() 推导文件路径。修改 context.json 位置只需更新 resources.py。
 
-**LLM-managed state**: State files written by LLM agents reading step guidance, not Python scripts. Leverages LLM capabilities for understanding context and following formats.
+**LLM 管理状态**：状态文件由读取步骤指引的 LLM agent 写入，而非 Python 脚本。利用 LLM 的上下文理解和格式遵循能力。
 
-**JSON-IR-First**: plan.json is authoritative; plan.md derived from it.
+**JSON-IR 优先**：plan.json 是权威来源；plan.md 从其派生。
 
-**QR iteration blocking**: Severity thresholds vary by iteration. Early iterations block all severities. Later iterations block only MUST to prevent infinite loops.
+**QR 迭代阻塞**：严重性阈值随迭代次数变化。早期迭代阻塞所有严重性。后期迭代仅阻塞 MUST，防止无限循环。
 
-**No temp directory cleanup**: OS handles /tmp cleanup on reboot.
+**不清理临时目录**：由操作系统在重启时处理 /tmp 清理。
 
-## Invariants
+## 不变量
 
-1. Every skill entry point defines exactly ONE Workflow
-2. discover_workflows() finds all Workflows without import errors
-3. plan.json is self-contained for execution
-4. Frozen plan.json is immutable (frozen_at timestamp means no writes)
-5. qr-{phase}.json files are ephemeral (exist only during QR cycle)
-6. QR iteration blocking: iter 1-2 all; iter 3-4 MUST/SHOULD; iter 5+ MUST only
+1. 每个 skill 入口点定义恰好一个 Workflow
+2. discover_workflows() 能找到所有 Workflow 且无导入错误
+3. plan.json 自包含，可独立执行
+4. 冻结的 plan.json 不可变（frozen_at 时间戳意味着不再写入）
+5. qr-{phase}.json 文件是临时的（仅在 QR 周期内存在）
+6. QR 迭代阻塞：迭代 1–2 全部；迭代 3–4 MUST/SHOULD；迭代 5+ 仅 MUST

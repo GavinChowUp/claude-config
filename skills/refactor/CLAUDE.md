@@ -1,10 +1,10 @@
 # refactor/
 
-Refactoring analysis skill across multiple dimensions.
+多维度重构分析 skill。
 
-## Files
+## 文件
 
-| File        | What                           | When to read               |
+| 文件        | 内容                           | 何时阅读               |
 | ----------- | ------------------------------ | -------------------------- |
-| `SKILL.md`  | Skill invocation and usage     | Using this skill           |
-| `README.md` | Architecture, design decisions | Understanding skill design |
+| `SKILL.md`  | Skill 调用方式与使用说明       | 使用本 skill 时            |
+| `README.md` | 架构设计与决策                 | 理解 skill 设计时          |

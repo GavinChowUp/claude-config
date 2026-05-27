@@ -1,104 +1,104 @@
-# Workflow Framework
+# 工作流框架
 
-## Overview
+## 概述
 
-Framework for skill registration and testing. Skills are defined using the `Workflow` class with `StepDef` instances - a data-driven approach where transitions are explicit data structures.
+用于 skill 注册与测试的框架。skill 使用 `Workflow` 类配合 `StepDef` 实例定义——这是一种数据驱动的方式，将转换关系表达为显式数据结构。
 
-## Architecture
-
-```
-Skills Layer (12 modules)
-       |
-       v
-   Workflow API (Workflow/StepDef/Outcome)
-       |
-       v
-Discovery Layer (importlib scanning)
-       |
-       v
-Core Framework (types, registry, ResourceProvider)
-       |
-       v
-CLI / Test Harness
-```
-
-### Data Flow
+## 架构
 
 ```
-CLI invocation
+Skills 层（12 个模块）
+       |
+       v
+   Workflow API（Workflow/StepDef/Outcome）
+       |
+       v
+Discovery 层（importlib 扫描）
+       |
+       v
+核心框架（类型、注册表、ResourceProvider）
+       |
+       v
+CLI / 测试脚手架
+```
+
+### 数据流
+
+```
+CLI 调用
       |
       v
-discover_workflows() -> scan skills/ -> build registry
+discover_workflows() -> 扫描 skills/ -> 构建注册表
       |
       v
 Workflow.run(step_id) -> STEPS[step_id].handler(context)
       |
       v
-StepOutput (title, actions, next_command)
+StepOutput（title、actions、next_command）
 ```
 
-Discovery uses importlib scanning to find workflows without executing module-level code. This pull-based approach eliminates import-time side effects and enables isolated testing.
+Discovery 使用 importlib 扫描来发现工作流，无需执行模块级代码。这种拉取式方式消除了导入时的副作用，并支持隔离测试。
 
-## Core Types
+## 核心类型
 
-### Outcome Enum
+### Outcome 枚举
 
-Separates "what outcome?" from "where next?" to make transition graphs introspectable as data:
+将「结果是什么？」与「下一步去哪？」分离，使转换图成为可内省的数据：
 
 ```python
 class Outcome(str, Enum):
-    OK = "ok"           # Success, proceed to next
-    FAIL = "fail"       # Failure, may trigger error handling
-    SKIP = "skip"       # Skip branch (used for mode branching)
-    ITERATE = "iterate" # Continue loop (used for confidence progression)
-    DEFAULT = "_default" # Fallback if specific outcome not mapped
+    OK = "ok"           # 成功，继续下一步
+    FAIL = "fail"       # 失败，可能触发错误处理
+    SKIP = "skip"       # 跳过分支（用于模式分支）
+    ITERATE = "iterate" # 继续循环（用于置信度推进）
+    DEFAULT = "_default" # 若无对应结果映射时的兜底
 ```
 
-**Why not booleans?** Booleans force transitions into code logic. Outcomes make the transition graph data that can be validated, visualized, and reasoned about.
+**为何不用布尔值？** 布尔值强迫转换逻辑写在代码里。Outcome 让转换图成为可验证、可可视化、可推理的数据。
 
-**Example**: Without Outcome, mode branching requires:
+**示例**：没有 Outcome 时，模式分支需要：
 
 ```python
 if mode == "quick":
-    return "step_11"  # Implicit meaning
+    return "step_11"  # 含义不明
 else:
-    return "step_5"   # What does this mean? Success? Skip?
+    return "step_5"   # 这是什么意思？成功？跳过？
 ```
 
-With Outcome:
+有了 Outcome：
 
 ```python
 def step_planning(ctx):
     if ctx.workflow_params["mode"] == "quick":
-        return Outcome.SKIP, {}  # Explicit: skipping this branch
-    return Outcome.OK, {}        # Explicit: proceeding normally
+        return Outcome.SKIP, {}  # 明确：跳过此分支
+    return Outcome.OK, {}        # 明确：正常推进
 
 StepDef(id="planning", next={
-    Outcome.OK: "subagent_design",      # Full mode path
-    Outcome.SKIP: "initial_synthesis",  # Quick mode path
+    Outcome.OK: "subagent_design",      # full 模式路径
+    Outcome.SKIP: "initial_synthesis",  # quick 模式路径
 })
 ```
 
-The transition graph is now visible in the StepDef, not buried in handler logic.
+转换图现在在 StepDef 中一目了然，不再埋藏在 handler 逻辑里。
 
 ### StepContext
 
-Runtime state container passed to handlers, enabling stateful iteration:
+传递给 handler 的运行时状态容器，支持有状态迭代：
 
 ```python
 @dataclass
 class StepContext:
-    step_id: str                         # Current step identifier
-    workflow_params: dict[str, Any]      # Immutable workflow parameters (--mode, --decision)
-    step_state: dict[str, Any]           # Mutable state (iteration count, confidence level)
+    step_id: str                         # 当前步骤标识符
+    workflow_params: dict[str, Any]      # 不可变工作流参数（--mode、--decision）
+    step_state: dict[str, Any]           # 可变状态（迭代计数、置信度等级）
 ```
 
-**Why separate params and state?**
+**为何要区分 params 和 state？**
 
-- `workflow_params`: Set at workflow start, never change (e.g., mode, input paths)
-- `step_state`: Updated by handlers, carries iteration state between steps
+- `workflow_params`：在工作流启动时设置，之后不变（如 mode、输入路径）
+- `step_state`：由 handler 更新，在步骤间传递迭代状态
 
-**Example - Confidence-driven iteration**:
+**示例——置信度驱动的迭代**：
 
 ```python
 def step_investigate(ctx: StepContext) -> tuple[Outcome, dict]:
@@ -116,36 +116,36 @@ StepDef(id="investigate", handler=step_investigate,
         next={Outcome.OK: "formulate", Outcome.ITERATE: "investigate"})
 ```
 
-### Handler Signature
+### Handler 签名
 
-Handlers process step logic and return next outcome:
+Handler 处理步骤逻辑并返回下一个结果：
 
 ```python
 def handler(ctx: StepContext) -> tuple[Outcome, dict]:
-    # Access workflow parameters (immutable)
+    # 访问工作流参数（不可变）
     mode = ctx.workflow_params.get("mode", "full")
 
-    # Access step state (from previous iterations)
+    # 访问步骤状态（来自上一次迭代）
     iteration = ctx.step_state.get("iteration", 1)
 
-    # Perform step logic...
+    # 执行步骤逻辑...
 
-    # Return outcome and updated state
+    # 返回结果和更新后的状态
     return Outcome.OK, {"iteration": iteration + 1}
 ```
 
-**Why return state dict?** Handlers are pure functions. Returning state rather than mutating context makes flow explicit and testable.
+**为何返回状态 dict？** Handler 是纯函数。返回状态而非修改上下文，使流程显式且可测试。
 
-**Output-only steps**: Steps that just print instructions can use a no-op handler:
+**仅输出步骤**：只打印指引的步骤可以使用无操作 handler：
 
 ```python
 def step_handler(ctx: StepContext) -> tuple[Outcome, dict]:
     return Outcome.OK, {}
 ```
 
-### Arg (Parameter Metadata)
+### Arg（参数元数据）
 
-Annotates handler parameters for testing:
+为 handler 参数添加注解，用于测试：
 
 ```python
 @dataclass(frozen=True)
@@ -158,7 +158,7 @@ class Arg:
     required: bool = False
 ```
 
-**Usage**:
+**使用方式**：
 
 ```python
 from typing import Annotated
@@ -170,21 +170,21 @@ def step_handler(
     ...
 ```
 
-The `Arg` metadata is extracted during workflow validation for testing.
+`Arg` 元数据在工作流验证期间被提取，用于测试。
 
-### Dispatch vs Callable Handlers
+### Dispatch vs 可调用 Handler
 
-**Callable handler**: Inline Python function (most common)
+**可调用 handler**：内联 Python 函数（最常见）
 
 ```python
 def step_analyze(ctx: StepContext) -> tuple[Outcome, dict]:
-    # Analysis logic here
+    # 分析逻辑
     return Outcome.OK, {}
 
 StepDef(id="analyze", handler=step_analyze, ...)
 ```
 
-**Dispatch handler**: Delegates to sub-agent script (for QR gates, parallel agents)
+**Dispatch handler**：委托给子 agent 脚本（用于 QR gate、并行 agent）
 
 ```python
 from skills.lib.workflow.types import Dispatch, AgentRole
@@ -199,31 +199,31 @@ StepDef(
 )
 ```
 
-The `Dispatch` handler tells the orchestrator to:
+`Dispatch` handler 告知编排器：
 
-1. Launch the specified agent with the script
-2. Wait for completion
-3. Map the agent's result to an Outcome
+1. 用指定脚本启动对应 agent
+2. 等待完成
+3. 将 agent 的结果映射为 Outcome
 
-**When to use Dispatch?**
+**何时使用 Dispatch？**
 
-- QR gates (quality reviewer checks)
-- Parallel sub-agent execution
-- Complex sub-workflows that need separate scripts
+- QR gate（质量审查检查）
+- 并行子 agent 执行
+- 需要独立脚本的复杂子工作流
 
-## Workflow Validation
+## 工作流验证
 
-`Workflow.__init__` performs 5 validation checks:
+`Workflow.__init__` 执行 5 项验证检查：
 
-1. **Entry point exists**: The `entry_point` step ID must be in the workflow
-2. **All transition targets exist**: Every target in `next` dicts must be a valid step ID or `None` (terminal)
-3. **At least one terminal step**: At least one step must have `None` in its `next` dict
-4. **All steps reachable**: Every step must be reachable from the entry point (detects orphaned steps)
-5. **Parameter extraction**: Extract `Arg` metadata from handler signatures for testing
+1. **入口点存在**：`entry_point` 步骤 ID 必须在工作流中
+2. **所有转换目标存在**：`next` dict 中的每个目标必须是合法步骤 ID 或 `None`（终止）
+3. **至少一个终止步骤**：至少一个步骤的 `next` dict 中包含 `None`
+4. **所有步骤可达**：每个步骤必须从入口点可达（检测孤立步骤）
+5. **参数提取**：从 handler 签名提取 `Arg` 元数据，用于测试
 
-These checks run at registration time, catching errors early.
+这些检查在注册时运行，尽早捕获错误。
 
-## Workflow Example
+## 工作流示例
 
 ```python
 from skills.lib.workflow import discover_workflows
@@ -250,51 +250,51 @@ WORKFLOW = Workflow(
         handler=step_handler,
         next={Outcome.OK: "generate_questions"},
     ),
-    # ... remaining steps
+    # ... 其余步骤
     description="Structured decision criticism workflow",
 )
 
-# Workflow discovery happens via discover_workflows('skills')
-# No registration needed - WORKFLOW constant is read directly
-# Pull-based discovery eliminates import-time side effects (Milestone 1)
+# 工作流发现通过 discover_workflows('skills') 进行
+# 无需手动注册——直接读取 WORKFLOW 常量
+# 拉取式发现消除了导入时的副作用（里程碑 1）
 ```
 
-Benefits of this architecture:
+此架构的优势：
 
-- Steps and transitions together in data structure
-- Transitions explicit and validatable
-- Workflow structure introspectable and validatable
-- Transition graph introspectable
+- 步骤与转换共同存在于数据结构中
+- 转换显式且可验证
+- 工作流结构可内省且可验证
+- 转换图可内省
 
-## Invariants
+## 不变量
 
-- **INVARIANT 1**: Every skill entry point defines exactly ONE Workflow
-- **INVARIANT 2**: discover_workflows() finds all Workflows without import errors
-- **INVARIANT 3**: Dispatcher routing produces same output as old if-step chains
-- **INVARIANT 4**: ResourceProvider protocol supports all 5 access patterns (conventions, file I/O, resources, Workflow objects, step data)
-- **INVARIANT 5**: QR iteration blocking severities: iter 1-2 block all; iter 3-4 block MUST/SHOULD; iter 5+ block MUST only
+- **不变量 1**：每个 skill 入口点定义恰好一个 Workflow
+- **不变量 2**：discover_workflows() 能找到所有 Workflow 且无导入错误
+- **不变量 3**：Dispatcher 路由产生的输出与旧 if-step 链相同
+- **不变量 4**：ResourceProvider 协议支持全部 5 种访问模式（约定、文件 I/O、资源、Workflow 对象、步骤数据）
+- **不变量 5**：QR 迭代阻塞严重性：迭代 1–2 阻塞所有；迭代 3–4 阻塞 MUST/SHOULD；迭代 5+ 仅阻塞 MUST
 
-## Design Decisions
+## 设计决策
 
-**Why separate Workflow and StepDef?** Workflows are collections; steps are atomic units. Separation allows validation at workflow level (reachability, terminals) while keeping step definitions focused.
+**为何区分 Workflow 和 StepDef？** Workflow 是集合，步骤是原子单元。分离允许在 Workflow 层级进行验证（可达性、终止步骤），同时保持步骤定义聚焦。
 
-**Why frozen dataclasses?** Workflows and StepDefs are immutable specifications. Frozen dataclasses prevent accidental mutation and make them safe to share across threads.
+**为何使用冻结 dataclass？** Workflow 和 StepDef 是不可变规范。冻结 dataclass 防止意外修改，并允许跨线程安全共享。
 
-**Why handler callables instead of strings?** Type safety, IDE support, and easier refactoring. Handlers are first-class functions, not magic strings.
+**为何使用可调用 handler 而非字符串？** 类型安全、IDE 支持和更易重构。Handler 是一等函数，而非魔法字符串。
 
-**Separate CLI entry points**: Running modules as `__main__` causes module identity issues (imported by `__init__.py` vs executed as `__main__`). Separate CLI entry points avoid this.
+**独立 CLI 入口点**：将模块作为 `__main__` 运行会导致模块身份问题（通过 `__init__.py` 导入 vs 作为 `__main__` 执行）。独立的 CLI 入口点可避免此问题。
 
-## Tradeoffs
+## 权衡
 
-**Idiomatic API vs Minimal**: Higher refactoring scope for consistent architecture across all skills. The think.py pattern proves Workflow/StepDef API works; extending it creates consistency without inventing new abstractions.
+**惯用 API vs 最小化**：为跨所有 skill 保持一致架构而扩大了重构范围。think.py 的模式证明了 Workflow/StepDef API 可行；扩展它能在不引入新抽象的前提下实现一致性。
 
-**Centralized enums vs Local**: One more place to update for discoverability and shared understanding. Enums (LoopState, DocumentAvailability) make state machines explicit and enable property-based testing.
+**集中枚举 vs 本地**：多一个维护点，换来可发现性和共享理解。枚举（LoopState、DocumentAvailability）使状态机显式，并支持基于属性的测试。
 
-**Clean break vs Dual-path**: Simpler implementation at cost of no migration period. Refactoring scope is internal (no external callers) so clean break reduces total work and eliminates transition bugs.
+**干净切断 vs 双路径**：实现更简单，代价是无迁移期。重构范围仅限内部（无外部调用者），因此干净切断减少了总工作量并消除了过渡期 bug。
 
-## Common Patterns
+## 常用模式
 
-### Pattern 1: Linear Workflow
+### 模式 1：线性工作流
 
 ```python
 WORKFLOW = Workflow(
@@ -304,11 +304,11 @@ WORKFLOW = Workflow(
     StepDef(id="step2", title="...", actions=[...],
             handler=step_handler, next={Outcome.OK: "step3"}),
     StepDef(id="step3", title="...", actions=[...],
-            next={Outcome.OK: None}),  # terminal
+            next={Outcome.OK: None}),  # 终止步骤
 )
 ```
 
-### Pattern 2: Confidence-Driven Iteration
+### 模式 2：置信度驱动的迭代
 
 ```python
 def step_investigate(ctx: StepContext) -> tuple[Outcome, dict]:
@@ -324,12 +324,12 @@ def step_investigate(ctx: StepContext) -> tuple[Outcome, dict]:
 
 StepDef(id="investigate", handler=step_investigate,
         next={
-            Outcome.OK: "formulate",       # exit loop
-            Outcome.ITERATE: "investigate"  # continue loop
+            Outcome.OK: "formulate",       # 退出循环
+            Outcome.ITERATE: "investigate"  # 继续循环
         })
 ```
 
-### Pattern 3: Mode Branching
+### 模式 3：模式分支
 
 ```python
 def step_planning(ctx: StepContext) -> tuple[Outcome, dict]:
@@ -340,12 +340,12 @@ def step_planning(ctx: StepContext) -> tuple[Outcome, dict]:
 
 StepDef(id="planning", handler=step_planning,
         next={
-            Outcome.OK: "subagent_design",      # full mode
-            Outcome.SKIP: "initial_synthesis",  # quick mode
+            Outcome.OK: "subagent_design",      # full 模式
+            Outcome.SKIP: "initial_synthesis",  # quick 模式
         })
 ```
 
-### Pattern 4: QR Gate
+### 模式 4：QR Gate
 
 ```python
 from skills.lib.workflow.types import Dispatch, AgentRole
@@ -365,9 +365,9 @@ StepDef(
 )
 ```
 
-### Pattern 5: Hybrid Static/Dynamic Steps (deepthink)
+### 模式 5：混合静态/动态步骤（deepthink）
 
-Workflows with mostly static steps and few parameterized steps benefit from a hybrid approach:
+大多数步骤为静态、少数步骤需要参数化的工作流可采用混合方式：
 
 ```python
 # ============================================================================
@@ -375,8 +375,8 @@ Workflows with mostly static steps and few parameterized steps benefit from a hy
 # ============================================================================
 
 def build_dispatch_body() -> str:
-    """Builder functions that dynamic formatters may call."""
-    # ... implementation
+    """动态格式化器可调用的构建函数。"""
+    # ... 实现
     return dispatch_text
 
 
@@ -384,29 +384,29 @@ def build_dispatch_body() -> str:
 # STEP DEFINITIONS
 # ============================================================================
 
-# Static steps: (title, instructions) tuples
+# 静态步骤：(title, instructions) 元组
 STATIC_STEPS = {
     1: ("Context Clarification", CONTEXT_CLARIFICATION_INSTRUCTIONS),
     2: ("Abstraction", ABSTRACTION_INSTRUCTIONS),
-    # ... more static steps
+    # ... 更多静态步骤
 }
 
 
-# Dynamic formatter functions - defined BEFORE DYNAMIC_STEPS dict
+# 动态格式化函数——必须定义在 DYNAMIC_STEPS dict 之前
 def _format_step_9(mode: str, confidence: str, iteration: int) -> tuple[str, str]:
-    """Dynamic step that calls a builder function."""
+    """调用构建函数的动态步骤。"""
     return ("Dispatch", build_dispatch_body())
 
 
 def _format_step_13(mode: str, confidence: str, iteration: int) -> tuple[str, str]:
-    """Dynamic step with parameterized title and body."""
+    """带参数化标题和正文的动态步骤。"""
     suffix = " -> Complete" if confidence == "certain" else ""
     title = f"Iterative Refinement (Iteration {iteration}){suffix}"
     body = INSTRUCTIONS.format(iteration=iteration, max_iter=MAX_ITERATIONS)
     return (title, body)
 
 
-# Dynamic steps dict - references functions defined above
+# 动态步骤 dict——引用上面定义的函数
 DYNAMIC_STEPS = {
     9: _format_step_9,
     13: _format_step_13,
@@ -418,7 +418,7 @@ DYNAMIC_STEPS = {
 # ============================================================================
 
 def format_output(step: int, mode: str, confidence: str, iteration: int) -> str:
-    """Callable dispatch: static lookup or dynamic function call."""
+    """可调用派发：静态查找或动态函数调用。"""
     if step in STATIC_STEPS:
         title, instructions = STATIC_STEPS[step]
     elif step in DYNAMIC_STEPS:
@@ -430,104 +430,94 @@ def format_output(step: int, mode: str, confidence: str, iteration: int) -> str:
     return format_step(instructions, next_cmd or "", title=f"WORKFLOW - {title}")
 ```
 
-**Ordering constraint (book pattern)**: Dynamic formatter functions that call MESSAGE BUILDERS must appear AFTER MESSAGE BUILDERS. The DYNAMIC_STEPS dictionary must appear AFTER all `_format_step_*` functions it references.
+**顺序约束（书本模式）**：调用 MESSAGE BUILDERS 的动态格式化函数必须出现在 MESSAGE BUILDERS 之后。DYNAMIC_STEPS 字典必须出现在它引用的所有 `_format_step_*` 函数之后。
 
-Use this pattern when:
+适用场景：
 
-- Many steps share the same structure (title + constant body)
-- Few steps need parameters for title or body construction
-- Parameters are uniform across all dynamic steps
+- 大多数步骤共享相同结构（标题 + 常量正文）
+- 少数步骤需要参数来构造标题或正文
+- 参数在所有动态步骤间统一
 
-Benefits:
+优势：
 
-- Compact representation for static steps (one line per step)
-- Clear, readable functions for dynamic steps
-- Single dispatch point in `format_output()`
-- Follows "book pattern" (all references resolve to definitions above)
+- 静态步骤表示紧凑（每步一行）
+- 动态步骤函数清晰可读
+- `format_output()` 中单一派发点
+- 遵循「书本模式」（所有引用都能解析到上方的定义）
 
-## Question Relay Protocol
+## 问题转发协议
 
-Sub-agents can request user clarification via the main agent. The protocol is
-pure prompt coordination -- no Python interception.
+子 agent 可通过主 agent 向用户请求澄清。该协议是纯 prompt 协调——无 Python 拦截。
 
-### Design Decisions
+### 设计决策
 
-**Task Reinvocation (not Resume)**: When a sub-agent yields with questions,
-the orchestrator REINVOKES it fresh (new Task, no resume parameter) after
-getting user answers. The sub-agent saves state to plan.json before yielding,
-then reads it back after reinvocation. This was chosen over resume because:
+**任务重新调用（而非恢复）**：子 agent 带着问题让出后，编排器在获得用户回答后以全新方式重新调用它（新 Task，无 resume 参数）。子 agent 在让出前将状态保存到 plan.json，重新调用后再读回。选择此方案而非 resume，原因如下：
 
-- Resume semantics are unreliable (0 tokens, 0 tool uses failures)
-- State file reading is explicit and auditable
-- Clean slate avoids stale context issues
-- Sub-agent scripts can detect continuation (plan.json exists)
+- resume 语义不可靠（0 tokens、0 tool uses 失败）
+- 状态文件读取显式且可审计
+- 全新上下文避免了过期上下文问题
+- 子 agent 脚本可检测续跑状态（plan.json 是否存在）
 
-**Questions-only output**: When a sub-agent needs clarification, it emits ONLY
-the `<needs_user_input>` XML block. Nothing else. This makes detection
-unambiguous -- no heuristic parsing of natural language.
+**仅输出问题**：子 agent 需要澄清时，只输出 `<needs_user_input>` XML 块，其余什么都不输出。这使检测无歧义——无需对自然语言进行启发式解析。
 
-**Explicit XML markers**: We use structured XML tags rather than detecting
-question marks in prose. This prevents false positives from rhetorical questions
-in analysis output.
+**显式 XML 标记**：使用结构化 XML 标签，而非检测散文中的问号。这防止了分析输出中的反问句造成误判。
 
-**Max 3 questions, 2-3 options**: Constraints match AskUserQuestion tool schema.
-Batching reduces round-trips. Options should be distinct and actionable.
+**最多 3 个问题，每题 2–3 个选项**：约束与 AskUserQuestion 工具 schema 匹配。批量提问减少往返次数。选项应明确且可操作。
 
-**State saving before yield**: Sub-agents MUST save all progress to plan.json
-before emitting `<needs_user_input>`. The reinvoked instance reads this state.
+**让出前保存状态**：子 agent 必须在发出 `<needs_user_input>` 之前将所有进度保存到 plan.json。重新调用的实例将读取此状态。
 
-### Flow
+### 流程
 
-1. Sub-agent saves current state to plan.json
-2. Sub-agent emits `<needs_user_input>` XML as entire response
-3. Main agent extracts questions, calls AskUserQuestion
-4. Main agent REINVOKES sub-agent fresh with answers and STATE_DIR
-5. New sub-agent instance reads plan.json, continues from saved state
+1. 子 agent 将当前状态保存到 plan.json
+2. 子 agent 以整个响应发出 `<needs_user_input>` XML
+3. 主 agent 提取问题，调用 AskUserQuestion
+4. 主 agent 以全新方式重新调用子 agent，传入回答和 STATE_DIR
+5. 新子 agent 实例读取 plan.json，从已保存状态继续
 
-### Constants
+### 常量
 
-| Constant                    | Purpose                                  |
+| 常量                        | 用途                                  |
 | --------------------------- | ---------------------------------------- |
-| `SUB_AGENT_QUESTION_FORMAT` | Tells sub-agent how to emit questions    |
-| `QUESTION_RELAY_HANDLER`    | Tells main agent how to detect and relay |
+| `SUB_AGENT_QUESTION_FORMAT` | 告知子 agent 如何发出问题    |
+| `QUESTION_RELAY_HANDLER`    | 告知主 agent 如何检测并转发 |
 
-### Integration
+### 集成
 
-For dispatch steps that support question relay:
+对于支持问题转发的派发步骤：
 
 ```python
 from skills.lib.workflow.constants import QUESTION_RELAY_HANDLER
 
-# In format_output or step handler for dispatch steps:
+# 在派发步骤的 format_output 或 step handler 中：
 if step_info.get("supports_questions"):
     actions.append(QUESTION_RELAY_HANDLER)
 ```
 
-For sub-agent scripts that may ask questions:
+对于可能提问的子 agent 脚本：
 
 ```python
 from skills.lib.workflow.constants import SUB_AGENT_QUESTION_FORMAT
 
-# In step 1 guidance:
+# 在第 1 步的指引中：
 actions.append(SUB_AGENT_QUESTION_FORMAT)
 ```
 
-## Invariants
+## 不变量
 
-- Every skill module appears in `SKILL_MODULES` in `tests/conftest.py`
-- Workflow validation must pass (entry point exists, all transitions valid, at least one terminal, all steps reachable)
-- Handler signatures must match `(ctx: StepContext) -> tuple[Outcome, dict]` or be a `Dispatch` instance
-- `next` dict keys must be `Outcome` enum values
-- `next` dict values must be valid step IDs or `None` (terminal)
+- 每个 skill 模块都出现在 `tests/conftest.py` 的 `SKILL_MODULES` 中
+- 工作流验证必须通过（入口点存在、所有转换合法、至少一个终止步骤、所有步骤可达）
+- Handler 签名必须匹配 `(ctx: StepContext) -> tuple[Outcome, dict]`，或为 `Dispatch` 实例
+- `next` dict 的键必须是 `Outcome` 枚举值
+- `next` dict 的值必须是合法步骤 ID 或 `None`（终止）
 
-## Exhaustive Testing Framework
+## 穷举测试框架
 
-Exhaustive testing framework generates all valid parameter combinations for workflow steps, using typed domain abstractions to represent parameter spaces.
+穷举测试框架为工作流步骤生成所有合法参数组合，使用类型化领域抽象来表示参数空间。
 
-### Architecture
+### 架构
 
 ```
-Workflow AST          Domain Types           Test Generation
+Workflow AST          领域类型           测试生成
      |                     |                       |
      v                     v                       v
 +----------+        +-------------+         +--------------+
@@ -542,79 +532,79 @@ Workflow AST          Domain Types           Test Generation
                                            +-------------+
 ```
 
-### Why This Structure
+### 为何如此设计
 
-Domain types separate from generation logic:
+领域类型与生成逻辑分离：
 
-- Domains are reusable (could drive fuzzing, documentation)
-- Generation logic depends on workflow structure, not domain semantics
-- Test file adds pytest-specific concerns
+- 领域类型可复用（可驱动模糊测试、文档生成）
+- 生成逻辑依赖工作流结构，而非领域语义
+- 测试文件额外引入 pytest 专属关注点
 
-### Data Flow
+### 数据流
 
-1. Import skills -> Workflow objects registered
+1. 导入 skill -> 注册 Workflow 对象
 2. extract_schema(workflow) -> {step: {param: Domain}}
-3. generate_inputs(workflow) -> Iterator[dict] (Cartesian product)
-4. pytest.parametrize -> test cases with IDs
-5. run_skill_invocation(workflow, params) -> subprocess exit code
+3. generate_inputs(workflow) -> Iterator[dict]（笛卡尔积）
+4. pytest.parametrize -> 带 ID 的测试用例
+5. run_skill_invocation(workflow, params) -> 子进程退出码
 
-### Key Design Decisions
+### 关键设计决策
 
-**Exhaustive vs sampling**: Domains are small (5 iterations x 5 confidences x 2 modes = ~300-500 total). Exhaustive enumeration is tractable and provides complete coverage. Sampling would miss edge combinations.
+**穷举 vs 采样**：领域规模很小（5 次迭代 x 5 种置信度 x 2 种模式 = 约 300–500 个总用例）。穷举枚举可行，提供完整覆盖。采样会遗漏边界组合。
 
-**Hardcoded mode-gating**: Only deepthink has mode parameter (quick mode skips steps 6-11). Introspection complexity not justified for single case. Explicit hardcoding is clearer and maintainable.
+**硬编码模式门控**：只有 deepthink 有 mode 参数（quick 模式跳过步骤 6–11）。单一情况不值得引入内省复杂度。显式硬编码更清晰且易维护。
 
-**Iteration detection**: Step.next dict contains Outcome.ITERATE for self-looping steps. Direct check without heuristics works for all current and future iterating workflows.
+**迭代检测**：Step.next dict 中包含 Outcome.ITERATE 的自循环步骤。直接检查无需启发式，适用于所有当前和未来的迭代工作流。
 
-**Step-index mapping**: \_params keyed by step_id (string) not step number. \_step_order provides authoritative index for CLI invocation.
+**步骤索引映射**：\_params 以 step_id（字符串）而非步骤编号为键。\_step_order 提供用于 CLI 调用的权威索引。
 
-### Invariants
+### 不变量
 
-- Each test case must have unique ID (workflow-step-params combo)
-- Conditional params only apply to applicable steps (iteration only at iterating steps)
-- Mode-gated steps skipped when mode value gates them out
-- step param always present (1 to total_steps)
-- total_steps always matches workflow.total_steps
-- Workflow.\_step_order must provide authoritative step index mapping: len(\_step_order) == total_steps and indices correspond to CLI --step values
+- 每个测试用例有唯一 ID（workflow-step-params 组合）
+- 条件参数仅适用于对应步骤（iteration 只在迭代步骤出现）
+- 模式门控步骤在对应模式值下被跳过
+- step 参数始终存在（1 到 total_steps）
+- total_steps 始终与 workflow.total_steps 匹配
+- Workflow.\_step_order 提供权威步骤索引映射：len(\_step_order) == total_steps，索引对应 CLI --step 值
 
-### Domain Types
+### 领域类型
 
-Located in types.py:
+位于 types.py：
 
-**BoundedInt**: Integer domain with inclusive bounds [lo, hi]
+**BoundedInt**：含闭区间 [lo, hi] 的整数领域
 
 ```python
 list(BoundedInt(1, 5))  # [1, 2, 3, 4, 5]
 ```
 
-**ChoiceSet**: Discrete choice domain
+**ChoiceSet**：离散选择领域
 
 ```python
 list(ChoiceSet(("full", "quick")))  # ["full", "quick"]
 ```
 
-**Constant**: Single-value domain
+**Constant**：单值领域
 
 ```python
 list(Constant(42))  # [42]
 ```
 
-All implement **iter** for use with itertools.product. frozen=True enables hashability for pytest param caching.
+所有类型均实现 **iter**，可与 itertools.product 配合使用。frozen=True 支持 pytest 参数缓存的可哈希性。
 
-## Testing
+## 测试
 
-All tests use pytest. Run from `skills/scripts/`:
+所有测试使用 pytest。从 `skills/scripts/` 运行：
 
 ```bash
-# Run all tests
+# 运行所有测试
 pytest tests/ -v
 
-# Test specific workflow
+# 测试指定工作流
 pytest tests/ -k deepthink -v
 
-# Test categories
-pytest tests/test_workflow_import.py -v     # Import tests
-pytest tests/test_workflow_structure.py -v  # Structure validation
-pytest tests/test_workflow_steps.py -v      # Step invocability (exhaustive)
-pytest tests/test_domain_types.py -v        # Domain type unit tests
+# 按类别测试
+pytest tests/test_workflow_import.py -v     # 导入测试
+pytest tests/test_workflow_structure.py -v  # 结构验证
+pytest tests/test_workflow_steps.py -v      # 步骤可调用性（穷举）
+pytest tests/test_domain_types.py -v        # 领域类型单元测试
 ```

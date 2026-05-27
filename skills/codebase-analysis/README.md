@@ -1,48 +1,40 @@
 # Analyze
 
-Before you plan anything non-trivial, you need to actually understand the
-codebase. Not impressions -- evidence. The analyze skill forces systematic
-investigation with structured phases and explicit evidence requirements.
+在规划任何非平凡任务之前,你需要真正理解代码库。不是印象——是证据。analyze skill 通过结构化阶段和明确的证据要求,强制进行系统性调查。
 
-| Phase                  | Actions                                                                        |
+| 阶段                   | 动作                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------ |
-| Exploration            | Delegate to Explore agent; process structure, tech stack, patterns             |
-| Focus Selection        | Classify areas (architecture, performance, security, quality); assign P1/P2/P3 |
-| Investigation Planning | Commit to specific files and questions; create accountability contract         |
-| Deep Analysis          | Progressive investigation; document with file:line + quoted code               |
-| Verification           | Audit completeness; ensure all commitments addressed                           |
-| Synthesis              | Consolidate by severity; provide prioritized recommendations                   |
+| 探索                   | 委托 Explore agent;处理结构、技术栈、模式                                     |
+| 焦点选择               | 分类关注点(架构、性能、安全、质量);分配 P1/P2/P3                            |
+| 调查规划               | 确定具体文件和问题;建立问责约定                                               |
+| 深度分析               | 渐进式调查;使用 file:line + 引用代码记录                                      |
+| 验证                   | 审计完整性;确保所有约定项均已处理                                             |
+| 综合                   | 按严重程度汇总;提供优先级排序的建议                                           |
 
-## When to Use
+## 适用场景
 
-Four scenarios where this matters:
+四种真正需要此 skill 的情况:
 
-- **Unfamiliar codebase** -- You cannot plan what you do not understand. Period.
-- **Security review** -- Vulnerability assessment requires systematic coverage,
-  not "I looked around and it seems fine."
-- **Performance analysis** -- Before optimization, know where time actually
-  goes, not where you assume it goes.
-- **Architecture evaluation** -- Major refactors deserve evidence-backed
-  understanding, not vibes.
+- **陌生代码库**——不理解就无法规划,句号。
+- **安全审查**——漏洞评估需要系统性覆盖,而非「我大致看了一下,感觉没问题」。
+- **性能分析**——优化之前,先知道时间实际花在哪,而非你以为的地方。
+- **架构评估**——重大重构值得有证据支撑的理解,而非直觉。
 
-## When to Skip
+## 可跳过的场景
 
-Not everything needs this level of rigor:
+并非所有情况都需要这种严格程度:
 
-- You already understand the codebase well
-- Simple bug fix with obvious scope
-- User has provided comprehensive context
+- 你已经对代码库很熟悉
+- 范围明显的简单 bug 修复
+- 用户已提供全面的上下文
 
-The astute reader will notice all three skip conditions share a trait: you
-already have the evidence. The skill exists for when you do not.
+细心的读者会注意到,三种跳过条件有一个共同点:你已经拥有证据。此 skill 存在的意义,正是为了你还没有证据的时候。
 
-## Example Usage
+## 使用示例
 
 ```
-Use your analyze skill to understand this codebase.
-Focus on security and architecture before we plan the authentication refactor.
+用你的 analyze skill 理解这个代码库。
+在我们规划认证重构之前,重点关注安全和架构。
 ```
 
-The skill outputs findings organized by severity (CRITICAL/HIGH/MEDIUM/LOW),
-each with file:line references and quoted code. This feeds directly into
-planning -- you have evidence-backed understanding before proposing changes.
+此 skill 的输出按严重程度(CRITICAL/HIGH/MEDIUM/LOW)组织,每项均包含 file:line 引用和引用代码。这直接为规划提供输入——你在提出修改建议之前,已经拥有有证据支撑的理解。

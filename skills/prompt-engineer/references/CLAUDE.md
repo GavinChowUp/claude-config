@@ -1,19 +1,19 @@
 # references/
 
-Research-backed prompt engineering technique references, organized by problem type.
+基于研究的 prompt 工程技术参考，按问题类型组织。
 
-## Files
+## 文件
 
-| File            | What                                  | When to read                            |
-| --------------- | ------------------------------------- | --------------------------------------- |
-| `README.md`     | Decision tree and navigation guide    | Selecting which reference to read       |
-| `efficiency.md` | Token reduction, latency optimization | Output too verbose, inference too slow  |
-| `structure.md`  | Output format constraints             | Need code, JSON, tables, or constrained |
+| 文件            | 内容                                  | 何时阅读                                    |
+| --------------- | ------------------------------------- | ------------------------------------------- |
+| `README.md`     | 决策树与导航指南                      | 选择应读哪份参考文档时                      |
+| `efficiency.md` | token 缩减、延迟优化                  | 输出过于冗长或推理太慢时                    |
+| `structure.md`  | 输出格式约束                          | 需要代码、JSON、表格或受限格式时            |
 
-## Subdirectories
+## 子目录
 
-| Directory      | What                                  | When to read                              |
+| 目录           | 内容                                  | 何时阅读                                  |
 | -------------- | ------------------------------------- | ----------------------------------------- |
-| `reasoning/`   | Decomposition and elicitation         | Model can't reason through complexity     |
-| `correctness/` | Sampling, verification, refinement    | Model gives wrong or inconsistent answers |
-| `context/`     | Reframing and augmentation techniques | Context is noisy or missing information   |
+| `reasoning/`   | 分解与引出                            | 模型无法处理多步骤复杂性时                |
+| `correctness/` | 采样、验证、精炼                      | 模型给出错误或不一致的答案时              |
+| `context/`     | 重构表述与增强技术                    | 上下文存在噪声或缺少信息时                |

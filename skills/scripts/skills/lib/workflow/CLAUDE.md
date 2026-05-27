@@ -1,37 +1,37 @@
 # workflow/
 
-Workflow orchestration framework: types, discovery, and AST-based XML generation.
+工作流编排框架：类型定义、发现机制与基于 AST 的 XML 生成。
 
-## Architecture
+## 架构
 
-Skills use CLI-based step invocation. The workflow flow is:
+skill 采用基于 CLI 的步骤调用方式。工作流执行流程为：
 
 ```
-main() -> format_output() -> print() -> LLM reads -> follows <invoke_after>
+main() -> format_output() -> print() -> LLM 读取 -> 跟随 <invoke_after>
 ```
 
-Workflow/StepDef are metadata containers for introspection. The execution engine
-(Workflow.run(), Outcome, StepContext) was removed as dead code.
+Workflow 与 StepDef 是供内省使用的元数据容器。执行引擎
+（Workflow.run()、Outcome、StepContext）已作为死代码移除。
 
-## Files
+## 文件
 
-| File           | What                                      | When to read                                        |
+| 文件           | 内容                                      | 何时阅读                                        |
 | -------------- | ----------------------------------------- | --------------------------------------------------- |
-| `core.py`      | Workflow, StepDef, Arg (metadata only)    | Defining new skills, workflow structure             |
-| `discovery.py` | Workflow discovery via importlib scanning | Understanding pull-based discovery, troubleshooting |
-| `__init__.py`  | Public API exports                        | Importing workflow types                            |
-| `cli.py`       | CLI helpers for workflow entry points     | Adding CLI arguments, step output helpers           |
-| `constants.py` | Shared constants, QR constants re-exports | Adding new constants                                |
-| `types.py`     | Domain types: Dispatch, AgentRole, etc.   | QR gates, sub-agent dispatch, test domains          |
+| `core.py`      | Workflow、StepDef、Arg（仅元数据）    | 定义新 skill、工作流结构时             |
+| `discovery.py` | 通过 importlib 扫描发现工作流 | 理解拉取式发现机制、排查问题时 |
+| `__init__.py`  | 公共 API 导出                        | 导入工作流类型时                            |
+| `cli.py`       | 工作流入口点的 CLI 辅助函数     | 添加 CLI 参数、步骤输出辅助函数时           |
+| `constants.py` | 共享常量，QR 常量重导出 | 新增常量时                                |
+| `types.py`     | 领域类型：Dispatch、AgentRole 等   | QR gate、子 agent 派发、测试域时      |
 
-## Subdirectories
+## 子目录
 
-| Directory     | What                            | When to read                   |
+| 目录          | 内容                            | 何时阅读                   |
 | ------------- | ------------------------------- | ------------------------------ |
-| `ast/`        | AST nodes, builder, renderer    | XML generation for step output |
-| `formatters/` | Re-exports from ast/ for compat | Use ast/ directly instead      |
+| `ast/`        | AST 节点、构建器、渲染器    | 为步骤输出生成 XML 时 |
+| `formatters/` | 从 ast/ 重导出以保持兼容性 | 新代码直接用 ast/      |
 
-## Test
+## 测试
 
 ```bash
 pytest tests/ -v

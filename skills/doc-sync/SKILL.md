@@ -1,54 +1,52 @@
 ---
 name: doc-sync
-description: Synchronizes docs across a repository. Use when user asks to sync docs.
+description: 跨 repo 同步文档。当用户要求同步文档时使用。Synchronizes docs across a repository. Use when user asks to sync docs.
 ---
 
 # Doc Sync
 
-Maintains the CLAUDE.md navigation hierarchy and README.md invisible knowledge
-docs across a repository. This skill is self-contained and performs all
-documentation work directly.
+维护整个 repo 中的 CLAUDE.md 导航层级和 README.md 隐性知识文档。本 skill 自包含，直接执行所有文档工作。
 
-## Documentation Conventions
+## 文档规范
 
-For authoritative CLAUDE.md and README.md format specification:
+关于 CLAUDE.md 和 README.md 的权威格式规范：
 
 <file working-dir=".claude" uri="conventions/documentation.md" />
 
-The conventions/ directory contains all universal documentation standards.
+`conventions/` 目录包含所有通用文档标准。
 
-## Scope Resolution
+## 范围确定
 
-Determine scope FIRST:
+首先确定范围：
 
-| User Request                                            | Scope                                     |
+| 用户请求                                            | 范围                                     |
 | ------------------------------------------------------- | ----------------------------------------- |
-| "sync docs" / "update documentation" / no specific path | REPOSITORY-WIDE                           |
-| "sync docs in src/validator/"                           | DIRECTORY: src/validator/ and descendants |
-| "update CLAUDE.md for parser.py"                        | FILE: single file's parent directory      |
+| 「同步文档」/ 「更新文档」/ 未指定路径 | 整个仓库                           |
+| 「同步 src/validator/ 中的文档」                           | 目录：src/validator/ 及其子目录 |
+| 「为 parser.py 更新 CLAUDE.md」                        | 文件：单个文件的父目录      |
 
-For REPOSITORY-WIDE scope, perform a full audit. For narrower scopes, operate only within the specified boundary.
+对于整个仓库范围，执行完整审计。对于更窄的范围，只在指定边界内操作。
 
-## Workflow
+## 工作流
 
-### Phase 1: Discovery
+### 阶段 1：发现
 
-Map directories requiring CLAUDE.md verification:
+映射需要 CLAUDE.md 验证的目录：
 
 ```bash
-# Find all directories (excluding .git, node_modules, __pycache__, etc.)
+# 查找所有目录（排除 .git、node_modules、__pycache__ 等）
 find . -type d \( -name .git -o -name node_modules -o -name __pycache__ -o -name .venv -o -name target -o -name dist -o -name build \) -prune -o -type d -print
 ```
 
-For each directory in scope, record:
+对范围内的每个目录，记录：
 
-1. Does CLAUDE.md exist?
-2. If yes, does it have the required table-based index structure?
-3. What files/subdirectories exist that need indexing?
+1. CLAUDE.md 是否存在？
+2. 如果存在，是否有所需的表格式索引结构？
+3. 哪些文件/子目录需要被索引？
 
-### Phase 2: Audit
+### 阶段 2：审计
 
-For each directory, check for drift and misplaced content:
+对每个目录，检查漂移和内容错位：
 
 ```
 <audit_check dir="[path]">
@@ -65,158 +63,155 @@ README.md warranted: [YES/NO] (invisible knowledge present?)
 </audit_check>
 ```
 
-### Phase 3: Content Migration
+### 阶段 3：内容迁移
 
-**Critical:** If CLAUDE.md contains content that does NOT belong there, migrate it:
+**关键：** 如果 CLAUDE.md 包含不属于其中的内容，须迁移：
 
-Content that MUST be moved from CLAUDE.md to README.md:
+必须从 CLAUDE.md 移到 README.md 的内容：
 
-- Architecture explanations or diagrams
-- Design decision documentation
-- Component interaction descriptions
-- Overview sections with prose (beyond one sentence)
-- Invariants or rules documentation
-- Any "why" explanations beyond simple triggers
-- Key Invariants sections
-- Dependencies sections (explanatory -- index can note dependencies exist)
-- Constraints sections
-- Purpose sections with prose (beyond one sentence)
-- Any bullet-point lists explaining rationale
+- 架构说明或图表
+- 设计决策文档
+- 组件交互描述
+- 带散文的概述章节（超过一句话）
+- 不变量或规则文档
+- 除简单触发器之外的任何「为什么」解释
+- 关键不变量章节
+- 依赖项章节（解释性的——索引可以注明依赖项存在）
+- 约束章节
+- 带散文的目的章节（超过一句话）
+- 解释原理的任何项目列表
 
-Content that MAY stay in CLAUDE.md (operational sections):
+可以留在 CLAUDE.md 中的内容（操作性章节）：
 
-- Build commands specific to this directory
-- Test commands specific to this directory
-- Regeneration/sync commands (e.g., protobuf regeneration)
-- Deploy commands
-- Other copy-pasteable procedural commands
+- 本目录特有的构建命令
+- 本目录特有的测试命令
+- 重新生成/同步命令（如 protobuf 重新生成）
+- 部署命令
+- 其他可直接复制执行的操作性命令
 
-**Test:** Ask "is this explaining WHY or telling HOW?" Explanatory content
-(architecture, decisions, rationale) goes to README.md. Operational content
-(commands, procedures) stays in CLAUDE.md.
+**测试：** 问「这是在解释为什么，还是在说明如何做？」解释性内容（架构、决策、原理）进入 README.md。操作性内容（命令、流程）留在 CLAUDE.md。
 
-Migration process:
+迁移流程：
 
-1. Identify misplaced content in CLAUDE.md
-2. Create or update README.md with the architectural content
-3. Strip CLAUDE.md down to pure index format
-4. Add README.md to the CLAUDE.md index table
+1. 识别 CLAUDE.md 中的错位内容
+2. 创建或更新 README.md，写入架构内容
+3. 将 CLAUDE.md 精简为纯索引格式
+4. 将 README.md 添加到 CLAUDE.md 的索引表中
 
-### Phase 4: Index Updates
+### 阶段 4：索引更新
 
-For each directory needing work:
+对需要处理的每个目录：
 
-**Creating/Updating CLAUDE.md:**
+**创建/更新 CLAUDE.md：**
 
-1. Use the appropriate template (ROOT or SUBDIRECTORY)
-2. Populate tables with all files and subdirectories
-3. Write "What" column: factual content description
-4. Write "When to read" column: action-oriented triggers
-5. If README.md exists, include it in the Files table
+1. 使用合适的模板（根目录或子目录）
+2. 用所有文件和子目录填充表格
+3. 「内容」列：写实际内容描述
+4. 「何时阅读」列：写面向动作的触发器
+5. 如果 README.md 存在，将其纳入文件表
 
-**Creating README.md (when invisible knowledge exists):**
+**创建 README.md（当隐性知识存在时）：**
 
-1. Verify invisible knowledge exists (semantic trigger, not structural)
-2. Document architecture, design decisions, invariants, tradeoffs
-3. Apply the content test: remove anything visible from code
-4. Keep as concise as possible while capturing all invisible knowledge
-5. Must be self-contained: do not reference external authoritative sources
+1. 验证隐性知识确实存在（语义触发，而非结构性）
+2. 记录架构、设计决策、不变量、权衡
+3. 应用内容测试：删除从代码中即可看到的内容
+4. 尽可能简洁，同时捕获所有隐性知识
+5. 必须自包含：不引用外部权威来源
 
-### Phase 5: Verification
+### 阶段 5：验证
 
-After all updates complete, verify:
+所有更新完成后，验证：
 
-1. Every directory in scope has CLAUDE.md
-2. All CLAUDE.md files use table-based index format (pure navigation)
-3. No drift remains (files <-> index entries match)
-4. No misplaced content in CLAUDE.md (explanatory prose moved to README.md)
-5. README.md files are indexed in their parent CLAUDE.md
-6. CLAUDE.md contains only: one-sentence overview + tabular index + operational sections
-7. README.md exists wherever invisible knowledge was identified
-8. README.md files are self-contained (no external authoritative references)
+1. 范围内每个目录都有 CLAUDE.md
+2. 所有 CLAUDE.md 使用表格式索引格式（纯导航）
+3. 没有漂移（文件与索引条目一一对应）
+4. CLAUDE.md 中没有错位内容（解释性散文已移到 README.md）
+5. README.md 文件已在父目录的 CLAUDE.md 中索引
+6. CLAUDE.md 只包含：一句话概述 + 表格索引 + 操作性章节
+7. 凡有隐性知识处均有 README.md
+8. README.md 是自包含的（无外部权威引用）
 
-## Output Format
+## 输出格式
 
 ```
-## Doc Sync Report
+## Doc Sync 报告
 
-### Scope: [REPOSITORY-WIDE | directory path]
+### 范围：[整个仓库 | 目录路径]
 
-### Changes Made
-- CREATED: [list of new CLAUDE.md files]
-- UPDATED: [list of modified CLAUDE.md files]
-- MIGRATED: [list of content moved from CLAUDE.md to README.md]
-- CREATED: [list of new README.md files]
-- FLAGGED: [any issues requiring human decision]
+### 已完成的变更
+- 创建：[新建的 CLAUDE.md 列表]
+- 更新：[修改的 CLAUDE.md 列表]
+- 迁移：[从 CLAUDE.md 移到 README.md 的内容列表]
+- 创建：[新建的 README.md 列表]
+- 标记：[需要人工决策的问题]
 
-### Verification
-- Directories audited: [count]
-- CLAUDE.md coverage: [count]/[total] (100%)
-- CLAUDE.md format: [count] pure index / [count] needed migration
-- Drift detected: [count] entries fixed
-- Content migrations: [count] (prose moved to README.md)
-- README.md files: [count] (wherever invisible knowledge exists)
-- Self-contained: [YES/NO] (no external authoritative references)
+### 验证
+- 已审计目录：[数量]
+- CLAUDE.md 覆盖率：[数量]/[总计]（100%）
+- CLAUDE.md 格式：[数量] 纯索引 / [数量] 需迁移
+- 检测到漂移：[数量] 条已修复
+- 内容迁移：[数量]（散文已移到 README.md）
+- README.md 文件：[数量]（凡有隐性知识处）
+- 自包含：[是/否]（无外部权威引用）
 ```
 
-## Exclusions
+## 排除项
 
-DO NOT create CLAUDE.md for:
+不为以下目录创建 CLAUDE.md：
 
-- Generated files directories (dist/, build/, compiled outputs)
-- Vendored dependencies (node_modules/, vendor/, third_party/)
-- Git internals (.git/)
-- IDE/editor configs (.idea/, .vscode/ unless project-specific settings)
-- **Stub directories** (contain only `.gitkeep` or no code files) - these do not
-  require CLAUDE.md until code is added
+- 生成文件目录（dist/、build/、编译输出）
+- 第三方依赖（node_modules/、vendor/、third_party/）
+- Git 内部目录（.git/）
+- IDE/编辑器配置（.idea/、.vscode/，除非是项目特有设置）
+- **存根目录**（只含 `.gitkeep` 或无代码文件）——在添加代码之前不需要 CLAUDE.md
 
-DO NOT index (skip these files in CLAUDE.md):
+不索引（CLAUDE.md 中跳过这些文件）：
 
-- Generated files (_.generated._, compiled outputs)
-- Vendored dependency files
+- 生成文件（_.generated._、编译输出）
+- 第三方依赖文件
 
-DO index:
+需索引：
 
-- Hidden config files that affect development (.eslintrc, .env.example, .gitignore)
-- Test files and test directories
-- Documentation files (including README.md)
+- 影响开发的隐藏配置文件（.eslintrc、.env.example、.gitignore）
+- 测试文件和测试目录
+- 文档文件（包括 README.md）
 
-## Anti-Patterns
+## 反模式
 
-### Index Anti-Patterns
+### 索引反模式
 
-**Too vague (matches everything):**
+**过于宽泛（什么都能匹配）：**
 
 ```markdown
-| `config/` | Configuration | Working with configuration |
+| `config/` | 配置 | 处理配置时 |
 ```
 
-**Content description instead of trigger:**
+**只有内容描述，没有触发器：**
 
 ```markdown
-| `cache.rs` | Contains the LRU cache implementation | - |
+| `cache.rs` | 包含 LRU 缓存实现 | - |
 ```
 
-**Missing action verb:**
+**缺少动作动词：**
 
 ```markdown
-| `parser.py` | Input parsing | Input parsing and format handling |
+| `parser.py` | 输入解析 | 输入解析和格式处理 |
 ```
 
-### Correct Examples
+### 正确示例
 
 ```markdown
-| `cache.rs` | LRU cache with O(1) get/set | Implementing caching, debugging misses, tuning eviction |
-| `config/` | YAML config parsing, env overrides | Adding config options, changing defaults, debugging config loading |
+| `cache.rs` | O(1) get/set 的 LRU 缓存 | 实现缓存、调试缓存未命中、调优驱逐策略 |
+| `config/` | YAML 配置解析、环境变量覆盖 | 添加配置选项、修改默认值、调试配置加载 |
 ```
 
-## When NOT to Use This Skill
+## 不适用场景
 
-- Single file documentation (inline comments, docstrings) - handle directly
-- Code comments - handle directly
-- Function/module docstrings - handle directly
-- This skill is for CLAUDE.md/README.md synchronization specifically
+- 单个文件的文档（行内注释、文档字符串）——直接处理
+- 代码注释——直接处理
+- 函数/模块 docstring——直接处理
+- 本 skill 专门用于 CLAUDE.md/README.md 同步
 
-## Reference
+## 参考
 
-For additional trigger pattern examples, see `references/trigger-patterns.md`.
+更多触发模式示例，参见 `references/trigger-patterns.md`。

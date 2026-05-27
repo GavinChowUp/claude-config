@@ -1,14 +1,13 @@
 ---
 name: planner
-description: Interactive planning and execution for complex tasks. IMMEDIATELY invoke when user asks to use planner.
+description: 复杂任务的交互式规划与执行。当用户要求使用 planner 时立即调用。
 ---
 
-## Activation
+## 激活
 
-When this skill activates, IMMEDIATELY invoke the corresponding script. The
-script IS the workflow.
+当此 skill 激活时,立即调用对应脚本。脚本本身即工作流。
 
-| Mode      | Intent                             | Command                                                                                                          |
+| 模式      | 意图                               | 命令                                                                                                          |
 | --------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| planning  | "plan", "design", "architect"      | `<invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.planner.orchestrator.planner --step 1" />`  |
-| execution | "execute", "implement", "run plan" | `<invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.planner.orchestrator.executor --step 1" />` |
+| planning  | "plan"、"design"、"architect"      | `<invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.planner.orchestrator.planner --step 1" />`  |
+| execution | "execute"、"implement"、"run plan" | `<invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.planner.orchestrator.executor --step 1" />` |

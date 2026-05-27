@@ -1,17 +1,17 @@
 # lib/
 
-Shared utilities and workflow framework for skills.
+skill 的共享工具函数与工作流框架。
 
-## Files
+## 文件
 
-| File             | What                                | When to read                                        |
+| 文件             | 内容                                | 何时阅读                                        |
 | ---------------- | ----------------------------------- | --------------------------------------------------- |
-| `__init__.py`    | Package marker                      | -                                                   |
-| `conventions.py` | Code convention loading for prompts | Adding convention references, modifying prompt text |
-| `io.py`          | File I/O utilities                  | Reading/writing files in skills                     |
+| `__init__.py`    | 包标记                              | -                                                   |
+| `conventions.py` | 为 prompt 加载代码约定 | 添加约定引用、修改 prompt 文本时 |
+| `io.py`          | 文件 I/O 工具函数                  | 在 skill 中读写文件时                     |
 
-## Subdirectories
+## 子目录
 
-| Directory   | What                             | When to read                                                 |
+| 目录        | 内容                             | 何时阅读                                                 |
 | ----------- | -------------------------------- | ------------------------------------------------------------ |
-| `workflow/` | Workflow orchestration framework | Adding skills, modifying step handling, testing registration |
+| `workflow/` | 工作流编排框架 | 新增 skill、修改步骤处理逻辑、测试注册时 |

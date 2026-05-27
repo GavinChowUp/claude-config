@@ -1,20 +1,19 @@
 ---
 name: decision-critic
-description: Invoke IMMEDIATELY via python script to stress-test decisions and reasoning. Do NOT analyze first - the script orchestrates the critique workflow.
+description: 当用户需要对 decision 和 reasoning 进行压力测试时，立即通过 python 脚本调用。不要先分析——脚本负责编排整个评审工作流。
 ---
 
 # Decision Critic
 
-When this skill activates, IMMEDIATELY invoke the script. The script IS the
-workflow.
+此 skill 激活时，立即调用脚本。脚本本身就是工作流。
 
-## Invocation
+## 调用方式
 
 <invoke working-dir=".claude/skills/scripts" cmd="python3 -m skills.decision_critic.decision_critic --step 1 --decision '<decision text>'" />
 
-| Argument        | Required | Description                             |
+| 参数            | 是否必填   | 说明                                   |
 | --------------- | -------- | --------------------------------------- |
-| `--step`        | Yes      | Current step (1-7)                      |
-| `--decision`    | Step 1   | The decision statement being criticized |
+| `--step`        | 是       | 当前步骤(1-7)                          |
+| `--decision`    | 步骤 1   | 待评审的决策陈述                        |
 
-Do NOT analyze or critique first. Run the script and follow its output.
+不要先分析或评审。运行脚本并跟随其输出执行。

@@ -1,21 +1,21 @@
-# Code Quality Guidelines
+# 代码质量指南
 
-Prompts for LLM agents detecting code smells. Organized by cognitive mode:
+面向 LLM agent 检测代码异味的 prompt，按认知模式分类组织：
 
-| File                               | Cognitive Mode                       | Categories |
+| 文件                               | 认知模式                             | 类别数     |
 | ---------------------------------- | ------------------------------------ | ---------- |
-| `01-naming-and-types.md`           | "Do names and types express intent?" | 5          |
-| `02-structure-and-composition.md`  | "Is this well-structured?"           | 5          |
-| `03-patterns-and-idioms.md`        | "Is this idiomatic?"                 | 5          |
-| `04-repetition-and-consistency.md` | "Is this DRY and consistent?"        | 5          |
-| `05-documentation-and-tests.md`    | "Is this documented and tested?"     | 4          |
-| `06-module-and-dependencies.md`    | "Are boundaries clean?"              | 2          |
-| `07-cross-file-consistency.md`     | "Is this consistent across files?"   | 4          |
-| `08-codebase-patterns.md`          | "What patterns are emerging?"        | 3          |
+| `01-naming-and-types.md`           | 「名称和类型是否表达了意图？」       | 5          |
+| `02-structure-and-composition.md`  | 「结构是否合理？」                   | 5          |
+| `03-patterns-and-idioms.md`        | 「是否符合惯用法？」                 | 5          |
+| `04-repetition-and-consistency.md` | 「是否 DRY 且一致？」                | 5          |
+| `05-documentation-and-tests.md`    | 「是否有完善的文档和测试？」         | 4          |
+| `06-module-and-dependencies.md`    | 「边界是否清晰？」                   | 2          |
+| `07-cross-file-consistency.md`     | 「跨文件是否一致？」                 | 4          |
+| `08-codebase-patterns.md`          | 「出现了哪些模式？」                 | 3          |
 
-## Applicability Matrix
+## 适用性矩阵
 
-| Group                       | Design Review | Diff Review | Codebase Review | Refactor Design | Refactor Code |
+| 分组                        | Design Review | Diff Review | Codebase Review | Refactor Design | Refactor Code |
 | --------------------------- | :-----------: | :---------: | :-------------: | :-------------: | :-----------: |
 | 01 Naming & Types           |      Yes      |     Yes     |       Yes       |       Yes       |      Yes      |
 | 02 Structure & Composition  |      Yes      |     Yes     |       Yes       |       Yes       |      Yes      |
@@ -26,26 +26,26 @@ Prompts for LLM agents detecting code smells. Organized by cognitive mode:
 | 07 Cross-file Consistency   |      Yes      |     No      |       Yes       |       Yes       |      Yes      |
 | 08 Codebase Patterns        |      No       |     No      |       Yes       |       No        |      Yes      |
 
-**Phase definitions**:
+**阶段定义**：
 
-- **Design Review**: Evaluating Code Intent before diffs exist
-- **Diff Review**: Evaluating proposed code changes in plan
-- **Codebase Review**: Evaluating code after implementation
-- **Refactor Design**: Analyzing architecture/intent quality in existing code
-- **Refactor Code**: Analyzing implementation quality in existing code
+- **Design Review**：在 diff 存在之前评估代码意图
+- **Diff Review**：评估计划中提出的代码变更
+- **Codebase Review**：在实现完成后评估代码
+- **Refactor Design**：分析现有代码的架构/意图质量
+- **Refactor Code**：分析现有代码的实现质量
 
-## Format Rationale
+## 格式设计原理
 
-Each document has a primer followed by numbered categories:
+每个文档由前言（primer）加上带编号的分类组成：
 
 ```markdown
 # [Group Name]
 
-[PRIMER: 2-3 paragraphs grounding the cognitive mode]
+[PRIMER: 2-3 段，确立认知模式]
 
 ## Applicability
 
-[Table showing which phases this document applies to]
+[表格，说明该文档适用于哪些阶段]
 
 ## Evaluation Modes
 
@@ -57,52 +57,52 @@ Each document has a primer followed by numbered categories:
 ## 1. Category Name
 
 <principle>
-Abstract rule unifying all examples. Stated first to prime generalization.
+统一所有示例的抽象规则，放在最前面以引导泛化。
 </principle>
 
-Detect: Detection question framing the evaluation lens.
+Detect: 描述评估视角的检测问题。
 
 <grep-hints>
-Terms that sometimes indicate issues (starting points, not definitive):
+可能表示问题的词项（起点，非定论）：
 `pattern1`, `pattern2`
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive) -- similar violations exist:
+说明性模式（非穷举）——类似违规也存在：
 
 [severity] Category label
 
-- Example with "e.g." prefix
-- Open-ended: "Any X that causes Y"
+- 示例，带 "e.g." 前缀
+- 开放式结尾："Any X that causes Y"
   </violations>
 
 <exceptions>
-Boundary cases with principle-based test.
+带原则性测试的边界情形。
 </exceptions>
 
 <threshold>
-Severity bar for flagging.
+标记的严重度门槛。
 </threshold>
 ```
 
-### Why This Works
+### 为什么这样有效
 
-| Feature                           | Mechanism                                               |
+| 特性                              | 机制                                                    |
 | --------------------------------- | ------------------------------------------------------- |
-| Primer first                      | Establishes cognitive mode before categories            |
-| `<principle>` first per category  | Primacy effect -- early content shapes interpretation   |
-| "starting points, not definitive" | Hedging breaks literal anchoring                        |
-| "e.g.," prefix                    | Signals exemplification vs enumeration                  |
-| Open-ended escape hatch           | Keeps violation list unbounded                          |
-| XML semantic markers              | Structure for LLM; transparent to line-range extraction |
+| Primer 在前                       | 在分类之前建立认知模式                                  |
+| 每个分类首先给出 `<principle>`    | 首因效应——早期内容塑造解读方式                         |
+| 「起点，非定论」                  | 限定语打破字面锚定                                      |
+| 「e.g.,」前缀                     | 明示这是举例而非穷举                                    |
+| 开放式兜底                        | 保持违规列表的开放性                                    |
+| XML 语义标记                      | 为 LLM 提供结构；对行范围提取透明                       |
 
-## Integration
+## 集成方式
 
-Skills extract sections by line range (regex: `^## \d+\. (.+)$`). Content within sections is free-form -- parser extracts raw text, LLM interprets structure.
+skill 通过行范围提取各节内容（正则：`^## \d+\. (.+)$`）。节内内容自由格式——解析器提取原始文本，由 LLM 解读结构。
 
-### Skill Prompt Additions
+### Skill Prompt 补充内容
 
-Wrap extracted blocks with:
+用以下内容包裹提取的代码块：
 
 ```
 <interpretation>
@@ -111,7 +111,7 @@ Detect ANY violation of the principle, including unlisted patterns.
 </interpretation>
 ```
 
-Add analogical prompting after block:
+在代码块后添加类比提示：
 
 ```
 GENERALIZATION:
@@ -119,95 +119,78 @@ Before searching, identify 2-3 OTHER patterns violating the SAME principle.
 Search for BOTH listed exemplars AND self-generated patterns.
 ```
 
-This triggers domain-specific recall, enabling transfer beyond listed examples.
+这能触发领域特定的联想，使检测能力迁移到列表之外的示例。
 
 ---
 
-## Invisible Knowledge: Design Decisions
+## 隐性知识：设计决策
 
-### Why 8 Documents?
+### 为什么是 8 个文档？
 
-These documents are organized by **cognitive mode** -- what the evaluator is
-looking at and how they reason about it. This enables:
+这些文档按**认知模式**组织——评估者在关注什么、如何推理。这带来以下优势：
 
-1. **Focused agents**: Refactor agents receive ONE category from a document.
-   The document primer establishes cognitive mode; the category provides focus.
+1. **专注的 agent**：重构 agent 接收单个文档中的某一个分类。文档前言确立认知模式，分类提供聚焦方向。
 
-2. **Comprehensive QR**: QR agents receive an ENTIRE document. All categories
-   in a document use the same cognitive mode, so checking multiple categories
-   in one pass is efficient.
+2. **全面的 QR**：QR agent 接收一个**完整文档**。同一文档中的所有分类使用相同的认知模式，因此在单次 pass 中检查多个分类效率很高。
 
-3. **Progressive disclosure**: Python scripts inject role/context first, then
-   the document primer grounds the cognitive mode, then categories provide
-   specifics.
+3. **渐进式披露**：Python 脚本先注入角色/上下文，再由文档前言确立认知模式，最后由分类提供具体内容。
 
-### Why Split Categories?
+### 为什么要拆分分类？
 
-Three categories (Zombie Code, Naming Consistency, Error Pattern Consistency)
-have both file-scope and codebase-scope variants. These are split because:
+三个分类（Zombie Code、Naming Consistency、Error Pattern Consistency）同时有文件级和代码库级的变体，因此拆分：
 
-- **File-scope**: Checkable on individual diffs. Used by Diff Review.
-- **Codebase-scope**: Requires full codebase view. Used by Codebase Review/Refactor.
+- **文件级**：可在单个 diff 上检查，用于 Diff Review。
+- **代码库级**：需要全局代码库视图，用于 Codebase Review/Refactor。
 
-Asking a Diff Review agent to find codebase-wide issues is impossible; asking a
-Refactor agent to ignore codebase-wide patterns wastes its capabilities.
+要求 Diff Review agent 发现代码库级问题是不可能的；要求 Refactor agent 忽略代码库级模式则是浪费其能力。
 
-Split assignments:
+拆分分配：
 
-| Category                  | File Scope                                        | Codebase Scope                               |
-| ------------------------- | ------------------------------------------------- | -------------------------------------------- |
-| Zombie Code               | Group 03 (commented blocks, unreachable branches) | Group 08 (0-reference exports, dead modules) |
-| Naming Consistency        | Group 01 (same file, different names)             | Group 07 (cross-module drift)                |
-| Error Pattern Consistency | Group 04 (within-class inconsistency)             | Group 07 (cross-abstraction-level)           |
+| 类别                      | 文件范围                                                | 代码库范围                                   |
+| ------------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| Zombie Code               | Group 03（注释块、不可达分支）                          | Group 08（零引用导出、死模块）               |
+| Naming Consistency        | Group 01（同文件内，命名不一致）                        | Group 07（跨模块漂移）                       |
+| Error Pattern Consistency | Group 04（类内不一致）                                  | Group 07（跨抽象层级）                       |
 
-### Design vs Code Facets
+### Design 与 Code 两种评估面
 
-Each document has two evaluation modes:
+每个文档有两种评估模式：
 
-- **Design-mode**: For evaluating Code Intent at Design Review. Checks whether
-  the proposed design exhibits the smell, based on description alone.
+- **Design-mode**：用于 Design Review 阶段评估代码意图。基于描述判断所提设计是否存在问题。
 
-- **Code-mode**: For evaluating actual code at Diff Review, Codebase Review,
-  or Refactor. Checks whether the implementation exhibits the smell.
+- **Code-mode**：用于 Diff Review、Codebase Review 或 Refactor 阶段评估实际代码。判断实现中是否存在问题。
 
-Groups 03, 05 have no design facet (require actual code). Groups 01, 02, 06, 07
-have both facets. Groups 04, 08 have partial design facets.
+Group 03、05 没有 design facet（需要实际代码）。Group 01、02、06、07 同时有两种 facet。Group 04、08 有部分 design facet。
 
-### Which Agents Use Which Documents?
+### 各 Agent 使用哪些文档？
 
-| Phase           | Documents      | Mode   | Agent Model                                  |
-| --------------- | -------------- | ------ | -------------------------------------------- |
-| Design Review   | 01, 02, 06, 07 | design | 4 parallel QR agents (one per doc)           |
-| Diff Review     | 01-05          | code   | 5 parallel QR agents (one per doc)           |
-| Codebase Review | 01-08          | code   | 8 parallel QR agents (one per doc)           |
-| Refactor Design | 01, 02, 06, 07 | design | N parallel Explore agents (one per category) |
-| Refactor Code   | 01-08          | code   | N parallel Explore agents (one per category) |
+| 阶段            | 文档           | 模式   | Agent 模型                                     |
+| --------------- | -------------- | ------ | ---------------------------------------------- |
+| Design Review   | 01, 02, 06, 07 | design | 4 个并行 QR agent（每个文档一个）              |
+| Diff Review     | 01-05          | code   | 5 个并行 QR agent（每个文档一个）              |
+| Codebase Review | 01-08          | code   | 8 个并行 QR agent（每个文档一个）              |
+| Refactor Design | 01, 02, 06, 07 | design | N 个并行 Explore agent（每个分类一个）         |
+| Refactor Code   | 01-08          | code   | N 个并行 Explore agent（每个分类一个）         |
 
-Each QR agent receives ONE full document and checks all categories within it.
-Each Refactor agent receives ONE category (random sampling from documents).
+每个 QR agent 接收**一个完整文档**并检查其中的所有分类。每个 Refactor agent 接收**一个分类**（从文档中随机采样）。
 
-### Machine-Parseable Metadata
+### 可机器解析的元数据
 
-Each document contains applicability metadata in an HTML comment at line 1:
+每个文档在第 1 行包含可机器解析的适用性元数据（HTML 注释）：
 
 ```markdown
 <!-- applicable_phases: design_review, diff_review, codebase_review, refactor_design, refactor_code -->
 ```
 
-This approach was chosen for several reasons:
+采用此方案的原因：
 
-1. **No external dependencies**: HTML comments can be parsed with stdlib regex,
-   avoiding dependencies on YAML/TOML parsers or frontmatter libraries.
+1. **无外部依赖**：HTML 注释可用标准库正则解析，无需依赖 YAML/TOML 解析器或 frontmatter 库。
 
-2. **Invisible to readers**: The metadata doesn't clutter the visible document
-   structure, keeping the primer as the first visible content.
+2. **对读者不可见**：元数据不会占用文档可见空间，让前言作为第一个可见内容。
 
-3. **Single source of truth**: The evaluation mode (design vs code) is derived
-   from the phase. If a phase maps to design mode, the extraction function
-   uses `<design-mode>` content; if it maps to code mode, it uses `<code-mode>`
-   content.
+3. **单一事实来源**：评估模式（design vs code）从阶段推导而来。若阶段映射到 design 模式，提取函数使用 `<design-mode>` 内容；若映射到 code 模式，则使用 `<code-mode>` 内容。
 
-The extraction function (`lib/workflow/quality_docs.py`) works as follows:
+提取函数（`lib/workflow/quality_docs.py`）工作方式如下：
 
 ```python
 def extract_content(doc_path: Path, phase: Phase) -> ExtractedContent | None:
@@ -234,7 +217,7 @@ def extract_content(doc_path: Path, phase: Phase) -> ExtractedContent | None:
     return ExtractedContent(primer, mode_guidance, categories)
 ```
 
-The `PHASE_TO_MODE` mapping ensures mode is always derived consistently:
+`PHASE_TO_MODE` 映射确保模式始终以一致方式从阶段推导：
 
 ```python
 PHASE_TO_MODE = {
@@ -246,5 +229,4 @@ PHASE_TO_MODE = {
 }
 ```
 
-This design makes it impossible for mode and phase to become inconsistent,
-since mode is computed from phase rather than stored separately.
+这种设计从根本上杜绝了模式与阶段不一致的情况，因为模式是从阶段计算得出的，而非单独存储。

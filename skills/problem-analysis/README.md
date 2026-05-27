@@ -1,151 +1,118 @@
 # Problem Analysis
 
-Root cause identification skill. This skill identifies WHY a problem occurs. It
-explicitly does NOT propose solutions -- that is a downstream concern for a
-separate skill (solution-discovery).
+根因识别 skill。此 skill 识别问题「为何」发生。它明确不提出解决方案——那是下游独立 skill(solution-discovery)的职责。
 
-## When to Use
+## 适用场景
 
-Use this when you need to understand the cause of a problem:
+当你需要理解问题原因时使用:
 
-- User reports "X happens when they do Y"
-- Component A fails under condition B
-- System exhibits unexpected behavior
-- Bug needs investigation before fixing
+- 用户报告「做 Y 时发生了 X」
+- 组件 A 在条件 B 下失败
+- 系统出现意外行为
+- Bug 需要在修复前先调查
 
-Do NOT use this for:
+不适用场景:
 
-- Choosing between known solutions (use decision-critic)
-- Evaluating architectural options (use decision-critic)
-- Problems where the cause is already known
+- 在已知方案之间做选择(使用 decision-critic)
+- 评估架构选项(使用 decision-critic)
+- 原因已经明确的问题
 
-## The Five Phases
+## 五个阶段
 
-| Phase       | Purpose                                           |
+| 阶段       | 目的                                              |
 | ----------- | ------------------------------------------------- |
-| Gate        | Validate input, establish single testable problem |
-| Hypothesize | Generate 2-4 distinct candidate explanations      |
-| Investigate | Iterative evidence gathering (up to 5 iterations) |
-| Formulate   | Synthesize findings into validated root cause     |
-| Output      | Structured report for downstream consumption      |
+| 质量门      | 验证输入,确立单一可测试的问题                    |
+| 假设        | 生成 2-4 个不同的候选解释                         |
+| 调查        | 迭代收集证据(最多 5 次迭代)                      |
+| 表述        | 将发现综合为经验证的根因                          |
+| 输出        | 结构化报告,供下游使用                             |
 
-## Invisible Knowledge
+## 隐性知识
 
-This section captures design decisions that cannot be inferred from code.
+本节记录无法从代码中推断出的设计决策。
 
-### Why the Original Skill Was Wrong
+### 为何原始 skill 是错的
 
-The original skill was titled "problem-analysis" but was actually a solution
-evaluation workflow. Its very first phase instructed the LLM to "GENERATE 2-4
-DISTINCT solutions." This violates the fundamental purpose of root cause
-analysis, which must understand the problem before considering solutions.
+原始 skill 标题为「problem-analysis」,实际上却是一个方案评估工作流。其第一阶段就指示 LLM「生成 2-4 个不同的解决方案」。这违背了根因分析的根本目的——必须先理解问题,再考虑解决方案。
 
-### The Problem/Solution Boundary
+### 问题/解决方案的边界
 
-Root causes must be framed as conditions that exist, not as absences of
-solutions. When you ask "why?" repeatedly during root cause analysis, you can
-drift from describing observable states to describing what's missing. The moment
-you frame something as "we don't have X" or "there's no Y," you've implicitly
-proposed a solution (get X, add Y) rather than identified a cause.
+根因必须以「存在的条件」来表述,而非以「解决方案的缺失」来表述。反复追问「为什么?」时,你可能从描述可观测状态漂移到描述缺失的东西。一旦你把某事表述为「我们没有 X」或「没有 Y」,你就已经隐含地提出了一个解决方案(获取 X、添加 Y),而非识别出根因。
 
-| Wrong (Absence)            | Correct (Condition)                                   |
+| 错误(缺失式)             | 正确(条件式)                                          |
 | -------------------------- | ----------------------------------------------------- |
-| "We don't have validation" | "User input reaches processing without sanitization"  |
-| "Missing retry logic"      | "Failed requests terminate immediately without retry" |
-| "No rate limiting"         | "The API accepts unbounded requests per client"       |
-| "Lack of monitoring"       | "Component failures propagate silently until impact"  |
+| 「没有验证」               | 「用户输入在未经清洗的情况下到达处理层」              |
+| 「缺少重试逻辑」           | 「失败的请求立即终止,没有重试」                      |
+| 「没有限流」               | 「API 接受每个客户端的无限请求」                      |
+| 「缺乏监控」               | 「组件故障静默传播,直到产生影响」                    |
 
-The correct framing describes observable reality and leaves multiple solution
-paths open. The wrong framing presupposes a specific solution.
+正确的表述描述可观测的现实,并为多种解决路径留有空间。错误的表述预设了特定的解决方案。
 
-### Why Self-Reported Confidence Doesn't Work
+### 为何自我报告的置信度不可靠
 
-LLMs have no calibrated introspective access to their own certainty. Asking "how
-confident are you?" produces unreliable answers because the model is pattern-
-matching on what confident-sounding language looks like, not measuring actual
-epistemic state.
+LLM 对自身确定性没有经过校准的内省访问。问「你有多自信?」得到的答案不可靠,因为模型只是在模式匹配听起来自信的语言,而非测量实际的认识论状态。
 
-The solution is to derive confidence from factual criteria: instead of "how sure
-are you?", we ask "can you answer YES to these specific questions about your
-analysis?"
+解决方案是从事实标准中推导置信度:不问「你多确定?」,而是问「你能对分析中的这些具体问题回答 YES 吗?」
 
-### Why "Certain" Is Not a Valid Target
+### 为何「确定」不是有效目标
 
-You can only truly confirm a root cause after implementing a fix and observing
-that the symptom disappears. Before that, you're working with hypotheses of
-varying confidence. Requiring "certainty" as an exit condition either blocks the
-workflow indefinitely or encourages the LLM to falsely claim certainty.
+只有在实施修复并观察到症状消失后,才能真正确认根因。在此之前,你处理的是置信度各异的假设。将「确定」作为退出条件,要么会无限阻塞工作流,要么会鼓励 LLM 虚假地声称确定性。
 
-The practical goal is "sufficient confidence to proceed to solution discovery,"
-which we call HIGH confidence.
+实际目标是「足以推进到方案发现的高置信度」,我们称之为 HIGH 置信度。
 
-### Why Multiple Hypotheses Matter
+### 为何多个假设很重要
 
-Investigation with only one hypothesis produces confirmation bias. You find
-supporting evidence whether or not the hypothesis is correct because you're only
-looking for evidence that supports it. Generating multiple hypotheses before
-investigating forces comparative evaluation and prevents tunnel vision.
+只有一个假设的调查会产生确认偏差。无论假设是否正确,你都会找到支持性证据——因为你只在寻找支持它的证据。在调查之前生成多个假设,强制进行比较评估,防止隧道视野。
 
-The requirement is at least two hypotheses that differ on mechanism or location,
-not just phrasing variations.
+要求至少两个在机制或位置上有所不同的假设,而非只是措辞上的变体。
 
-### The Iteration Cap Rationale
+### 迭代上限的理由
 
-The investigation phase uses an iterative loop with a maximum of 5 iterations.
-This cap exists because root cause analysis could theoretically continue forever
-(you can always ask another "why?"). The cap forces eventual termination while
-allowing enough depth for meaningful investigation.
+调查阶段使用最多 5 次迭代的循环。之所以设置上限,是因为根因分析理论上可以无限延续(你总可以再问一个「为什么?」)。上限在允许足够深度的同时强制终止。
 
-Five iterations is a balance: enough to go beyond surface-level analysis, not so
-many that the skill becomes unwieldy.
+五次迭代是一个平衡:足以超越表面分析,又不至于让 skill 变得难以使用。
 
-### Script-Managed Iteration
+### 脚本管理迭代
 
-The iteration count is managed by the script, not the LLM. The LLM reports its
-findings and confidence criteria; the script increments the iteration counter
-and determines whether to continue or proceed to the next phase.
+迭代计数由脚本管理,而非 LLM。LLM 报告其发现和置信度标准;脚本递增迭代计数器并决定是否继续或进入下一阶段。
 
-This prevents the LLM from miscounting or gaming the iteration limit.
+这防止 LLM 错误计数或规避迭代限制。
 
-### The Four Readiness Questions
+### 四个准备就绪问题
 
-Confidence is derived from four factual questions about the analysis:
+置信度从四个关于分析的事实问题中推导:
 
-| Question     | Criterion                                                |
+| 问题     | 标准                                                     |
 | ------------ | -------------------------------------------------------- |
-| Evidence     | Can you cite specific code/config/docs supporting cause? |
-| Alternatives | Did you examine at least one alternative hypothesis?     |
-| Explanation  | Does the root cause fully explain the symptom?           |
-| Framing      | Is root cause a positive condition (not absence)?        |
+| 证据         | 能否引用支持根因的具体代码/配置/文档?                   |
+| 替代方案     | 是否检验了至少一个替代假设?                             |
+| 解释力       | 根因是否完整解释了症状?                                 |
+| 表述         | 根因是否以正向条件(非缺失)表述?                       |
 
-Scoring:
+评分:
 
-- YES = 1 point, PARTIAL = 0.5 points, NO = 0 points
-- 4 points = HIGH (ready to proceed)
-- 3-3.5 = MEDIUM
-- 2-2.5 = LOW
+- YES = 1 分,PARTIAL = 0.5 分,NO = 0 分
+- 4 分 = HIGH(可以推进)
+- 3–3.5 = MEDIUM
+- 2–2.5 = LOW
 - <2 = INSUFFICIENT
 
-Question 4 (Framing) has no partial credit. If framing is wrong, it must be
-fixed before proceeding.
+问题 4(表述)没有部分分。表述有误则必须修正后才能推进。
 
-## Example Usage
+## 使用示例
 
 ```
-A user reported that their session expires immediately after login on mobile
-devices, but works fine on desktop. Figure out why this is happening.
+有用户报告他们在移动设备上登录后 session 立即过期,但桌面端正常。找出原因。
 ```
 
-The skill will:
+此 skill 将:
 
-1. Gate: Validate this is a single, well-defined problem
-2. Hypothesize: Generate candidates (cookie handling, token storage, etc.)
-3. Investigate: Examine code for each hypothesis
-4. Formulate: Synthesize into root cause statement
-5. Output: Structured report for solution discovery
+1. 质量门:验证这是单一、定义明确的问题
+2. 假设:生成候选项(cookie 处理、token 存储等)
+3. 调查:针对每个假设检查代码
+4. 表述:综合为根因陈述
+5. 输出:结构化报告供方案发现使用
 
-## Implementation Notes
+## 实现说明
 
-The workflow uses `skills.lib.workflow.formatters.text` for output formatting.
-Phase 3 uses `build_invoke_command()` with dynamic `--iteration` parameter
-computed by the script.
+工作流使用 `skills.lib.workflow.formatters.text` 进行输出格式化。阶段 3 使用 `build_invoke_command()`,动态 `--iteration` 参数由脚本计算。

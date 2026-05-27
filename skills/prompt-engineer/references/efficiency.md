@@ -1,351 +1,243 @@
-# Efficiency and Compression Techniques
+# 效率与压缩技术
 
-Efficiency techniques address scenarios where LLM inference costs become prohibitive --
-verbose chain-of-thought traces consuming excessive tokens, long prompts increasing
-latency, or batching requirements for high-volume applications. These techniques trade
-some reasoning depth for reduced computational overhead. Use them when token costs or
-latency are primary concerns, when problems are simple enough to not require full
-reasoning elaboration, or when operating at scale where per-request costs compound.
+效率技术针对 LLM 推理成本过高的场景——冗长的思维链轨迹消耗过多 token、长 prompt 增加延迟、或高吞吐量应用需要批处理。这些技术以牺牲一定推理深度为代价来降低计算开销。当 token 成本或延迟是首要考量时、当问题足够简单无需完整推理展开时、或当规模化部署导致单请求成本累积时，可使用这些技术。
 
-## Output Compression Techniques
+## 输出压缩技术
 
-### Concise Chain-of-Thought (CCoT)
+### 简洁思维链（Concise Chain-of-Thought，CCoT）
 
-**Mechanism**: Append "Be concise" to standard CoT prompt; optionally provide concise
-few-shot examples.
+**机制**：在标准 CoT prompt 后追加「Be concise」；可选择性地提供简洁的少样本示例。
 
-**When to use**: Default CoT responses are unnecessarily verbose; per-token costs are a
-concern; problems do not require elaborate mathematical reasoning.
+**使用场景**：默认 CoT 输出不必要地冗长；token 成本是关注点；问题无需详细数学推理。
 
-**Implementation**: Add instruction "Be concise" after "think step-by-step". Provide
-one-shot example with abbreviated reasoning. Works best with larger models (GPT-4 class);
-smaller models may suffer accuracy loss on math problems (~28% degradation on GPT-3.5 for
-math).
+**实现方式**：在「think step-by-step」后加上指令「Be concise」。提供一个带有精简推理的单样本示例。对较大模型（GPT-4 级别）效果最好；较小模型在数学问题上可能出现准确率下降（GPT-3.5 约下降 28%）。
 
-**Tradeoffs**: 48% token reduction with negligible accuracy impact on most tasks. Math
-problems on smaller models show significant accuracy loss. No additional API calls.
+**权衡**：token 减少 48%，对大多数任务准确率影响可忽略不计。小型模型在数学问题上准确率显著下降。无需额外 API 调用。
 
 ---
 
-### Chain of Draft (CoD)
+### Chain of Draft（CoD）
 
-**Mechanism**: Instruct model to limit each reasoning step to 5 words maximum, mimicking
-human shorthand notes.
+**机制**：指示模型将每个推理步骤限制在最多 5 个词，模仿人类速记的简写方式。
 
-**When to use**: Reasoning tasks where abbreviated notation suffices (arithmetic,
-symbolic reasoning, commonsense); latency is critical; standard CoT produces
-92%+ excess tokens.
+**使用场景**：简略表示法足够的推理任务（算术、符号推理、常识推理）；延迟至关重要；标准 CoT 产生 92% 以上的冗余 token。
 
-**Implementation**: Prompt: "Think step by step, but only keep a minimum draft for each
-thinking step, with 5 words at most." Requires few-shot examples demonstrating the
-condensed format. Example output: "20 - x = 12; x = 8" instead of paragraph explanation.
+**实现方式**：Prompt：「Think step by step, but only keep a minimum draft for each thinking step, with 5 words at most.」需要展示精简格式的少样本示例。示例输出：「20 - x = 12; x = 8」而非段落式说明。
 
-**Tradeoffs**: 76-92% token reduction. Requires few-shot examples -- zero-shot mode
-degrades substantially (frontier models lose ~10 percentage points; smaller models show
-even larger gaps of ~16 points). Performance gap widens on small models (<3B). Maintains
-accuracy on arithmetic, commonsense, and symbolic tasks when few-shot examples provided.
+**权衡**：token 减少 76-92%。需要少样本示例——零样本模式性能显著下降（前沿模型下降约 10 个百分点；较小模型差距更大，约 16 个百分点）。小型模型（<3B）性能差距更明显。在提供少样本示例的情况下，算术、常识和符号任务的准确率得以保持。
 
 ---
 
-### Constrained-CoT (CCoT) with Word Limits
+### 带词数限制的 Constrained-CoT（CCoT）
 
-**Mechanism**: Explicitly request maximum word/token count in prompt: "limit the length
-of the answer to N words."
+**机制**：在 prompt 中明确要求最大词数/token 数：「limit the length of the answer to N words.」
 
-**When to use**: Need predictable generation times; real-time systems with latency
-constraints; specific large instruction-tuned models tested to follow length constraints
-(e.g., Llama2-70b, Falcon-40b).
+**使用场景**：需要可预测的生成时间；具有延迟约束的实时系统；已测试能遵循长度约束的特定大型指令微调模型（如 Llama2-70b、Falcon-40b）。
 
-**Implementation**: Append length constraint after CoT instruction. Test with varying
-limits (15, 30, 45, 60, 100 words). Larger models (Llama2-70b) can improve accuracy
-while reducing length; smaller models often fail to respect constraints or lose accuracy.
+**实现方式**：在 CoT 指令后追加长度约束。测试不同限制（15、30、45、60、100 词）。较大模型（Llama2-70b）可在缩短长度的同时提升准确率；较小模型通常无法可靠遵循约束或会损失准确率。
 
-**Tradeoffs**: 21-28% token reduction. Large models may gain accuracy through forced
-conciseness. Small/medium models (<13B) often cannot follow constraints reliably. Requires
-tuning optimal word limit per task.
+**权衡**：token 减少 21-28%。大型模型可能因强制简洁而提升准确率。中小型模型（<13B）通常无法可靠遵循约束。需要针对每项任务调优最佳词数上限。
 
 ---
 
-### Token-Budget-Aware Reasoning (TALE)
+### Token 预算感知推理（TALE）
 
-**Mechanism**: Dynamically estimate required tokens per problem, then include budget in
-prompt: "use less than N tokens."
+**机制**：动态估算每个问题所需的 token 数，然后将预算写入 prompt：「use less than N tokens.」
 
-**When to use**: Problem difficulty varies significantly; want adaptive compression rather
-than fixed limits; willing to trade one extra API call for better budget estimation.
+**使用场景**：问题难度差异较大；希望使用自适应压缩而非固定限制；愿意多用一次 API 调用换取更准确的预算估算。
 
-**Implementation**: TALE-EP: First call estimates budget from problem complexity
-(zero-shot), second call reasons within budget. TALE-PT: Fine-tune model to internalize
-budget awareness. Token elasticity phenomenon: too-small budgets cause models to exceed
-limits dramatically.
+**实现方式**：TALE-EP：第一次调用从零样本估算问题复杂度所需 token 数，第二次调用在预算内推理。TALE-PT：微调模型以内化预算感知能力。Token 弹性现象：预算过小会导致模型大幅超出限制。
 
-**Tradeoffs**: 67% token reduction with <3% accuracy loss. Requires extra API call for
-budget estimation. Models struggle with unreasonably small budgets. Post-training version
-(TALE-PT) eliminates extra call but requires fine-tuning access.
+**权衡**：token 减少 67%，准确率损失 <3%。需要额外 API 调用来估算预算。模型难以处理不合理的小预算。训练后版本（TALE-PT）无需额外调用，但需要微调访问权限。
 
 ---
 
-### Sketch-of-Thought (SoT)
+### Sketch-of-Thought（SoT）
 
-**Mechanism**: Route problems to one of three cognitively-inspired paradigms: Conceptual
-Chaining (arrows between concepts), Chunked Symbolism (mathematical notation), or Expert
-Lexicons (domain abbreviations).
+**机制**：将问题路由到三种受认知启发的范式之一：概念链接（概念间用箭头连接）、分块符号化（数学符号表示）或专业词汇（领域缩写）。
 
-**When to use**: Multi-domain reasoning with distinct problem types; want structured
-compression with interpretable intermediate steps; can afford lightweight routing model.
+**使用场景**：具有不同问题类型的多领域推理；希望使用具有可解释中间步骤的结构化压缩；可承担轻量级路由模型的成本。
 
-**Implementation**: Train DistilBERT router on 14K samples to classify incoming queries.
-Conceptual Chaining: "#Seoul -> #South Korea -> Won". Chunked Symbolism: "a = 2.5, vi = 15,
-vf = vi + a\*t = 40". Expert Lexicons: "STEMI -> MONA -> Aspirin in MONA".
+**实现方式**：在 14K 样本上训练 DistilBERT 路由器以对输入问题分类。概念链接：「#Seoul -> #South Korea -> Won」。分块符号化：「a = 2.5, vi = 15, vf = vi + a\*t = 40」。专业词汇：「STEMI -> MONA -> Aspirin in MONA」。
 
-**Tradeoffs**: Up to 84% token reduction. Requires training router model. Performance
-varies by paradigm-task alignment. Generalizes to multilingual/multimodal with adapted
-exemplars.
+**权衡**：token 最多减少 84%。需要训练路由器模型。性能因范式与任务的匹配程度而异。可通过改编示例推广到多语言/多模态场景。
 
 ---
 
-### Focused Chain-of-Thought (F-CoT)
+### 聚焦思维链（Focused Chain-of-Thought，F-CoT）
 
-**Mechanism**: Separate information extraction from reasoning -- first extract structured
-context (XML format), then reason only over that context.
+**机制**：将信息提取与推理分离——先将结构化上下文提取为 XML 格式，再仅基于该上下文进行推理。
 
-**When to use**: Input contains irrelevant narrative details; verbose word problems;
-model tends to overthink; want interpretable intermediate representation.
+**使用场景**：输入包含无关叙述细节；冗长的文字题；模型倾向于过度思考；希望获得可解释的中间表示。
 
-**Implementation**: Stage 1: Extract facts into `<info_1>`, `<info_2>`, `<question>` blocks.
-Stage 2: Reason exclusively over structured context with explicit citations. Can use
-larger model for extraction, smaller for reasoning.
+**实现方式**：阶段 1：将事实提取到 `<info_1>`、`<info_2>`、`<question>` 块中。阶段 2：仅基于结构化上下文进行推理，并明确引用来源。可使用较大模型做提取，较小模型做推理。
 
-**Tradeoffs**: 2-3x token reduction. Extraction stage may lose subtle information.
-Reasoning quality depends on extraction accuracy. Smaller models struggle with
-self-extraction; hybrid pipeline recommended.
+**权衡**：token 减少 2-3 倍。提取阶段可能遗漏细微信息。推理质量取决于提取准确性。较小模型难以自我提取；推荐使用混合管道。
 
 ---
 
-### Compressed Chain of Thought (CCoT - Continuous)
+### 连续压缩思维链（Compressed Chain of Thought，CCoT - Continuous）
 
-**Mechanism**: Generate continuous contemplation tokens that compress reasoning chains
-into dense vector representations.
+**机制**：生成连续的「思考 token」，将推理链压缩为稠密向量表示。
 
-**When to use**: Have fine-tuning access; want maximum compression; can tolerate
-interpretability loss; need adaptive compression at inference.
+**使用场景**：拥有微调访问权限；追求最大压缩；可接受可解释性的损失；需要在推理时进行自适应压缩。
 
-**Implementation**: Train module to approximate subset of full CoT hidden states. Use
-intermediate layer (l ~ L/2) for autoregressive token generation. Variable compression
-ratio (5-10% of original) controlled at training time.
+**实现方式**：训练模块以近似完整 CoT 隐藏状态的子集。使用中间层（l ≈ L/2）进行自回归 token 生成。可在训练时控制压缩比例（原始的 5-10%）。
 
-**Tradeoffs**: 10x speedup possible. Requires LoRA fine-tuning. Loses explicit reasoning
-trace interpretability. Compression ratios typically range 5-20% of original token count.
-Accuracy plateaus around 20% compression ratio -- pushing beyond this threshold causes
-approximation errors to propagate and compound through the reasoning chain.
+**权衡**：最高可实现 10 倍加速。需要 LoRA 微调。失去显式推理轨迹的可解释性。压缩比通常为原始 token 数的 5-20%。准确率在 20% 压缩比附近趋于平稳——超过此阈值后，近似误差会在推理链中传播累积。
 
 ---
 
-### ASAP (Anchor-guided, Surprisal-based Pruning)
+### ASAP（基于锚点和意外性的剪枝）
 
-**Mechanism**: Two-stage CoT compression: (1) prune structural redundancy via alignment
-with "direct thought" anchor, (2) prune logical redundancy by retaining high
-first-token-surprisal steps.
+**机制**：两阶段 CoT 压缩：（1）通过与「直接思考」锚点对齐来剪除结构冗余；（2）保留首 token 意外性高的步骤来剪除逻辑冗余。
 
-**When to use**: Working with long reasoning traces from Large Reasoning Models (R1-class);
-need both structural and logical compression; have compute for offline preprocessing.
+**使用场景**：处理大型推理模型（R1 级别）生成的长推理轨迹；需要同时进行结构和逻辑压缩；有离线预处理计算资源。
 
-**Implementation**: Generate concise "direct thought" from (question, answer) pair. Pattern-match
-original CoT steps against anchor. Compute surprisal of first token per step; iteratively
-remove lowest-surprisal steps until budget met. Fine-tune on pruned CoTs.
+**实现方式**：从（问题、答案）对生成简洁的「直接思考」。将原始 CoT 步骤与锚点进行模式匹配。计算每步首 token 的意外性；迭代移除意外性最低的步骤直至满足预算。在剪枝后的 CoT 上进行微调。
 
-**Tradeoffs**: 75% training token reduction, 60% training time reduction. 23% inference
-token reduction with accuracy improvements. Requires offline preprocessing pipeline.
-First-token surprisal outperforms perplexity for logical importance.
+**权衡**：训练 token 减少 75%，训练时间减少 60%。推理 token 减少 23%，准确率有所提升。需要离线预处理管道。首 token 意外性在评估逻辑重要性方面优于困惑度。
 
-## Input Compression Techniques
+## 输入压缩技术
 
-### Batch Prompting
+### 批处理 Prompting
 
-**Mechanism**: Group multiple samples in single prompt; model generates all responses in
-one API call.
+**机制**：在单个 prompt 中组合多个样本；模型在一次 API 调用中生成所有响应。
 
-**When to use**: High-volume inference with similar problem types; few-shot prompting
-where exemplars dominate token cost; batch size 2-6 samples optimal.
+**使用场景**：相似问题类型的高吞吐量推理；少样本 prompt 中示例占主要 token 成本；每批 2-6 个样本最优。
 
-**Implementation**: Group K few-shot exemplars into K/b batches. Append b test samples.
-Add position identifiers "[1]", "[2]" for response parsing. Token efficiency scales as
-b/(K+b) versus 1/(K+1) for standard prompting.
+**实现方式**：将 K 个少样本示例分成 K/b 批次。追加 b 个测试样本。添加位置标识符「[1]」、「[2]」用于解析响应。token 效率为 b/(K+b)，而标准 prompting 为 1/(K+1)。
 
-**Tradeoffs**: Up to 5x cost reduction (6 samples/batch). Performance degrades with
-batch size >6. Long input contexts degrade batch performance more. Task complexity
-affects optimal batch size.
+**权衡**：最多降低 5 倍成本（6 个样本/批）。批次大小超过 6 时性能下降。较长的输入上下文会降低批处理性能。任务复杂度影响最优批次大小。
 
 ---
 
-### System 2 Attention (S2A)
+### System 2 注意力（S2A）
 
-**Mechanism**: Regenerate input context to remove irrelevant/opinion content before
-reasoning.
+**机制**：在推理前重新生成输入上下文以去除无关/观点性内容。
 
-**When to use**: Context contains distractor information; sycophancy concerns; irrelevant
-sentences in math word problems; opinion-laden queries.
+**使用场景**：上下文包含干扰信息；存在迎合性偏见；数学文字题中有无关句子；带有观点倾向的查询。
 
-**Implementation**: Two-step process: (1) Prompt model to regenerate only relevant
-context portions, (2) Reason over regenerated context. Variants: with/without
-question-context separation, keep-original for safety.
+**实现方式**：两步流程：（1）提示模型重新生成仅包含相关上下文部分；（2）基于重新生成的上下文进行推理。变体：有/无问题-上下文分离，保留原始内容以确保安全。
 
-**Tradeoffs**: Doubles API calls. 18% accuracy improvement on distractor-heavy tasks.
-Requires context to be regenerable (fails on very long contexts). Increases factuality,
-decreases sycophancy.
+**权衡**：API 调用翻倍。在干扰信息较多的任务上准确率提升 18%。要求上下文可重新生成（对非常长的上下文失效）。提升事实性，降低迎合性。
 
 ---
 
-### State-Update Multi-turn Dialogue
+### 状态更新多轮对话
 
-**Mechanism**: Replace linear history concatenation with state reconstruction -- inject
-only previously-identified key information into each turn.
+**机制**：用状态重建替代线性历史拼接——每轮仅注入之前识别的关键信息。
 
-**When to use**: Long multi-turn dialogues; information filtering tasks; model suffers
-"lost in the middle" phenomenon; token costs compound across turns.
+**使用场景**：长多轮对话；信息过滤任务；模型出现「迷失在中间」现象；token 成本随轮次累积。
 
-**Implementation**: Each turn: provide new passage + "Previously selected: [prior key info]".
-Use XML tags (`<info>`) for structured output. Parse model output, carry forward as
-explicit history reminder.
+**实现方式**：每轮提供新段落 + 「Previously selected: [prior key info]」。使用 XML 标签（`<info>`）进行结构化输出。解析模型输出，作为显式历史提示向后传递。
 
-**Tradeoffs**: 59% token reduction, 73% latency reduction. Requires structured output
-parsing. Mitigates recency bias/forgetting. Three components are essential: State
-Reconstruction (injecting prior key info), History Reminder (explicit carry-forward),
-and XML Structured Output (using `<info>` tags for parseable extraction).
+**权衡**：token 减少 59%，延迟减少 73%。需要结构化输出解析。缓解近因偏差/遗忘问题。三个关键组件缺一不可：状态重建（注入之前关键信息）、历史提醒（显式向后传递）和 XML 结构化输出（使用 `<info>` 标签进行可解析提取）。
 
 ---
 
-### Behavior-Equivalent Token (BE Token)
+### 行为等价 Token（BE Token）
 
-**Mechanism**: Train single token to replace entire system prompt while preserving
-downstream behavior.
+**机制**：训练单个 token 替代整个系统 prompt，同时保留下游行为。
 
-**When to use**: Long system prompts (500-3000 tokens); prompt is fixed across many
-queries; have fine-tuning access; single-turn interactions.
+**使用场景**：长系统 prompt（500-3000 token）；prompt 在大量查询中固定不变；拥有微调访问权限；单轮交互场景。
 
-**Implementation**: Three-stage training pipeline: (1) Pre-train universal [AE] trigger
-token for text reconstruction across diverse prompts, (2) Train prompt-specific [BE]
-token to reconstruct target prompt via the [AE] decoder, (3) Distill behavioral alignment
-via knowledge distillation from full-prompt teacher. Critical insight: reconstruction
-loss alone fails -- behavior distillation provides the essential learning signal that
-enables downstream task performance. Balance parameter weights behavior distillation
-heavily over reconstruction.
+**实现方式**：三阶段训练流程：（1）预训练通用 [AE] 触发 token，用于跨多样化 prompt 的文本重建；（2）训练特定 prompt 的 [BE] token，通过 [AE] 解码器重建目标 prompt；（3）通过知识蒸馏从完整 prompt 的教师模型中提炼行为对齐。关键洞见：仅靠重建损失会失败——行为蒸馏提供了支撑下游任务性能的核心学习信号。参数权重应大幅偏向行为蒸馏而非重建。
 
-**Tradeoffs**: 3000x prompt compression. 98% downstream performance retained. Requires
-per-prompt training. Single-turn only. 28-59% TTFT reduction depending on prompt length.
+**权衡**：prompt 压缩 3000 倍。下游性能保留 98%。需要针对每个 prompt 训练。仅支持单轮。TTFT（首 token 生成时间）减少 28-59%，具体取决于 prompt 长度。
 
-## Theoretical Framework
+## 理论框架
 
-### Token Complexity
+### Token 复杂度
 
-**Mechanism**: Each problem has intrinsic minimum tokens required for solution --
-performance exhibits sharp threshold at this complexity.
+**机制**：每个问题都有求解所需的最少 token 数——性能在该复杂度处出现急剧阈值跳变。
 
-**When to use**: Evaluating compression strategies; understanding accuracy-length
-tradeoffs; designing adaptive systems; benchmarking new methods.
+**使用场景**：评估压缩策略；理解准确率-长度权衡；设计自适应系统；对新方法进行基准测试。
 
-**Implementation**: Estimate complexity by finding threshold where accuracy transitions
-from 0 to 1 across compression levels. Universal tradeoff curve exists: all reasonable
-compression prompts lie on same Pareto frontier.
+**实现方式**：通过寻找准确率从 0 跳变到 1 的阈值来估算复杂度。存在通用权衡曲线：所有合理的压缩 prompt 都位于同一 Pareto 前沿上。
 
-**Tradeoffs**: Optimal compression requires knowing per-problem complexity. Current
-prompt methods far from theoretical limit (3-11x gap). Verifier-based routing approaches
-theoretical bound but requires accurate verifier.
+**权衡**：最优压缩需要了解每个问题的复杂度。当前 prompt 方法距理论极限相差甚远（差距 3-11 倍）。基于验证器的路由方法接近理论上界，但需要准确的验证器。
 
 ---
 
-### Reasoning Boundary Framework (RBF) and MARP Prompting
+### 推理边界框架（RBF）与 MARP Prompting
 
-**Mechanism**: Quantifies upper bounds of chain-of-thought performance through
-"Reasoning Boundaries" (RBs) -- fundamental limits on what CoT can achieve for different
-operation types. A "combination law" (weighted harmonic mean) predicts composite task
-performance from individual RBs. MARP (Maximizing operations And Reducing Planning)
-prompting optimizes token efficiency by maximizing local computation per step while
-minimizing global planning steps.
+**机制**：通过「推理边界」（RBs）量化思维链性能的上界——这是 CoT 对不同操作类型所能达到的根本极限。「组合定律」（加权调和平均）从各独立 RB 预测复合任务性能。MARP（最大化操作、减少规划步骤）通过最大化每步的本地计算同时最小化全局规划步骤来优化 token 效率。
 
-**When to use**: Want principled understanding of CoT limits before compressing;
-designing adaptive prompts; task involves multiple reasoning operations; want to
-maximize work-per-token ratio.
+**使用场景**：在压缩前从原理层面理解 CoT 的极限；设计自适应 prompt；任务涉及多种推理操作；希望最大化每 token 的工作量比。
 
-**Implementation**: MARP prompt pattern: "Perform multi-step reasoning. Each step
-should carry out as many basic operations as possible while remaining correct. Minimize
-the number of planning or meta-reasoning steps." The approach consolidates multiple
-simple operations into single steps rather than spreading them across many verbose steps.
+**实现方式**：MARP prompt 模式：「Perform multi-step reasoning. Each step should carry out as many basic operations as possible while remaining correct. Minimize the number of planning or meta-reasoning steps.」该方法将多个简单操作合并到单个步骤中，而不是分散到许多冗长步骤中。
 
-**Example contrast**:
+**示例对比**：
 ```
-# VERBOSE (many planning steps)
+# 冗长（多个规划步骤）
 Step 1: First I need to identify what we're calculating.
 Step 2: The formula is distance = rate × time.
 Step 3: Let me plug in the values: rate = 60, time = 2.5.
 Step 4: Now I multiply: 60 × 2.5 = 150.
 Step 5: The answer is 150 miles.
 
-# MARP (maximized operations per step)
+# MARP（每步最大化操作数）
 distance = rate × time = 60 × 2.5 = 150 miles
 ```
 
-**Tradeoffs**: Provides theoretical grounding for why compression works (and when it
-fails). Combination law explains why multi-operation tasks degrade faster than single-
-operation tasks under compression. MARP requires model to reliably execute compound
-operations -- smaller models may need more decomposition. Complements Token Complexity
-by explaining *why* certain problems have higher intrinsic complexity.
+**权衡**：为压缩为何有效（以及何时失效）提供理论基础。组合定律解释了为什么多操作任务在压缩下的性能退化比单操作任务更快。MARP 要求模型可靠地执行复合操作——较小模型可能需要更多分解。与 Token 复杂度框架互补，解释了为什么某些问题具有更高的内在复杂度。
 
-## Decision Guidance
+## 决策指引
 
-**Problem: Output too verbose, simple tasks**
+**问题：输出冗长，任务简单**
 
-- Start with CCoT ("be concise") -- zero implementation cost
-- If still verbose, try Chain of Draft with few-shot examples
-- For math/arithmetic: Chunked Symbolism from SoT
+- 从 CCoT（「be concise」）开始——实现成本为零
+- 若仍冗长，尝试带少样本示例的 Chain of Draft
+- 对于数学/算术：使用 SoT 的分块符号化
 
-**Problem: Variable difficulty, want adaptive compression**
+**问题：难度不一，需要自适应压缩**
 
-- TALE-EP for prompt-based estimation
-- F-CoT if problems have extractable structure
-- Token Complexity + RBF framework for understanding limits
-- MARP prompting to maximize operations per step
+- 使用 TALE-EP 进行基于 prompt 的估算
+- 若问题结构可提取，使用 F-CoT
+- 使用 Token 复杂度 + RBF 框架理解极限
+- 使用 MARP prompting 最大化每步操作数
 
-**Problem: High-volume batch processing**
+**问题：高吞吐量批处理**
 
-- Batch Prompting for 2-6 samples per call
-- BE Token if system prompt is long and fixed
+- 每次调用 2-6 个样本的批处理 Prompting
+- 若系统 prompt 较长且固定，使用 BE Token
 
-**Problem: Long multi-turn conversations**
+**问题：长多轮对话**
 
-- State-Update Dialogue strategy
-- Compress context between turns, not within
+- 使用状态更新对话策略
+- 在轮次之间压缩上下文，而非在同一轮内压缩
 
-**Problem: Noisy/distractor-heavy context**
+**问题：上下文嘈杂/干扰信息多**
 
-- S2A for context regeneration
-- F-CoT for structured extraction
+- 使用 S2A 重新生成上下文
+- 使用 F-CoT 进行结构化提取
 
-**Problem: Maximum compression needed, have fine-tuning**
+**问题：需要最大压缩，且拥有微调能力**
 
-- ASAP for training data compression
-- Compressed CoT for continuous representations
-- TALE-PT for internalized budget awareness
+- 使用 ASAP 压缩训练数据
+- 使用连续 CoT 获取连续表示
+- 使用 TALE-PT 内化预算感知能力
 
-## Composability Notes
+## 可组合性说明
 
-**Combine well:**
+**可有效组合：**
 
-- Batch Prompting + any output compression (CCoT, CoD)
-- F-CoT extraction + CoD reasoning
-- S2A context cleaning + subsequent reasoning technique
-- TALE budget estimation + any constrained generation
-- MARP prompting + Token Complexity analysis (theoretical + practical)
+- 批处理 Prompting + 任意输出压缩（CCoT、CoD）
+- F-CoT 提取 + CoD 推理
+- S2A 上下文清洗 + 后续推理技术
+- TALE 预算估算 + 任意约束生成
+- MARP prompting + Token 复杂度分析（理论 + 实践）
 
-**Avoid combining:**
+**避免组合：**
 
-- Multiple output compression instructions (conflicting constraints)
-- Continuous compression (CCoT) + interpretability requirements
-- Heavy compression + small models (<7B parameters)
-- Token limits + complex mathematical reasoning
+- 多个输出压缩指令（约束冲突）
+- 连续压缩（CCoT）+ 可解释性需求
+- 强压缩 + 小型模型（<7B 参数）
+- Token 限制 + 复杂数学推理
 
-**Synergies:**
+**协同效应：**
 
-- Structured input (F-CoT) naturally produces shorter outputs without explicit constraint
-- S2A + standard CoT often outperforms compressed CoT on distractor tasks
-- Batch Prompting efficiency gains compound with any per-sample compression
+- 结构化输入（F-CoT）无需显式约束就能自然产生更短的输出
+- S2A + 标准 CoT 在干扰任务上通常优于压缩 CoT
+- 批处理 Prompting 的效率提升与任意单样本压缩可叠加

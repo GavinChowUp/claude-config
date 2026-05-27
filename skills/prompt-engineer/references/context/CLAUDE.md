@@ -1,10 +1,10 @@
 # context/
 
-Synthesized guidance for context problems.
+上下文问题的综合指导。
 
-## Files
+## 文件
 
-| File              | What                             | When to read                         |
+| 文件              | 内容                             | 何时阅读                             |
 | ----------------- | -------------------------------- | ------------------------------------ |
-| `reframing.md`    | Context restructuring techniques | Context is noisy, poorly framed      |
-| `augmentation.md` | Knowledge injection techniques   | Model lacks knowledge to reason with |
+| `reframing.md`    | 上下文重构技术                   | 上下文存在噪声或框架不当时           |
+| `augmentation.md` | 知识注入技术                     | 模型缺乏推理所需的知识时             |

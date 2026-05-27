@@ -1,343 +1,238 @@
-# Verification Techniques
+# 验证技术
 
-Verification techniques add explicit checking steps to catch errors in LLM outputs
-before finalization. Use these when factual accuracy is critical, hallucination risk
-is high, or outputs require validation against external sources. Key insight: models
-answering targeted verification questions often achieve higher accuracy than the same
-facts embedded in longer responses.
+验证技术在最终确定 LLM 输出之前添加显式的检验步骤，以捕获错误。当事实准确性至关重要、幻觉风险较高，或输出需要对照外部来源验证时，可使用这些技术。核心洞见：对有针对性的验证问题回答，模型通常比将相同事实嵌入更长响应时获得更高的准确率。
 
-**Critical caveat**: Intrinsic self-correction (without external feedback) typically
-degrades reasoning performance. Effective verification requires either external tools,
-structured decomposition, or grounded feedback sources.
+**关键警告**：内在自我纠正（无外部反馈）通常会降低推理性能。有效的验证需要外部工具、结构化分解，或有根基的反馈来源。
 
 ---
 
-## Chain-of-Verification (CoVe)
+## 链式验证（CoVe）
 
-Generate baseline response, plan verification questions, answer them independently,
-then produce final verified response. The "factored" variant answers verification
-questions without access to the original response, preventing repetition of
-hallucinations.
+生成基础响应，规划验证问题，独立回答它们，然后产出最终经过验证的响应。「分解」变体在没有原始响应访问权限的情况下回答验证问题，防止重复幻觉内容。
 
-**Triggers**:
+**触发条件**：
 
-- Factual accuracy critical and hallucination risk high
-- List-based questions requiring multiple entity answers
-- Longform generation where exposure bias increases hallucinations
-- Closed-book QA without retrieval support
+- 事实准确性至关重要且幻觉风险高
+- 需要多实体答案的基于列表的问题
+- 长文本生成（曝光偏差增加幻觉）
+- 无检索支持的封闭式问答
 
-**Tradeoffs**: 3-5x tokens, 4 sequential steps. Few-shot examples required for each
-step. Factored variant needs separate prompts per verification question.
+**权衡**：3-5 倍 token，4 个顺序步骤。每步需要少样本示例。分解变体每个验证问题需要独立 prompt。
 
 ---
 
-## Self-Refine
+## Self-Refine（自我精炼）
 
-Same LLM iteratively generates output, provides feedback on its output, then refines
-based on feedback. Requires actionable, specific feedback pointing to concrete
-phrases to change.
+同一个 LLM 迭代地生成输出、对其输出提供反馈，然后基于反馈进行精炼。需要具体、可操作的反馈，指向要修改的具体短语。
 
-**Triggers**:
+**触发条件**：
 
-- Output requires iterative refinement for quality improvement
-- Tasks with multifaceted objectives (dialogue, code readability)
-- Hard-to-define quality goals where initial output needs improvement
-- Open-ended generation with large solution space
+- 输出需要迭代精炼以提升质量
+- 具有多维目标的任务（对话、代码可读性）
+- 难以明确定义质量目标，初始输出需要改进
+- 答案空间大的开放式生成
 
-**Tradeoffs**: 3-4x tokens (accumulated history), 2-4 iterations. Few-shot examples
-required. Diminishing returns after 2-3 iterations. Struggles with detecting nuanced
-math errors -- feedback identifies location incorrectly 33% of time, suggests wrong
-fix 61% of time in failure cases.
+**权衡**：3-4 倍 token（积累历史），2-4 次迭代。需要少样本示例。2-3 次迭代后收益递减。在检测细微数学错误时效果欠佳——在失败案例中，反馈有 33% 的概率错误定位问题位置，61% 的概率给出错误修复建议。
 
-**Lightweight variant (SESO)**: Self-Evaluation Self-Optimization uses three prompt
-stages: (1) defect analysis ("list the defects of this answer"), (2) guided
-optimization ("refine the answer addressing the identified flaw"), (3) voting
-("which answer is better, 1 or 2?"). First-order memory (no history accumulation)
-keeps token costs constant per iteration. Stop when voting selects previous answer
-over refined version.
+**轻量变体（SESO）**：自我评估自我优化使用三个 prompt 阶段：（1）缺陷分析（「列出这个答案的缺陷」），（2）引导优化（「精炼答案以解决已识别的缺陷」），（3）投票（「答案 1 和 2 哪个更好？」）。一阶记忆（不积累历史）使每次迭代的 token 成本保持不变。当投票选择之前的答案而非精炼版本时停止。
 
 ---
 
-## Explanation-based Calibration
+## 基于解释的校准
 
-Use the factuality of model-generated explanations to calibrate prediction
-confidence. Nonfactual explanations reliably signal incorrect predictions.
+使用模型生成的解释的事实性来校准预测置信度。不符合事实的解释可靠地预示错误预测。
 
-**The process**:
+**流程**：
 
-1. Generate prediction with explanation (Predict-then-Explain)
-2. Score explanation factuality via lexical overlap with input context
-3. If factuality score low: reject prediction or iterate with next candidate
+1. 带解释生成预测（先预测后解释）
+2. 通过与输入上下文的词汇重叠对解释事实性打分
+3. 若事实性分数低：拒绝预测或迭代到下一个候选
 
-**Triggers**:
+**触发条件**：
 
-- QA tasks where explanations can be grounded in provided context
-- NLI tasks where premise-hypothesis overlap indicates reasoning quality
-- Selective prediction scenarios (model can abstain on low-confidence cases)
-- Post-hoc verification when training a calibrator is feasible
+- 解释可以在提供的上下文中得到验证的问答任务
+- 前提-假设重叠能指示推理质量的自然语言推断任务
+- 选择性预测场景（模型可以对低置信度案例拒绝回答）
+- 可行训练校准器的事后验证场景
 
-**Why this works**: LLMs generate consistent explanations (>80% entail predictions)
-but explanations may not be factually grounded. A nonfactual explanation is more
-likely paired with an incorrect prediction. Factuality assessment, even via simple
-lexical overlap, provides signal that probabilities alone cannot.
+**为何有效**：LLM 生成连贯的解释（>80% 与预测一致），但解释可能不符合事实。不符合事实的解释更有可能与错误预测配对。即使通过简单的词汇重叠评估事实性，也能提供概率单独无法提供的信号。
 
-**CoT unfaithfulness caveat**: Chain-of-thought explanations can systematically
-rationalize biased answers without mentioning the bias. Models alter explanations
-to justify bias-consistent predictions while the biasing feature (prompt structure,
-suggested answers, stereotypes) never appears in the reasoning trace. This means
-plausible-looking explanations may be post-hoc rationalizations rather than faithful
-reasoning records. Explanation-based calibration partially detects this via factuality
-mismatch -- unfaithful explanations tend to have lower grounding in input context.
+**CoT 不忠实警告**：链式推理解释可以系统性地为有偏答案辩解，而不提及偏差。模型调整解释以为偏差一致的预测辩护，而偏差特征（prompt 结构、建议答案、刻板印象）从不出现在推理轨迹中。这意味着看起来合理的解释可能是事后合理化，而非忠实的推理记录。基于解释的校准通过事实性不匹配部分检测到这一点——不忠实的解释往往对输入上下文的根植程度较低。
 
-**Tradeoffs**: Requires explanation generation (1.5-2x tokens). Simple lexical
-overlap approximates factuality but is imperfect. Training a lightweight calibrator
-(few parameters) on 32-128 labeled examples measurably improves accuracy over
-uncalibrated few-shot learning.
+**权衡**：需要解释生成（1.5-2 倍 token）。简单词汇重叠近似事实性，但并不完美。在 32-128 个标注示例上训练轻量级校准器（少量参数）可显著提升准确率，优于未校准的少样本学习。
 
 ---
 
 ## CRITIC
 
-LLM validates output via external tool interactions (search engines, code
-interpreters, calculators) then self-corrects based on tool-generated critiques.
-Addresses the fundamental limitation that LLMs cannot reliably verify their own
-reasoning without external grounding.
+LLM 通过与外部工具的交互（搜索引擎、代码解释器、计算器）验证输出，然后基于工具生成的批评进行自我纠正。解决了 LLM 无法可靠验证自身推理而不依赖外部根基这一根本局限。
 
-**Triggers**:
+**触发条件**：
 
-- Factual accuracy verification needed
-- Generated code requires execution validation
-- Mathematical reasoning correctness must be verified
-- Multi-hop reasoning with factual dependencies
+- 需要事实准确性验证
+- 生成的代码需要执行验证
+- 数学推理正确性必须验证
+- 具有事实依赖的多跳推理
 
-**Tradeoffs**: 2-4x tokens per iteration, plus tool API calls. Requires access to
-appropriate external tools. Verify-then-correct cycle can iterate until stopping
-condition met.
+**权衡**：每次迭代 2-4 倍 token，加上工具 API 调用。需要访问适当的外部工具。验证-纠正循环可迭代直至满足停止条件。
 
-**Why external verification matters**: Process reward models (trained verifiers)
-outperform both LLM-as-judge and self-critique on verification tasks. Long-chain-
-of-thought verifiers (ThinkPRM) achieve strong verification with minimal labeled
-data. When external verifiers are unavailable, tool-based grounding (CRITIC pattern)
-remains the most reliable alternative to intrinsic self-correction.
+**为何外部验证很重要**：过程奖励模型（训练的验证器）在验证任务上优于 LLM-as-judge 和自我批评。长链推理验证器（ThinkPRM）以最少标注数据实现强验证性能。当外部验证器不可用时，基于工具的根基（CRITIC 模式）仍是内在自我纠正最可靠的替代方案。
 
-**Schema-based validation variant**: For structured outputs (API calls, JSON, database
-queries), validate against a deterministic schema checker. The checker identifies
-specific error types: wrong method name, missing required parameter, invalid parameter
-value, incorrect operator. Feed fine-grained error descriptions back to LLM for
-targeted correction. This pattern significantly outperforms generic "try again"
-feedback because the LLM knows exactly what to fix. Iterate until schema validates
-or max attempts reached.
+**模式验证变体**：对于结构化输出（API 调用、JSON、数据库查询），对照确定性模式检查器进行验证。检查器识别特定错误类型：错误方法名、缺少必需参数、无效参数值、不正确运算符。将细粒度错误描述反馈给 LLM 进行有针对性的纠正。这种模式显著优于通用的「请重试」反馈，因为 LLM 确切地知道需要修复什么。迭代直至模式验证通过或达到最大尝试次数。
 
 ---
 
-## Reflexion
+## Reflexion（反思）
 
-Agents verbally reflect on task feedback and store reflections in episodic memory
-to improve subsequent trials. Works with binary/scalar rewards from environment
-execution.
+Agent 对任务反馈进行口头反思，并将反思存储在情节记忆中以改善后续尝试。适用于来自环境执行的二元/标量奖励。
 
-**Triggers**:
+**触发条件**：
 
-- Agent needs trial-and-error learning over multiple episodes
-- Sequential decision-making with sparse binary rewards
-- Self-generated tests or heuristics can validate outputs
-- Credit assignment problem exists in long action trajectories
+- Agent 需要通过多轮尝试进行试错学习
+- 具有稀疏二元奖励的顺序决策
+- 自生成的测试或启发式方法可以验证输出
+- 长动作轨迹中存在信用分配问题
 
-**Tradeoffs**: 2-12x tokens across trials, 1-12 iterative trials per task. Requires
-episodic memory buffer (1-3 experiences) and environment feedback signal. Fails on
-tasks requiring extreme exploration diversity.
+**权衡**：跨尝试 2-12 倍 token，每项任务 1-12 次迭代。需要情节记忆缓冲区（1-3 次经验）和环境反馈信号。在需要极端探索多样性的任务上失败。
 
 ---
 
-## Factored Verification
+## 分解验证
 
-Decompose summary into claims, verify each claim against sources independently,
-then revise based on critiques. Targets summarization where individual facts can
-be checked against provided context.
+将摘要分解为声明，独立对照来源验证每个声明，然后基于批评进行修订。针对可将单个事实对照所提供上下文进行检验的摘要任务。
 
-**Triggers**:
+**触发条件**：
 
-- Summarization of grounded source material where accuracy is critical
-- Academic paper summarization or synthesis
-- Claims must be verifiable against provided context
-- Model-generated content needs citation verification
+- 准确性至关重要的有根基来源材料摘要
+- 学术论文摘要或综合
+- 声明必须可对照提供的上下文验证
+- 模型生成的内容需要引用验证
 
-**Tradeoffs**: 2-3x tokens per claim, n+2 calls (1 decomposition + n claim
-verifications + 1 revision). Increases false negatives when claims require
-transitive reasoning across sources.
+**权衡**：每个声明 2-3 倍 token，n+2 次调用（1 次分解 + n 次声明验证 + 1 次修订）。当声明需要跨来源的传递推理时，会增加假阴性率。
 
 ---
 
-## Self-Contrast
+## Self-Contrast（自我对比）
 
-Contrast diverse solving perspectives to identify discrepancies and generate
-checklist for self-correction. Addresses overconfident or inconsistent self-feedback
-by examining differences between multiple solution approaches.
+对比多样化的解题视角以识别差异，并生成自我纠正清单。通过检查多种解法之间的差异来解决过度自信或不一致的自我反馈。
 
-**Triggers**:
+**触发条件**：
 
-- Self-evaluation produces overconfident or inconsistent feedback
-- Multiple solving approaches exist for the problem
-- Initial reflection shows stubborn biases or insufficient error detection
-- Task benefits from examining discrepancies between different solutions
+- 自我评估产生过度自信或不一致的反馈
+- 问题存在多种解题方法
+- 初始反思显示顽固的偏差或错误检测不足
+- 任务受益于检查不同解法之间的差异
 
-**Tradeoffs**: 7-8x tokens, ~7.8 API calls average (2-9 perspectives + contrast +
-reflection). Requires clustering for selection, pairwise contrast comparisons.
-Outperforms multi-agent debate with fewer calls.
+**权衡**：7-8 倍 token，平均约 7.8 次 API 调用（2-9 个视角 + 对比 + 反思）。需要为选择进行聚类，进行成对对比比较。优于多 agent 辩论，且调用次数更少。
 
 ---
 
 ## REFINER
 
-Generator model iteratively refines intermediate reasoning steps using structured
-feedback from a trained critic model. Critic provides fine-grained error types and
-localized feedback on specific reasoning steps.
+生成器模型使用来自训练批评模型的结构化反馈，迭代精炼中间推理步骤。批评提供细粒度的错误类型和对特定推理步骤的定位反馈。
 
-**Triggers**:
+**触发条件**：
 
-- Multi-step reasoning with structured intermediate representations
-- Mathematical problem solving requiring equation generation
-- Intermediate reasoning errors can be categorized into fine-grained error types
-- Feedback can be structured and localized to specific reasoning steps
+- 具有结构化中间表示的多步骤推理
+- 需要方程生成的数学问题求解
+- 中间推理错误可以归类为细粒度错误类型
+- 反馈可以结构化并定位到特定推理步骤
 
-**Tradeoffs**: 3x tokens (T=3 iterations), 3-4 generator-critic iterations. Requires
-finetuned critic model (220M params) and warm-up phase with 10% supervised data.
-More effective than scalar reward feedback (PPO) or self-refinement.
+**权衡**：3 倍 token（T=3 次迭代），3-4 次生成器-批评器迭代。需要微调的批评模型（220M 参数）和 10% 监督数据的预热阶段。比标量奖励反馈（PPO）或自我精炼更有效。
 
 ---
 
-## Instruct-of-Reflection (IoRT)
+## 反思指令（IoRT）
 
-Dynamic instructor uses meta-thoughts and self-consistency to generate refresh, stop,
-or select instructions guiding iterative reflection. Addresses redundancy (correct
-answers remain correct), drift (correct becomes incorrect), and stubbornness
-(incorrect persists).
+动态指导器使用元思维和自洽性生成刷新、停止或选择指令，引导迭代反思。解决冗余（正确答案保持正确）、漂移（正确变错误）和顽固（错误持续存在）问题。
 
-**Triggers**:
+**触发条件**：
 
-- Static iterative reflection shows redundancy or drift
-- Model is stubborn (incorrect answers persist across iterations)
-- Multi-iteration reasoning where stopping condition is unclear
-- Scenarios where self-correction degrades performance without oracle labels
+- 静态迭代反思表现出冗余或漂移
+- 模型顽固（错误答案在迭代中持续存在）
+- 多迭代推理中停止条件不明确
+- 没有预言标签的情况下自我纠正会降低性能
 
-**Tradeoffs**: Variable overhead, average 2.2 iterations vs fixed 4. Significantly
-fewer calls than fixed-iteration methods. Requires few-shot meta-thought examples,
-retrieval system for meta-thought memory, self-consistency classifier.
+**权衡**：可变开销，平均 2.2 次迭代 vs 固定的 4 次。比固定迭代方法显著减少调用次数。需要少样本元思维示例、元思维记忆的检索系统、自洽性分类器。
 
 ---
 
-## Intrinsic Self-Correction Failure (Anti-Pattern)
+## 内在自我纠正的失败（反模式）
 
-LLMs review their initial reasoning and attempt refinement without external feedback,
-typically degrading performance. Documented to understand limitations.
+LLM 在没有外部反馈的情况下审查其初始推理并尝试精炼，通常会降低性能。记录此内容以理解其局限性。
 
-**Evidence**: Self-correction without oracle labels consistently degrades reasoning
-accuracy across models and benchmarks. Models are more likely to change correct
-answers to incorrect than vice versa. The feedback prompt biases the model away
-from its optimal initial response.
+**证据**：没有预言标签的自我纠正在各模型和基准上一致地降低推理准确率。模型将正确答案改为错误的可能性大于反过来。反馈 prompt 会使模型偏离其最优初始响应。
 
-**Formal verification domains confirm this pattern**: On tasks with sound external
-verifiers (Game of 24 expression evaluation, Graph Coloring constraint checking,
-STRIPS planning validation), LLM self-verification performance collapses while
-LLM + sound verifier maintains benefits. The verifier LLM's false negative rate
-(rejecting correct solutions) is high enough that overall performance suffers
-compared to taking the initial answer. Critique generation compounds errors --
-LLMs hallucinate constraint violations, misidentify error locations, and provide
-misleading feedback that biases subsequent attempts away from correct solutions.
+**形式验证领域证实了这一模式**：在具有可靠外部验证器的任务上（24 点游戏表达式评估、图着色约束检查、STRIPS 规划验证），LLM 自我验证性能崩溃，而 LLM + 可靠验证器能保持收益。验证器 LLM 的假阴性率（拒绝正确解法）足够高，以至于整体性能不如取初始答案。批评生成会复合错误——LLM 会幻觉出约束违反、错误定位错误位置，并提供将后续尝试引偏离正确解法的误导性反馈。
 
-**Root cause**: LLMs cannot properly judge correctness of their own reasoning.
-Without external ground truth, self-critique introduces errors at two points:
-verification (passing wrong answers, rejecting correct ones) and critique generation
-(misleading feedback). These errors compound across iterations.
+**根本原因**：LLM 无法正确判断自身推理的正确性。没有外部真实答案，自我批评在两个点引入错误：验证（通过错误答案、拒绝正确答案）和批评生成（误导性反馈）。这些错误在迭代中复合。
 
-**Multi-turn debate escalation**: When two LLMs debate, both show systematic
-overconfidence (baseline confidence already exceeds rational bounds). Confidence
-escalates across turns even when answers are mutually incompatible. Models rarely
-update beliefs based on opponent arguments -- debates become confidence contests
-rather than truth-seeking. Red-teaming prompts ("argue against your position")
-partially mitigate escalation.
+**多轮辩论升级**：两个 LLM 辩论时，双方都表现出系统性过度自信（基线置信度已超出理性范围）。即使答案相互矛盾，置信度也会随轮次升级。模型很少基于对方的论证更新信念——辩论变成了置信度竞赛而非真相探索。红队 prompt（「反驳你的立场」）可部分缓解升级。
 
-**Detection via verbalization divergence**: Compare model answers to paraphrased
-versions of the same question. High divergence signals uncertainty and potential
-hallucination. Combine consistency check across verbalizations with atypicality
-scores (deviation from typical answer patterns) for lightweight hallucination
-detection without external tools.
+**通过表述分歧检测**：对比模型对同一问题的改写版本的答案。高分歧表明不确定性和潜在幻觉。将跨表述的一致性检查与非典型性分数（偏离典型答案模式的程度）结合，可在不使用外部工具的情况下进行轻量级幻觉检测。
 
 ---
 
-## Decision Guidance
+## 决策指引
 
-**Choose based on feedback source availability:**
+**根据反馈来源选择：**
 
-| Feedback Source             | Technique                     |
+| 反馈来源 | 技术 |
 | --------------------------- | ----------------------------- |
-| External tools available    | CRITIC                        |
-| Schema/spec available       | CRITIC (schema validation)    |
-| Environment provides signal | Reflexion                     |
-| Source documents available  | Factored Verification         |
-| Trained critic available    | REFINER                       |
-| Human correction acceptable | MCS (see below)               |
-| Explanations groundable     | Explanation-based Calibration |
-| No external feedback        | Self-Contrast, CoVe           |
-| None (avoid)                | Intrinsic self-correction     |
+| 外部工具可用 | CRITIC |
+| 有模式/规范可用 | CRITIC（模式验证） |
+| 环境提供信号 | Reflexion |
+| 来源文档可用 | 分解验证 |
+| 训练批评模型可用 | REFINER |
+| 可接受人工纠正 | MCS（见下文） |
+| 解释可根基化 | 基于解释的校准 |
+| 无外部反馈 | Self-Contrast、CoVe |
+| 无（避免） | 内在自我纠正 |
 
-**Human-in-the-loop verification (MCS)**: When human expert correction is acceptable,
-use diversity-based filtering to identify which outputs need review. Generate multiple
-reasoning chains, compute answer diversity (Diversity Entropy). High diversity signals
-likely error -- route these cases to human review. Humans correct specific sub-logic
-errors (modify calculation, add missing step, delete redundant logic) rather than
-rewriting entire solutions. This targets human effort at high-uncertainty cases and
-leverages human ability to spot localized errors that self-correction misses.
+**人机协作验证（MCS）**：当可以接受人工专家纠正时，使用基于多样性的过滤来识别哪些输出需要审查。生成多条推理链，计算答案多样性（多样性熵）。高多样性表明可能有错误——将这些案例路由给人工审查。人工纠正特定的子逻辑错误（修改计算、添加缺失步骤、删除冗余逻辑），而非重写整个解法。这将人工精力集中在高不确定性案例上，并利用人类发现自我纠正所遗漏的局部错误的能力。
 
-**Structured HITL feedback**: When collecting human corrections, use tagged feedback
-categories rather than free-form comments. Four response types: RATIFY (agree with
-both answer and explanation), REVISE (disagree but can update own understanding),
-REFUTE (disagree, cannot reconcile), REJECT (disagree with both answer and reasoning).
-Tagged feedback enables measuring communication quality and identifying when human-LLM
-interaction is productive vs. talking past each other.
+**结构化人机反馈**：收集人工纠正时，使用带标签的反馈类别而非自由形式评论。四种响应类型：RATIFY（同意答案和解释）、REVISE（不同意但可以更新自己的理解）、REFUTE（不同意，无法调和）、REJECT（不同意答案和推理）。带标签的反馈使测量沟通质量成为可能，并识别人机交互何时富有成效 vs 各说各话。
 
-**Choose based on task type:**
+**根据任务类型选择：**
 
-| Task Type                    | Technique                            |
+| 任务类型 | 技术 |
 | ---------------------------- | ------------------------------------ |
-| Factual QA / hallucination   | CoVe, CRITIC, Factored Verification  |
-| Code generation              | CRITIC (with interpreter), Reflexion |
-| Math reasoning               | CRITIC (calculator), REFINER         |
-| Structured output (API/JSON) | CRITIC (schema validation)           |
-| Multi-aspect quality         | Self-Refine                          |
-| Summarization                | Factored Verification                |
-| Complex reasoning            | Self-Contrast, IoRT                  |
-| Selective prediction         | Explanation-based Calibration        |
+| 事实问答 / 幻觉 | CoVe、CRITIC、分解验证 |
+| 代码生成 | CRITIC（带解释器）、Reflexion |
+| 数学推理 | CRITIC（计算器）、REFINER |
+| 结构化输出（API/JSON） | CRITIC（模式验证） |
+| 多维质量 | Self-Refine |
+| 摘要 | 分解验证 |
+| 复杂推理 | Self-Contrast、IoRT |
+| 选择性预测 | 基于解释的校准 |
 
 ---
 
-## Composability Notes
+## 可组合性说明
 
-**Effective combinations:**
+**有效组合：**
 
-- CoVe + retrieval augmentation: verification questions can use external sources
-- CRITIC + CoT: tool interaction validates reasoning chains
-- Reflexion + ReAct: episodic memory enhances action-observation loops
-- Self-Contrast + Self-Consistency: diverse perspectives plus voting
+- CoVe + 检索增强：验证问题可使用外部来源
+- CRITIC + CoT：工具交互验证推理链
+- Reflexion + ReAct：情节记忆增强动作-观察循环
+- Self-Contrast + 自洽性：多样化视角加投票
 
-**Conflicts to avoid:**
+**需要避免的冲突：**
 
-- Intrinsic self-correction + reasoning tasks: documented to degrade performance
-- Multiple verification loops without stopping criteria: token explosion
-- Generic feedback + refinement: specific, actionable feedback essential
+- 内在自我纠正 + 推理任务：已有文献证明会降低性能
+- 没有停止标准的多个验证循环：token 爆炸
+- 通用反馈 + 精炼：具体、可操作的反馈是关键
 
-**Turn-wise iteration dynamics** (domain-specific collapse patterns):
+**逐轮迭代动态**（领域特定的崩溃模式）：
 
-- Ideation: gains arrive early (turns 1-3); vague feedback causes repetition collapse
-- Code: early decision is decisive; if correct path not found by turn 3-4, stop/restart
-- Math: late turns matter when guided by elaboration ("explain each step in more
-  detail"); exploration prompts ("try alternative method") often stagnate
-- General pattern: vague feedback ("improve it") plateaus or reverses correctness
-  after first few turns; targeted steering reliably shifts intended quality axis
+- 创意生成：早期收益（1-3 轮）；模糊反馈导致重复崩溃
+- 代码：早期决策是决定性的；若 3-4 轮内未找到正确路径，停止/重启
+- 数学：通过详细说明引导的晚期轮次有价值（「详细解释每步」）；探索 prompt（「尝试替代方法」）常常停滞
+- 通用规律：模糊反馈（「改进它」）在前几轮后准确率达到平台期或倒退；有针对性的引导可靠地在预期的质量轴上产生变化
 
-**Cost optimization:**
+**成本优化：**
 
-- Use factored/2-step variants to prevent hallucination repetition
-- Set maximum iterations (2-4 typical) -- diminishing returns after
-- For equivalent inference budget, self-consistency often outperforms debate
-- IoRT's adaptive stopping reduces overhead vs fixed iterations
+- 使用分解/两步变体防止幻觉重复
+- 设置最大迭代次数（通常 2-4 次）——之后收益递减
+- 在相同推理预算下，自洽性通常优于辩论
+- IoRT 的自适应停止比固定迭代减少开销

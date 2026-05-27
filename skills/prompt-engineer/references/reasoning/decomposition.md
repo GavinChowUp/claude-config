@@ -1,503 +1,377 @@
-# Decomposition Techniques
+# 分解技术
 
-## Overview
+## 概述
 
-Decomposition techniques break complex problems into simpler sub-problems that
-models can solve more reliably. Use decomposition when:
+分解技术将复杂问题拆分为更简单的子问题，使模型能够更可靠地求解。在以下情况使用分解技术：
 
-- Multi-step reasoning exceeds model capability in a single pass
-- Test problems are harder or longer than training exemplars (easy-to-hard
-  generalization)
-- Problems have natural hierarchical or sequential structure
-- Intermediate results need to be verified before proceeding
-- Different sub-tasks require specialized handling or external tools
+- 多步骤推理超出了模型单次推理的能力
+- 测试问题比训练示例更难或更长（易到难泛化）
+- 问题具有自然的层次或顺序结构
+- 中间结果需要在继续之前进行验证
+- 不同的子任务需要专业化处理或外部工具
 
-The core tradeoff: decomposition increases API calls and token usage but enables
-solving problems that would otherwise fail, provides interpretable reasoning
-traces, and allows modular debugging of sub-components.
+核心权衡：分解会增加 API 调用次数和 token 用量，但能解决原本会失败的问题，提供可解释的推理轨迹，并支持对子组件的模块化调试。
 
-**Meta-principle:** Prefer deeper decomposition chains when uncertain. Longer
-reasoning chains correlate with more robust multi-step reasoning—when selecting
-examples or sampling solutions, favor complexity over brevity.
+**元原则：** 在不确定时倾向于更深的分解链。更长的推理链与更健壮的多步骤推理相关——在选择示例或采样解法时，优先选择复杂的而非简洁的。
 
 ---
 
-## Techniques
+## 技术
 
 ### Least-to-Most Prompting
 
-**Mechanism:** Decompose complex problems into simpler subproblems, then
-sequentially solve them using previous answers accumulated in context.
+**机制：** 将复杂问题分解为更简单的子问题，然后顺序求解，将之前的答案积累到上下文中。
 
-**Triggers:**
+**触发条件：**
 
-- Test problems harder than exemplars (easy-to-hard generalization)
-- Compositional generalization with systematic combination
-- Multi-step problems where subproblems build on prior solutions
-- Length generalization beyond training examples
+- 测试问题比示例更难（易到难泛化）
+- 需要系统性组合的组合泛化
+- 子问题基于先前解法的多步骤问题
+- 超出训练示例的长度泛化
 
-**Tradeoffs:** 2-3x tokens (decomposition + sequential solving). k+1 API calls
-(1 decomposition + k subproblems). Requires few-shot examples for both
-decomposition and subproblem solving. Domain-specific decomposition prompts do
-not generalize well across domains.
+**权衡：** 2-3 倍 token（分解 + 顺序求解）。k+1 次 API 调用（1 次分解 + k 个子问题）。需要分解和子问题求解的少样本示例。领域特定的分解 prompt 在不同领域之间泛化性差。
 
 ---
 
-### Decomposed Prompting (DecomP)
+### 分解式 Prompting（DecomP）
 
-**Mechanism:** Decompose complex tasks into simpler sub-tasks delegated to
-specialized prompts in a shared library, with hierarchical or recursive
-decomposition possible.
+**机制：** 将复杂任务分解为更简单的子任务，委托给共享库中的专业化 prompt，支持层次或递归分解。
 
-**Triggers:**
+**触发条件：**
 
-- Individual reasoning steps hard to learn in monolithic prompt
-- Sub-components need specialized knowledge or capabilities
-- Multi-hop reasoning requiring retrieval or external tools
-- Need to swap sub-task implementations without changing overall system
-- Isolated debugging of sub-components would improve accuracy
+- 单个推理步骤在整体 prompt 中难以学习
+- 子组件需要专业知识或能力
+- 需要检索或外部工具的多跳推理
+- 需要在不改变整体系统的情况下替换子任务实现
+- 子组件的隔离调试能提升准确率
 
-**Tradeoffs:** Variable token overhead depending on decomposition depth.
-Multiple adaptive calls — 1 decomposer + k sub-task handlers per step. Requires
-upfront task decomposition design. Enables modular optimization and tool
-integration at cost of increased latency.
+**权衡：** 可变 token 开销，取决于分解深度。多次自适应调用——1 次分解器 + 每步 k 次子任务处理器。需要前期任务分解设计。以更高延迟为代价支持模块化优化和工具集成。
 
 ---
 
-### ADAPT (As-Needed Decomposition)
+### ADAPT（按需分解）
 
-**Mechanism:** Recursively decompose tasks only when executor fails, adapting
-decomposition depth to task complexity dynamically.
+**机制：** 仅在执行器失败时递归分解任务，根据任务复杂度动态调整分解深度。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step tasks with unpredictable sub-task complexity
-- Navigation or exploration in unknown environments
-- Compositional tasks where some sub-tasks harder than others
-- Tasks requiring both high-level planning and low-level execution
-- Interactive decision-making with long action trajectories
+- 子任务复杂度不可预测的多步骤任务
+- 未知环境中的导航或探索
+- 某些子任务比其他子任务更难的组合任务
+- 需要高层规划和低层执行的任务
+- 具有长动作轨迹的交互式决策
 
-**Tradeoffs:** Adaptive 2-4x tokens depending on task complexity. 1 to d_max
-recursive levels of planner + executor calls. Requires environment interaction
-capabilities and self-evaluation in executor. Only decomposes when needed,
-avoiding redundant re-execution. Planner and executor can use different LLMs—use
-cheaper model for planning, more capable model for execution.
+**权衡：** 自适应 2-4 倍 token，取决于任务复杂度。1 到 d_max 层递归的规划器 + 执行器调用。需要环境交互能力和执行器中的自我评估。仅在需要时分解，避免冗余重新执行。规划器和执行器可以使用不同的 LLM——对规划使用更便宜的模型，对执行使用更有能力的模型。
 
-#### DEPS Pattern (Describe-Explain-Plan-Select)
+#### DEPS 模式（描述-解释-规划-选择）
 
-For agent planning scenarios, extend ADAPT with four-stage decomposition:
-Describe the current situation → Explain relevant domain knowledge → Plan
-candidate actions → Select the best action. This separates situation
-understanding from knowledge retrieval from planning from selection, reducing
-error propagation across stages.
+对于 agent 规划场景，用四阶段分解扩展 ADAPT：描述当前情况 → 解释相关领域知识 → 规划候选动作 → 选择最佳动作。这将情况理解、知识检索、规划和选择分离，减少跨阶段的错误传播。
 
 ---
 
-### Tree of Thoughts (ToT)
+### 思维树（ToT）
 
-**Mechanism:** Maintain tree of intermediate thoughts, explore multiple
-reasoning paths via search (BFS/DFS) with LM-based evaluation and backtracking.
+**机制：** 维护中间思维的树，通过 LM 评估和回溯进行搜索（BFS/DFS），探索多条推理路径。
 
-**Triggers:**
+**触发条件：**
 
-- Task requires exploration or strategic lookahead
-- Initial decisions play pivotal role in solution quality
-- Problem involves search through combinatorial space
-- Multiple valid reasoning paths exist requiring evaluation
-- Need backtracking when reasoning hits dead ends
+- 任务需要探索或策略性前瞻
+- 初始决策在解法质量中起关键作用
+- 问题涉及搜索组合空间
+- 存在多条需要评估的有效推理路径
+- 需要在推理遇到死胡同时回溯
 
-**Tradeoffs:** 5-100x tokens vs CoT depending on search depth/breadth. Adaptive
-API calls based on search algorithm — typically 10-100+ calls. Requires few-shot
-examples for thought generation plus state evaluation prompts. Not needed for
-tasks where LM already excels via simpler methods.
+**权衡：** 相对 CoT 5-100 倍 token，取决于搜索深度/宽度。基于搜索算法的自适应 API 调用——通常 10-100 次以上。需要思维生成的少样本示例加状态评估 prompt。对 LM 已能用更简单方法处理好的任务不需要此技术。
 
 ---
 
-### Selection-Inference
+### 选择-推理
 
-**Mechanism:** Alternate between selecting relevant facts from context and
-making single-step inferences to build causal reasoning chains. The selection
-module is constrained to context facts only—this prevents fabrication by
-ensuring all selected premises exist in the provided context.
+**机制：** 交替从上下文中选择相关事实和进行单步推理，以构建因果推理链。选择模块被限制在上下文事实内——这通过确保所有选择的前提存在于提供的上下文中来防止捏造。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step logical reasoning with 2+ inference steps
-- Context contains both relevant and irrelevant facts
-- Deductive/inductive reasoning requiring step-by-step justification
-- Tasks requiring causal, interpretable reasoning traces
-- Vanilla LLMs struggle with multi-hop reasoning
+- 2+ 推理步骤的多步骤逻辑推理
+- 上下文同时包含相关和无关的事实
+- 需要逐步论证的演绎/归纳推理
+- 需要因果、可解释推理轨迹的任务
+- 普通 LLM 在多跳推理上挣扎
 
-**Tradeoffs:** N x 2 steps tokens where N is reasoning depth. 2N API calls
-(selection + inference per step). Requires few-shot examples for both selection
-and inference modules. Fixed halting depth must be predetermined.
+**权衡：** 推理深度为 N 时需要 N×2 步骤 token。2N 次 API 调用（每步 1 次选择 + 1 次推理）。需要选择和推理模块的少样本示例。必须预先确定固定的停止深度。
 
-#### Logic-of-Thought (LoT)
+#### 思维逻辑（LoT）
 
-For tasks requiring formal logical reasoning, extend Selection-Inference with
-logic augmentation: Extract logical propositions from the problem → Extend via
-logical rules using symbolic solver (e.g., Python) → Translate expanded logic
-back to natural language. The augmented prompt contains deduced logical
-information that would otherwise be lost during reasoning. LoT is orthogonal to
-CoT/ToT—use as a preprocessing step before applying other decomposition
-techniques.
+对于需要形式逻辑推理的任务，用逻辑增强扩展选择-推理：从问题中提取逻辑命题 → 使用符号求解器（如 Python）通过逻辑规则进行扩展 → 将扩展后的逻辑翻译回自然语言。增强后的 prompt 包含推理过程中原本会丢失的推导出的逻辑信息。LoT 与 CoT/ToT 正交——可以作为预处理步骤应用于其他分解技术之前。
 
 ---
 
-### R³ Prompting (Review, Rephrase, Resolve)
+### R³ Prompting（审查、改写、求解）
 
-**Mechanism:** Three-stage denoising for reasoning under noisy contexts: Review
-extracts key sentences from the problem, Rephrase converts extracted information
-to a variable-centric form, Resolve performs reasoning on the cleaned
-representation.
+**机制：** 针对噪声上下文推理的三阶段去噪：审查从问题中提取关键句子，改写将提取的信息转换为以变量为中心的形式，求解基于清理后的表示进行推理。
 
-**Triggers:**
+**触发条件：**
 
-- Input context contains irrelevant or distracting information
-- Model accuracy degrades as noise or context length increases
-- Multi-step reasoning where distractor filtering is critical
-- Problems where relevant facts are buried in verbose descriptions
+- 输入上下文包含无关或干扰信息
+- 随着噪声或上下文长度增加，模型准确率下降
+- 干扰过滤至关重要的多步骤推理
+- 相关事实埋藏在冗长描述中的问题
 
-**Tradeoffs:** 3x tokens (review + rephrase + resolve). 3 API calls sequentially.
-Maintains stable accuracy even as noise increases. Requires few-shot examples
-demonstrating the three-stage pattern.
+**权衡：** 3 倍 token（审查 + 改写 + 求解）。3 次 API 顺序调用。即使噪声增加也能保持稳定准确率。需要展示三阶段模式的少样本示例。
 
 ---
 
-### Thread of Thought (ThoT)
+### 思维线索（ThoT）
 
-**Mechanism:** Two-step reasoning for chaotic contexts: first "walk through this
-context in manageable parts step by step, summarizing and analyzing as we go,"
-then extract the answer from the accumulated summaries.
+**机制：** 针对混乱上下文的两步推理：首先「分步浏览上下文，边走边总结和分析」，然后从积累的摘要中提取答案。
 
-**Triggers:**
+**触发条件：**
 
-- Input contains chaotic, unstructured, or interleaved information
-- Multiple conversation threads or topics mixed together
-- Long contexts where relevant information is scattered
-- Retrieval-augmented scenarios with multiple retrieved passages
+- 输入包含混乱、无结构或交织的信息
+- 多个对话线程或主题混合在一起
+- 长上下文中相关信息分散各处
+- 有多个检索段落的检索增强场景
 
-**Tradeoffs:** 2x tokens (context walk-through + answer extraction). 2 API calls.
-Segments and summarizes incrementally rather than reasoning over full context at
-once. Works well in zero-shot scenarios without domain-specific examples.
+**权衡：** 2 倍 token（上下文浏览 + 答案提取）。2 次 API 调用。逐步分段和总结，而非一次性在完整上下文上推理。在无需领域特定示例的零样本场景下效果好。
 
 ---
 
-### Narrative-of-Thought (NoT)
+### 叙事思维（NoT）
 
-**Mechanism:** For temporal reasoning, transform events into structured form,
-generate a temporally grounded narrative, then parse the narrative into a
-temporal graph for answer extraction.
+**机制：** 对于时间推理，将事件转化为结构化形式，生成有时间根基的叙事，然后将叙事解析为时间图以提取答案。
 
-**Triggers:**
+**触发条件：**
 
-- Questions requiring temporal ordering of events
-- Problems involving time expressions, durations, or sequences
-- Contexts with multiple events and temporal relationships
-- Tasks where temporal graph structure aids reasoning
+- 需要事件时间排序的问题
+- 涉及时间表达式、持续时间或序列的问题
+- 具有多个事件和时间关系的上下文
+- 时间图结构有助于推理的任务
 
-**Tradeoffs:** 3x tokens (structure + narrative + parse). 3 API calls. Leverages
-LLM's strong narrative generation capabilities to order events coherently.
-Specialized technique—use only for temporal reasoning tasks.
+**权衡：** 3 倍 token（结构化 + 叙事 + 解析）。3 次 API 调用。利用 LLM 强大的叙事生成能力来一致地排序事件。专业化技术——仅在时间推理任务中使用。
 
 ---
 
-### Plan-and-Solve Prompting
+### 规划-求解 Prompting
 
-**Mechanism:** Replace "Let's think step by step" with explicit plan-devising
-and plan-execution instructions to reduce missing steps.
+**机制：** 将「Let's think step by step」替换为显式的规划制定和规划执行指令，以减少缺失步骤。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step reasoning with calculation errors
-- Complex tasks prone to missing intermediate steps
-- Problems requiring explicit variable extraction
-- Arithmetic word problems requiring step-by-step planning
-- Zero-shot scenarios where manual examples unavailable
+- 有计算错误的多步骤推理
+- 易遗漏中间步骤的复杂任务
+- 需要显式变量提取的问题
+- 需要逐步规划的算术文字题
+- 无法获取手工示例的零样本场景
 
-**The trigger phrase:** "Let's first understand the problem and devise a plan to
-solve the problem. Then, let's carry out the plan and solve the problem step by
-step."
+**触发短语：** 「Let's first understand the problem and devise a plan to solve the problem. Then, let's carry out the plan and solve the problem step by step.」
 
-**PS+ variant:** Add "extract relevant variables and their corresponding
-numerals" and "calculate intermediate results (pay attention to calculation and
-commonsense)" for additional precision on arithmetic problems.
+**PS+ 变体：** 添加「extract relevant variables and their corresponding numerals」和「calculate intermediate results (pay attention to calculation and commonsense)」以在算术问题上提高精确度。
 
-**Tradeoffs:** 2x tokens. 2 API calls (reasoning generation + answer
-extraction). Zero-shot approach eliminates need for manual few-shot examples.
-Does not address semantic misunderstanding errors.
+**权衡：** 2 倍 token。2 次 API 调用（推理生成 + 答案提取）。零样本方法消除了对人工少样本示例的需求。不解决语义误解错误。
 
-#### Problem Elaboration Prompting (PEP)
+#### 问题详述 Prompting（PEP）
 
-Before Plan-and-Solve reasoning, decompose the problem into segments and
-elucidate each segment. This prevents hasty reasoning by ensuring all conditions
-are processed in correct order. PEP acts as a preprocessing step that improves
-subsequent Plan-and-Solve or CoT reasoning. Particularly effective for
-ill-formed problems with distracting information.
+在规划-求解推理之前，将问题分解为段落并阐明每个段落。这通过确保所有条件以正确顺序处理来防止匆忙推理。PEP 是一个预处理步骤，可改善后续的规划-求解或 CoT 推理。对于包含干扰信息的不规范问题特别有效。
 
-#### Multi-Stage Prompting (Generate-then-Use)
+#### 多阶段 Prompting（生成后使用）
 
-For tasks requiring intermediate knowledge construction, use two stages: First
-prompt generates intermediate artifact (knowledge, plan, elaboration), second
-prompt uses artifact plus original context for final generation. Separates
-knowledge construction from knowledge application.
+对于需要中间知识构建的任务，使用两阶段：第一个 prompt 生成中间产物（知识、规划、详述），第二个 prompt 将产物与原始上下文一起用于最终生成。将知识构建与知识应用分离。
 
 ---
 
-### PEARL (Plan, Execute, and Revise with Long Documents)
+### PEARL（针对长文档的规划、执行和修订）
 
-**Mechanism:** Three-stage decomposition for long document reasoning: Action
-mining discovers task-specific operations from training questions, Plan
-generation creates executable action sequences with variable binding, Plan
-execution runs actions over the document.
+**机制：** 针对长文档推理的三阶段分解：动作挖掘从训练问题中发现任务特定操作，规划生成创建带变量绑定的可执行动作序列，规划执行在文档上运行动作。
 
-**Triggers:**
+**触发条件：**
 
-- Long document question answering (narratives, legal, technical docs)
-- Tasks requiring multiple operations over document content
-- Questions involving entity tracking across document sections
-- Problems where action sequences can be learned from examples
+- 长文档问答（叙事、法律、技术文档）
+- 需要对文档内容进行多次操作的任务
+- 跨文档部分追踪实体的问题
+- 动作序列可从示例中学习的问题
 
-**Tradeoffs:** 3x tokens (mine + plan + execute). 3+ API calls depending on plan
-length. Variable binding enables composition across steps. Requires upfront
-action mining from training data.
+**权衡：** 3 倍 token（挖掘 + 规划 + 执行）。3+ 次 API 调用，取决于规划长度。变量绑定支持跨步骤组合。需要从训练数据进行前期动作挖掘。
 
 ---
 
-### Self-Ask
+### Self-Ask（自问）
 
-**Mechanism:** Model explicitly generates and answers follow-up sub-questions
-before answering the main compositional question.
+**机制：** 模型在回答主要组合问题之前，显式地生成并回答后续子问题。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-hop questions requiring composition of separately-known facts
-- Model knows sub-facts but fails to compose them
-- Compositional reasoning where intermediate steps need external verification
-- Tasks requiring explicit sub-question formulation for tool integration
+- 需要组合分散已知事实的多跳问题
+- 模型知道子事实但无法组合它们
+- 中间步骤需要外部验证的组合推理
+- 需要显式子问题公式化以实现工具集成的任务
 
-**Critical insight:** The compositionality gap (model knows facts individually
-but fails to compose them) does not shrink with model scale. Decomposition
-remains necessary even for larger models—this is not a capability that emerges
-with scale.
+**关键洞见：** 组合性差距（模型单独知道事实但无法组合它们）不随模型规模缩小。即使对于更大的模型，分解仍然是必要的——这不是随规模涌现的能力。
 
-**Tradeoffs:** 2-3x tokens vs direct prompting, 30% fewer than least-to-most. 1
-call for self-ask alone, 1+k calls with search (k=number of follow-ups).
-Requires few-shot examples demonstrating self-questioning pattern. May generate
-unnecessary decomposition for simple queries.
+**权衡：** 相对直接 prompting 2-3 倍 token，比 least-to-most 少 30%。单独 self-ask 为 1 次调用，带搜索为 1+k 次调用（k 为后续问题数量）。需要展示自问模式的少样本示例。可能对简单查询产生不必要的分解。
 
 ---
 
-### Successive Prompting
+### 渐进式 Prompting
 
-**Mechanism:** Iteratively decompose complex questions into simple QA pairs,
-solve each, and repeat until final answer is reached.
+**机制：** 将复杂问题迭代地分解为简单问答对，逐个求解，重复直至得出最终答案。
 
-**Triggers:**
+**触发条件：**
 
-- Complex multi-step questions requiring latent decisions
-- Questions involving multiple arithmetic operations
-- Compositional reading comprehension with sequential reasoning
-- Problems where intermediate QA pairs can be explicitly articulated
+- 需要隐式决策的复杂多步骤问题
+- 涉及多个算术运算的问题
+- 需要顺序推理的组合阅读理解
+- 中间问答对可以明确表达的问题
 
-**Tradeoffs:** k iterations where k is decomposition depth (typically 2-10x
-tokens). 2k API calls per question (k QD + k QA calls). Requires decomposition
-examples and separate QD/QA indices. Fine-tuning the QA module improves answer
-quality for complex multi-hop questions by enabling iterative refinement.
+**权衡：** k 次迭代（通常 2-10 倍 token）。每个问题 2k 次 API 调用（k 次 QD + k 次 QA 调用）。需要分解示例和独立的 QD/QA 索引。微调 QA 模块通过支持迭代精炼提升复杂多跳问题的答案质量。
 
 ---
 
-### Branch-Solve-Merge (BSM)
+### 分支-求解-合并（BSM）
 
-**Mechanism:** Decompose tasks into parallel sub-tasks via branching, solve each
-independently, then merge solutions into final output.
+**机制：** 通过分支将任务分解为并行子任务，独立求解每个子任务，然后将解法合并为最终输出。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-faceted tasks requiring evaluation against multiple criteria
-- Constrained generation with multiple constraints to satisfy
-- Evaluation of long-form responses to arbitrary questions
-- Problems where parallel sub-task decomposition more natural than sequential
-- LLM evaluation tasks exhibiting position bias, length bias, or
-  self-enhancement bias—BSM mitigates these by evaluating aspects independently
+- 需要对多个标准评估的多维任务
+- 需要满足多个约束的约束生成
+- 对任意问题长文本响应的评估
+- 并行子任务分解比顺序更自然的问题
+- 表现出位置偏差、长度偏差或自我增强偏差的 LLM 评估任务——BSM 通过独立评估各方面来缓解这些问题
 
-**Tradeoffs:** 3-7x tokens depending on branching factor. k+2 API calls (1
-branch + k solve + 1 merge), where k typically 2-5. Zero-shot prompts for
-branch/solve/merge modules. Parallel decomposition enables better performance
-than sequential approaches.
+**权衡：** 3-7 倍 token，取决于分支因子。k+2 次 API 调用（1 次分支 + k 次求解 + 1 次合并），k 通常为 2-5。分支/求解/合并模块的零样本 prompt。并行分解能实现优于顺序方法的性能。
 
 ---
 
-### Divide-and-Conquer Prompting
+### 分而治之 Prompting
 
-**Mechanism:** Divide input into parallel sub-inputs, solve independently, then
-merge results without sequential dependency.
+**机制：** 将输入分为并行子输入，独立求解，然后合并结果，无顺序依赖。
 
-**Triggers:**
+**触发条件：**
 
-- Long sequences with repetitive sub-tasks (e.g., large integer arithmetic)
-- Deceptive/misleading content requiring independent verification
-- Task decomposable into parallel homogeneous sub-tasks without dependencies
-- Sub-problems can be computed without knowing other sub-answers
-- Long document analysis where segments can be verified independently
+- 具有重复子任务的长序列（如大整数算术）
+- 需要独立验证的欺骗性/误导性内容
+- 任务可分解为无依赖关系的并行同质子任务
+- 子问题可以在不知道其他子答案的情况下计算
+- 段落可独立验证的长文档分析
 
-**Key question:** Can each sub-answer be computed independently, without
-requiring results from other sub-problems? If yes, use Divide-and-Conquer. If
-sub-problems have sequential dependencies, use Least-to-Most instead.
+**关键问题：** 每个子答案能否在不知道其他子问题结果的情况下独立计算？若是，使用分而治之。若子问题有顺序依赖，使用 Least-to-Most。
 
-**Tradeoffs:** k+2 API calls (decompose + k sub-tasks + merge). Recursive for
-multi-level decomposition. Requires three distinct prompts: decomposition,
-sub-task tackling, solution merge. Not suitable for sequential tasks with
-dependent sub-steps.
+**权衡：** k+2 次 API 调用（分解 + k 次子任务 + 合并）。多级分解时递归。需要三个不同的 prompt：分解、子任务处理、解法合并。不适合有依赖子步骤的顺序任务。
 
 ---
 
-### Skeleton-of-Thought
+### 思维骨架
 
-**Mechanism:** Generate answer skeleton first, then expand each point in
-parallel via batched decoding or parallel API calls.
+**机制：** 先生成答案骨架，然后通过批量解码或并行 API 调用同时扩展每个要点。
 
-**Triggers:**
+**触发条件：**
 
-- Question answerable as list of independent points
-- Answer covers multiple perspectives expandable separately
-- Generic questions about types, tips, categories, or aspects
-- Knowledge/commonsense questions with multiple facets
-- Latency reduction critical for user experience
+- 问题可作为独立要点列表回答
+- 答案涵盖多个可独立扩展的视角
+- 关于类型、技巧、类别或方面的通用问题
+- 具有多个方面的知识/常识问题
+- 用户体验对延迟降低至关重要
 
-**Tradeoffs:** 30-90x prefilling tokens (batched decoding reuses common prefix).
-1 + k parallel calls (skeleton + k point expansions). Achieves 2-2.39x speedup.
-Fails on step-by-step reasoning where later steps depend on earlier step details
-(math, coding).
+**权衡：** 30-90 倍预填充 token（批量解码复用公共前缀）。1 + k 次并行调用（骨架 + k 次要点扩展）。实现 2-2.39 倍加速。在后续步骤依赖于前步细节的逐步推理上失败（数学、代码）。
 
 ---
 
-### Cumulative Reasoning
+### 累积推理
 
-**Mechanism:** Orchestrate Proposer, Verifier, and Reporter roles to build DAG
-of verified reasoning steps iteratively.
+**机制：** 编排提议者、验证者和报告者角色，迭代地构建经过验证的推理步骤的有向无环图（DAG）。
 
-**Triggers:**
+**触发条件：**
 
-- Multi-step reasoning requiring verified intermediate steps
-- Logical inference problems with multiple premises
-- Complex mathematical problems with cumulative derivations
-- Tasks where error propagation must be prevented
-- Problems requiring systematic exploration of validated knowledge
+- 需要验证中间步骤的多步骤推理
+- 具有多个前提的逻辑推断问题
+- 具有累积推导的复杂数学问题
+- 必须防止错误传播的任务
+- 需要系统性探索验证知识的问题
 
-**Tradeoffs:** 2-3x tokens per iteration cycle. n iterations with Proposer +
-Verifier + Reporter calls. Requires few-shot examples for role prompts and DAG
-state management. More efficient than ToT for verified reasoning (achieves
-comparable accuracy with fewer explored states).
+**权衡：** 每次迭代循环 2-3 倍 token。n 次迭代，包含提议者 + 验证者 + 报告者调用。需要角色 prompt 的少样本示例和 DAG 状态管理。比 ToT 更高效地进行验证推理（以更少的探索状态达到可比准确率）。
 
 ---
 
-### LM² (Language Model Society)
+### LM²（语言模型社会）
 
-**Mechanism:** Coordinate three specialized LLM roles: Decomposer generates
-subproblems and relevant concepts, Solver answers each subproblem, Verifier
-validates answers before they enter the reasoning context. Verifier feedback
-prevents error propagation through subsequent steps.
+**机制：** 协调三个专业化 LLM 角色：分解器生成子问题和相关概念，求解器回答每个子问题，验证者在答案进入推理上下文之前进行验证。验证者的反馈防止错误通过后续步骤传播。
 
-**Triggers:**
+**触发条件：**
 
-- Complex reasoning where error propagation is the primary failure mode
-- Multi-step problems where intermediate answers need validation
-- Tasks benefiting from separation of decomposition, solving, and verification
-- Problems requiring concept extraction alongside decomposition
+- 错误传播是主要失败模式的复杂推理
+- 中间答案需要验证的多步骤问题
+- 受益于分解、求解和验证分离的任务
+- 需要在分解过程中提取概念的问题
 
-**Tradeoffs:** 3x tokens per reasoning cycle. Multiple calls per step
-(decompose + solve + verify). Verifier catches errors before they contaminate
-subsequent reasoning. Roles can use different models or prompts optimized for
-each function.
+**权衡：** 每个推理循环 3 倍 token。每步多次调用（分解 + 求解 + 验证）。验证者在错误污染后续推理之前捕获它们。各角色可以使用不同的模型或为每种功能优化的 prompt。
 
 ---
 
-## Decision Guidance
+## 决策指引
 
-**Start simple:** Use Plan-and-Solve or Self-Ask for zero-shot scenarios where
-you lack few-shot examples.
+**从简单开始：** 在缺乏少样本示例的零样本场景中，使用规划-求解或 Self-Ask。
 
-**Sequential dependencies:** Use Least-to-Most or Successive Prompting when
-later subproblems depend on earlier solutions.
+**顺序依赖：** 当后续子问题依赖于前面的解法时，使用 Least-to-Most 或渐进式 Prompting。
 
-**Parallel sub-tasks:** Use Branch-Solve-Merge or Divide-and-Conquer when
-sub-problems are independent and can be solved simultaneously.
+**并行子任务：** 当子问题独立且可同时求解时，使用 BSM 或分而治之。
 
-**Uncertain complexity:** Use ADAPT when task difficulty is unpredictable and
-you want decomposition only when needed.
+**不确定复杂度：** 当任务难度不可预测且只在需要时分解时，使用 ADAPT。
 
-**Search required:** Use Tree of Thoughts when exploration, backtracking, or
-strategic lookahead is essential.
+**需要搜索：** 当探索、回溯或策略性前瞻是关键时，使用思维树。
 
-**Tool integration:** Use Decomposed Prompting when sub-tasks require external
-APIs, retrieval, or specialized handling.
+**工具集成：** 当子任务需要外部 API、检索或专业化处理时，使用分解式 Prompting。
 
-**Verification critical:** Use Selection-Inference, Cumulative Reasoning, or LM²
-when intermediate steps need explicit validation.
+**验证至关重要：** 当中间步骤需要显式验证时，使用选择-推理、累积推理或 LM²。
 
-**Noisy contexts:** Use R³ Prompting or Thread of Thought when input contains
-distracting or chaotic information.
+**上下文有噪声：** 当输入包含干扰或混乱信息时，使用 R³ Prompting 或思维线索。
 
-**Long documents:** Use PEARL when reasoning over lengthy narratives or
-technical documents with multiple operations.
+**长文档：** 当对长叙事或技术文档进行多次操作推理时，使用 PEARL。
 
-**Temporal reasoning:** Use Narrative-of-Thought when questions involve event
-ordering or temporal relationships.
+**时间推理：** 当问题涉及事件排序或时间关系时，使用叙事思维。
 
 ---
 
-## Composability Notes
+## 可组合性说明
 
-**Layer techniques:** Decomposition composes well with:
+**分层技术：** 分解与以下技术可良好组合：
 
-- Self-consistency voting on sub-problem solutions
-- Verification steps at each decomposition level
-- Retrieval augmentation for knowledge-intensive sub-tasks
+- 子问题解法上的自洽性投票
+- 每个分解级别的验证步骤
+- 知识密集型子任务的检索增强
 
-**Conflicts:**
+**冲突：**
 
-- Skeleton-of-Thought conflicts with CoT/ToT/Least-to-Most (parallel vs
-  sequential reasoning)
-- Divide-and-Conquer conflicts with CoT/Least-to-Most (independent vs dependent
-  sub-steps)
+- 思维骨架与 CoT/ToT/Least-to-Most 冲突（并行 vs 顺序推理）
+- 分而治之与 CoT/Least-to-Most 冲突（独立 vs 依赖子步骤）
 
-**Common patterns:**
+**常见模式：**
 
-- Decomposition + Self-Consistency: Apply voting to each sub-problem
-- Decomposition + Verification: Check intermediate results before proceeding
-- Decomposition + Tool Use: Route sub-tasks to appropriate handlers
-- Recursive decomposition: Apply same technique to sub-problems that remain too
-  complex
+- 分解 + 自洽性：对每个子问题应用投票
+- 分解 + 验证：在继续之前检查中间结果
+- 分解 + 工具使用：将子任务路由到合适的处理器
+- 递归分解：对仍然过于复杂的子问题应用相同技术
 
-### Complexity-Based Selection
+### 基于复杂度的选择
 
-When selecting decomposition examples or sampling multiple solutions, prefer
-complexity: longer reasoning chains in prompts elicit more robust multi-step
-reasoning. When voting among multiple solution chains, weight votes from more
-complex chains higher—complexity correlates with reasoning robustness.
+在选择分解示例或对多个解法采样时，优先考虑复杂性：prompt 中更长的推理链能引出更健壮的多步骤推理。在多个解法链之间投票时，给更复杂的链更高的权重——复杂度与推理健壮性相关。
 
-### Human-in-the-Loop Checkpoint Patterns
+### 带人机协作的检查点模式
 
-For agentic systems with human oversight (e.g., Claude Code with human query
-capability), structure decomposition with approval gates:
+对于有人工监督的 agent 系统（如具备人工查询能力的 Claude Code），使用批准关卡组织分解：
 
-- Place human checkpoints after planning stages, before irreversible execution
-- Structure each stage to produce human-reviewable artifacts
-- Human edits become additional context for re-generation of subsequent stages
-- Checkpoint at points where domain expertise enriches context
+- 在规划阶段之后、不可逆执行之前设置人工检查点
+- 组织每个阶段以产出人工可审查的产物
+- 人工编辑成为后续阶段重新生成的额外上下文
+- 在领域专业知识能丰富上下文的节点设置检查点
 
-This pattern enables meaningful human oversight without blocking every action—
-humans review plans and artifacts rather than individual steps.
+这种模式实现了有意义的人工监督，而无需在每个动作处阻塞——人工审查规划和产物而非单个步骤。
 
-### Preprocessing Combinations
+### 预处理组合
 
-Several techniques function as preprocessing steps that improve subsequent
-decomposition:
+几种技术作为预处理步骤，可改善后续分解：
 
-- Problem Elaboration Prompting → Plan-and-Solve
-- Logic-of-Thought → Selection-Inference or CoT
-- R³ Prompting → any downstream technique
-- Thread of Thought → any downstream technique
+- 问题详述 Prompting → 规划-求解
+- 思维逻辑 → 选择-推理或 CoT
+- R³ Prompting → 任意下游技术
+- 思维线索 → 任意下游技术
 
-Apply preprocessing when input quality is the bottleneck, then decompose.
+当输入质量是瓶颈时应用预处理，然后再分解。

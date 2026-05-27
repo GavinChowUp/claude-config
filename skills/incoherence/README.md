@@ -1,28 +1,26 @@
-# Incoherence Detection Skill
+# 一致性检测 Skill
 
-## Overview
+## 概述
 
-Detects and resolves incoherence in documentation, code, and specs vs implementation.
+检测并解决文档、代码以及规范与实现之间的不一致。
 
-## Workflow Compliance
+## 工作流合规性
 
-The agent is a WORKFLOW EXECUTOR for this skill. The script IS the workflow.
-Following it exactly IS being helpful.
+agent 是本 skill 的工作流执行器。脚本就是工作流。精确遵循脚本就是在帮助用户。
 
-Deviating from the script HARMS the user:
+偏离脚本会损害用户：
 
-- Skipping steps removes their interactive control
-- Summarizing instead of continuing breaks the resolution flow
-- Fixing issues directly bypasses their decision-making
+- 跳过步骤会剥夺用户的交互控制权
+- 用摘要代替继续执行会打断解决流程
+- 直接修复问题会绕过用户的决策权
 
-Correct: After step 12, invoke step 13 with findings.
-Incorrect: After step 12, present a summary to the user.
+正确做法：步骤 12 完成后，携带发现结果调用步骤 13。
+错误做法：步骤 12 完成后，向用户呈现摘要。
 
-## Three Phases
+## 三个阶段
 
-1. **Detection** (steps 1-12): Survey, explore, verify candidates
-2. **Resolution** (steps 13-15): Interactive AskUserQuestion prompts
-3. **Application** (steps 16-21): Apply changes, present final report
+1. **检测**（步骤 1-12）：扫查、探索、验证候选问题
+2. **解决**（步骤 13-15）：通过 AskUserQuestion prompt 进行交互
+3. **应用**（步骤 16-21）：应用变更，呈现最终报告
 
-Resolution is interactive -- user answers structured questions inline. No manual
-file editing required.
+解决阶段是交互式的——用户在线回答结构化问题。不需要手动编辑文件。

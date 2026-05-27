@@ -1,16 +1,16 @@
 # doc-sync/
 
-Cross-repository documentation synchronization skill.
+跨 repo 文档同步 skill。
 
-## Files
+## 文件
 
-| File        | What                               | When to read                 |
+| 文件        | 内容                               | 何时阅读                 |
 | ----------- | ---------------------------------- | ---------------------------- |
-| `SKILL.md`  | Skill activation and full workflow | Using this skill             |
-| `README.md` | Architecture and design decisions  | Understanding skill behavior |
+| `SKILL.md`  | Skill 激活与完整工作流 | 使用本 skill             |
+| `README.md` | 架构与设计决策  | 理解 skill 行为 |
 
-## Subdirectories
+## 子目录
 
-| Directory     | What                     | When to read                  |
+| 目录          | 内容                     | 何时阅读                  |
 | ------------- | ------------------------ | ----------------------------- |
-| `references/` | Trigger pattern examples | Writing better index triggers |
+| `references/` | 触发模式示例 | 编写更好的索引触发器 |

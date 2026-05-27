@@ -1,66 +1,60 @@
 # arxiv-to-md
 
-Convert arXiv papers (TeX source) to clean, LLM-consumable markdown.
+将 arXiv 论文（TeX 源码）转换为干净的、LLM 可消费的 Markdown。
 
-## Architecture
+## 架构
 
 ```
-main.py (orchestrator)          sub_agent.py (worker)
+main.py（编排器）                sub_agent.py（工作器）
 =======================         =====================
-Step 1: Discover/Dispatch  ---> Step 1: Fetch
-Step 2: Wait                    Step 2: Preprocess
-Step 3: Finalize           <--- Step 3: Convert
-                                Step 4: Clean
-                                Step 5: Verify
-                                Step 6: Validate -> FILE: or FAIL:
+步骤 1：发现/派发          ---> 步骤 1：获取
+步骤 2：等待                    步骤 2：预处理
+步骤 3：最终处理           <--- 步骤 3：转换
+                                步骤 4：清洗
+                                步骤 5：验证
+                                步骤 6：校验 -> FILE: 或 FAIL:
 ```
 
-The orchestrator ALWAYS dispatches to sub-agents, even for a single paper. This
-keeps the architecture uniform and allows parallel processing when multiple
-papers are requested.
+编排器始终派发给子 agent，即使只处理单篇论文。这使架构保持统一，并在请求多篇论文时支持并行处理。
 
-## Usage
+## 用法
 
-Single paper:
+单篇论文：
 
 ```
 Convert arxiv.org/abs/2503.05179 to markdown
 ```
 
-Multiple papers:
+多篇论文：
 
 ```
 Convert these papers to markdown: 2503.05179, 2401.12345, 2312.09876
 ```
 
-## Prerequisites
+## 前提条件
 
-- pandoc binary installed (`brew install pandoc` or equivalent)
+- 已安装 pandoc 二进制（`brew install pandoc` 或同等命令）
 
-## Invisible Knowledge
+## 隐性知识
 
-**Why always dispatch (even for single paper):**
+**为何始终派发（即使只有单篇论文）：**
 
-Previous design conditionally dispatched only for multiple papers. This created
-two code paths and made the orchestrator logic complex. Always dispatching:
+早期设计只在处理多篇论文时才条件性地派发，这导致了两条代码路径，使编排器逻辑变得复杂。始终派发的好处：
 
-1. Keeps orchestrator simple (no conditional branching)
-2. Ensures sub-agent is always tested
-3. Makes parallel processing automatic when scaling
+1. 编排器保持简单（无条件分支）
+2. 子 agent 始终得到测试
+3. 扩展时并行处理自动生效
 
-**Why step 1 discovers from folder metadata:**
+**为何步骤 1 从文件夹元数据中发现论文：**
 
-Users often invoke this skill from a directory containing paper-related files
-(PDFs, .bib files, READMEs with arXiv links). Discovering IDs from context
-reduces friction and avoids user having to manually extract IDs they've already
-referenced elsewhere.
+用户经常从包含论文相关文件的目录（PDF、.bib 文件、带 arXiv 链接的 README）中调用本 skill。从上下文中自动发现 ID 减少了摩擦，用户不必手动提取他们已在其他地方引用过的 ID。
 
-**Handoff minimalism:**
+**交接最小化：**
 
-Sub-agent receives ONLY: arxiv_id. It doesn't know:
+子 agent 只接收：arxiv_id。它不知道：
 
-- How many papers are being processed
-- What the orchestrator will do with the output
-- Where the final file will be placed
+- 正在处理多少篇论文
+- 编排器会对输出做什么
+- 最终文件会放在哪里
 
-This keeps sub-agent focused and prevents coupling.
+这使子 agent 保持专注，防止耦合。

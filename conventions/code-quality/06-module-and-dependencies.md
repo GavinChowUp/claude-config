@@ -2,37 +2,37 @@
 
 # Module & Dependencies
 
-Evaluate whether module boundaries are clean and architecture aligns with change patterns.
+评估模块边界是否清晰，以及架构是否与变更模式一致。
 
-**The core question**: Are boundaries clean? Modules should have clear boundaries with minimal coupling. Architecture should align with how features actually change. When changes ripple across unrelated modules or require touching many components, the boundaries are wrong.
+**核心问题**：边界是否清晰？模块应当有明确的边界且耦合最小。架构应与特性的实际变更方式保持一致。当变更扩散到无关模块或需要修改许多组件时，边界是错误的。
 
-**What to look for**:
+**关注点**：
 
-- Circular dependencies
-- Layer violations (domain importing infrastructure)
-- Wrong component boundaries (features awkwardly split)
-- Architecture forcing cross-cutting changes for single-domain features
+- 循环依赖
+- 层级违规（领域层导入基础设施）
+- 错误的组件边界（特性被尴尬地拆分）
+- 强迫跨切关注点变更的架构（即使是单领域特性）
 
-**The threshold**: Flag when dependencies cause compilation issues or domain corruption. Flag when adding a feature requires touching many unrelated components. This is inherently about relationships between files and modules, not local code patterns.
+**门槛**：当依赖导致编译问题或领域污染时标记。当添加一个特性需要修改许多无关组件时标记。这本质上是关于文件和模块之间的关系，而非本地代码模式。
 
 <design-mode>
-When evaluating Code Intent (Design Review phase):
+评估代码意图时（Design Review 阶段）：
 
-- Does the proposed design create circular dependencies?
-- Does it violate layer boundaries?
-- Would implementing this feature require touching many components?
+- 提出的设计是否创建了循环依赖？
+- 是否违反了层级边界？
+- 实现这个特性是否需要修改许多组件？
 
-Evidence format: Quote the Code Intent description showing boundary issue.
+证据格式：引用代码意图描述，指出边界问题。
 </design-mode>
 
 <code-mode>
-When evaluating actual code (Codebase Review, Refactor):
+评估实际代码时（Codebase Review、Refactor）：
 
-- Do import graphs show circular dependencies?
-- Are there layer violations in actual imports?
-- Are features split across many loosely related components?
+- 导入图是否显示循环依赖？
+- 实际导入中是否存在层级违规？
+- 特性是否跨许多松散相关的组件拆分？
 
-Evidence format: Quote import statements or describe dependency structure showing the issue.
+证据格式：引用 import 语句或描述依赖结构，指出问题所在。
 </code-mode>
 
 ---
@@ -40,80 +40,80 @@ Evidence format: Quote import statements or describe dependency structure showin
 ## 1. Module Structure
 
 <principle>
-Modules should have clear boundaries with minimal coupling. When changes ripple across unrelated modules, the boundaries are wrong.
+模块应有明确的边界且耦合最小。当变更扩散到无关模块时，边界是错误的。
 </principle>
 
-Detect: Do changes ripple to unrelated modules? Can a module be modified without understanding its dependents?
+Detect: 变更是否扩散到无关模块？模块能否在不理解其依赖方的情况下被修改？
 
 <grep-hints>
-Structural indicators (starting points, not definitive):
-Import graphs, dependency declarations, module boundaries
+结构指示词（起点，非定论）：
+导入图，依赖声明，模块边界
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Structural violations
 
-- Circular dependencies (e.g., A imports B imports A)
-- Layer violations (e.g., domain importing infrastructure)
-- Any dependency causing compilation order issues or domain corruption
+- 循环依赖（如 A 导入 B 导入 A）
+- 层级违规（如领域层导入基础设施）
+- 任何导致编译顺序问题或领域污染的依赖
 
 [medium] Cohesion problems
 
-- Wrong cohesion (unrelated things grouped in same module)
-- Missing facades (module internals exposed directly)
+- 错误的内聚（无关事物分组在同一模块）
+- 缺少外观（模块内部直接暴露）
 
 [low] Scope creep
 
-- God modules (too many responsibilities in one module)
+- 上帝模块（一个模块承担太多职责）
   </violations>
 
 <exceptions>
-Circular deps within same bounded context. Infrastructure adapters importing domain. Shared kernel patterns.
+同一有界上下文内的循环依赖。导入领域的基础设施适配器。共享内核模式。
 </exceptions>
 
 <threshold>
-Flag when dependency causes compilation order issues OR when layer violation allows infrastructure to corrupt domain.
+当依赖导致编译顺序问题**或**层级违规允许基础设施污染领域时标记。
 </threshold>
 
 ## 2. Architecture
 
 <principle>
-Architecture should align with change patterns. When adding a feature requires touching many unrelated components, the architecture fights the domain.
+架构应与变更模式一致。当添加一个特性需要修改许多无关组件时，架构与领域对抗。
 </principle>
 
-Detect: Would adding a feature require touching many components? Do cross-cutting changes indicate misaligned boundaries?
+Detect: 添加一个特性是否需要修改许多组件？跨切关注点变更是否表明边界不对齐？
 
 <grep-hints>
-Structural indicators (starting points, not definitive):
-Component boundaries, service interfaces, configuration locations
+结构指示词（起点，非定论）：
+组件边界，服务接口，配置位置
 </grep-hints>
 
 <violations>
-Illustrative patterns (not exhaustive -- similar violations exist):
+说明性模式（非穷举——类似违规也存在）：
 
 [high] Boundary misalignment
 
-- Wrong component boundaries (features awkwardly split)
-- Single points of failure (no fallback, no retry paths)
-- Any architecture forcing cross-cutting changes for single-domain features
+- 错误的组件边界（特性被尴尬地拆分）
+- 单点故障（无回退，无重试路径）
+- 任何强迫单领域特性也需要跨切变更的架构
 
 [medium] Scaling issues
 
-- Scaling bottlenecks (synchronous where async needed)
-- Monolith patterns in distributed code (or vice versa)
+- 扩展瓶颈（需要异步的地方用了同步）
+- 分布式代码中使用单体模式（或反之）
 
 [low] Missing structure
 
-- Missing abstraction layers (everything directly coupled)
-- Configuration scattered (no central policy, settings in many places)
+- 缺少抽象层（所有东西直接耦合）
+- 配置分散（无中央策略，设置在多处）
   </violations>
 
 <exceptions>
-Intentional coupling for simplicity. Early-stage monolith. Bounded contexts with shared kernel.
+为简单性故意耦合。早期阶段单体。带共享内核的有界上下文。
 </exceptions>
 
 <threshold>
-Flag when architecture forces cross-cutting changes for single-domain features.
+当架构强迫单领域特性也需要跨切变更时标记。
 </threshold>

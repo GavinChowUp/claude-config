@@ -1,12 +1,12 @@
 # problem-analysis/
 
-Root cause identification skill. IMMEDIATELY invoke the script -- do NOT explore first.
+根因识别 skill。立即调用脚本——不要先探索。
 
-## Files
+## 文件
 
-| File        | What                                  | When to read               |
-| ----------- | ------------------------------------- | -------------------------- |
-| `SKILL.md`  | Skill invocation, phases, principles  | Using this skill           |
-| `README.md` | Design rationale, invisible knowledge | Understanding why it works |
+| 文件        | 内容                                   | 何时阅读               |
+| ----------- | -------------------------------------- | -------------------------- |
+| `SKILL.md`  | Skill 调用方式、阶段、原则             | 使用此 skill 时           |
+| `README.md` | 设计原理、隐性知识                     | 理解其工作原理时          |
 
-Python code: `scripts/skills/problem_analysis/analyze.py`
+Python 代码:`scripts/skills/problem_analysis/analyze.py`

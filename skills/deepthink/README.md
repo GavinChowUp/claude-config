@@ -1,128 +1,103 @@
 # DeepThink
 
-Structured multi-step reasoning for open-ended analytical questions. Handles
-questions where the answer structure is itself unknown: taxonomy design,
-conceptual analysis, trade-off exploration, definitional questions.
+针对开放性分析问题的结构化多步骤推理。适用于答案结构本身未知的问题:分类法设计、概念分析、权衡取舍探索、定义性问题。
 
-## When to Use
+## 适用场景
 
-Use this when the question resists predefined frameworks:
+当问题无法套用预定义框架时使用:
 
-- "What's the correct way to classify X?"
-- "What makes a good Y?"
-- "How should I balance A versus B?"
-- "What does Z actually mean in our context?"
+- 「对 X 进行分类的正确方式是什么?」
+- 「什么样的 Y 才算好?」
+- 「A 与 B 之间应该如何权衡?」
+- 「Z 在我们的上下文中究竟是什么意思?」
 
-Do NOT use for:
+不适用场景:
 
-- Problems with verifiable answers (math, coding with test cases)
-- Problems requiring external data retrieval
-- Known problem types (use problem-analysis)
+- 有可验证答案的问题(数学、有测试用例的编码)
+- 需要获取外部数据的问题
+- 已知问题类型(使用 problem-analysis)
 
-## Workflow Phases
+## 工作流阶段
 
-Two modes: Full (14 steps) and Quick (8 steps, bypasses sub-agents).
+两种模式:完整模式(14 步)和快速模式(8 步,跳过子 agent)。
 
-| Phase                 | Steps | Purpose                                  |
+| 阶段                  | 步骤  | 目的                                     |
 | --------------------- | ----- | ---------------------------------------- |
-| Input Processing      | 1     | Remove bias from input (S2A)             |
-| Problem Understanding | 2-4   | Abstraction, characterization, analogies |
-| Planning              | 5     | Sub-questions, success criteria          |
-| Sub-Agent Design      | 6-8   | Design, critique, revise (Full only)     |
-| Divergent Exploration | 9-11  | Dispatch, gate, aggregate (Full only)    |
-| Convergent Synthesis  | 12    | Initial synthesis                        |
-| Iterative Refinement  | 13    | Verification loop until confident        |
-| Formatting & Output   | 14    | Format and present final answer          |
+| 输入处理              | 1     | 去除输入偏差(S2A)                       |
+| 问题理解              | 2-4   | 抽象、特征刻画、类比                     |
+| 规划                  | 5     | 子问题、成功标准                         |
+| 子 agent 设计         | 6-8   | 设计、评审、修订(仅完整模式)            |
+| 发散探索              | 9-11  | 派发、质量门、聚合(仅完整模式)          |
+| 收敛综合              | 12    | 初步综合                                 |
+| 迭代精炼              | 13    | 验证循环直至置信度达标                   |
+| 格式化与输出          | 14    | 格式化并呈现最终答案                     |
 
-Step 3 determines mode. Quick mode jumps from step 5 directly to step 12.
+步骤 3 决定模式。快速模式从步骤 5 直接跳至步骤 12。
 
-## Invisible Knowledge
+## 隐性知识
 
-### Why Context Clarification First
+### 为何先澄清上下文
 
-LLM soft attention assigns probability to irrelevant context, causing factual
-errors and sycophancy. Regenerating the input to extract only relevant,
-unbiased portions prevents framing effects from contaminating downstream
-reasoning.
+LLM 的 soft attention 会为无关上下文分配概率,导致事实错误和奉承性回答。重新生成输入、只提取相关且无偏见的部分,能防止框架效应污染下游推理。
 
-### Why Abstraction Before Reasoning
+### 为何在推理之前先做抽象
 
-Prompting for high-level concepts and first principles before addressing
-specifics improves performance 7-27%. Abstraction moves UP to principles rather
-than DOWN to subtasks -- distinct from decomposition.
+在处理具体问题之前先 prompt 高层概念和第一性原理,可将性能提升 7–27%。抽象是向上走向原则,而非向下分解为子任务——这与分解是两回事。
 
-### Why Self-Generated Analogies
+### 为何使用自生成类比
 
-Prompting to recall similar problems from training accesses parametric knowledge
-that isn't retrieved without explicit prompting. Works better than providing
-fixed examples because analogies are problem-specific.
+Prompt 模型回忆训练数据中的类似问题,能激活不经显式提示就无法检索的参数知识。比提供固定示例效果更好,因为类比是针对具体问题生成的。
 
-### Why Factored Verification
+### 为何使用分解验证
 
-LLMs that view their own synthesis when verifying tend to justify existing
-conclusions rather than check them. Generating verification questions, then
-answering them WITHOUT viewing the synthesis, produces accurate verification.
-Short-form questions are more accurately answered than long-form queries.
+LLM 在验证时如果看到自己的综合结论,往往会倾向于为既有结论辩护而非真正检验。先生成验证问题,再在不看综合结论的情况下回答,能产生准确的验证结果。短问题比长问题回答得更准确。
 
-### Why Actionable Feedback
+### 为何需要可操作的反馈
 
-Generic feedback ("could be stronger") fails to improve output. Feedback must
-specify: ELEMENT (what), PROBLEM (why wrong), ACTION (how to fix). Changing from
-actionable to generic drops performance 43.2 -> 31.2.
+泛泛的反馈(「可以更好」)无法改善输出。反馈必须指明:要素(什么)、问题(为何不对)、行动(如何修正)。从可操作反馈切换为泛泛反馈,性能从 43.2 降至 31.2。
 
-### Why Intermediate Insight Extraction
+### 为何提取中间洞见
 
-Multiple reasoning chains contain valuable intermediate steps even when final
-conclusions are wrong. Extracting evidence from ALL chains, not just majority,
-produces better synthesis than pure voting.
+多条推理链即使最终结论有误,也包含有价值的中间步骤。从所有推理链(而非仅多数派)提取证据,比纯投票产生更好的综合结论。
 
-### Why Self-Critique Before Dispatch
+### 为何在派发前先自我评审
 
-Sub-agent design benefits from explicit critique. Coverage gaps, unnecessary
-overlap, and inappropriate divisions are caught before expensive parallel
-execution.
+子 agent 设计受益于显式评审。覆盖缺口、不必要的重叠和不恰当的划分,能在昂贵的并行执行之前被发现。
 
-### Why Confidence Thresholds Not Self-Report
+### 为何用置信度标准而非自我报告
 
-LLMs have no calibrated introspective access to their own certainty. Asking "how
-confident are you?" produces unreliable answers. Confidence must be derived from
-factual criteria about the analysis, not introspection.
+LLM 对自身确定性没有经过校准的内省访问。问「你有多自信?」会得到不可靠的答案。置信度必须从关于分析的事实标准中推导,而非依赖内省。
 
-### Why Iteration Cap
+### 为何设置迭代上限
 
-Analytical questions could theoretically continue forever. The cap (5
-iterations) forces eventual termination while allowing sufficient depth. Balance
-between shallow analysis and indefinite loops.
+分析性问题理论上可以无限延续。上限(5 次迭代)在允许足够深度的同时强制终止。这是浅层分析与无限循环之间的平衡。
 
-## Academic Grounding (Condensed)
+## 学术依据(摘要)
 
-| Pattern                  | Source                           | Key Insight                              |
+| 模式                   | 来源                                      | 核心洞见                                    |
 | ------------------------ | -------------------------------- | ---------------------------------------- |
-| Context Clarification    | S2A (Weston & Sukhbaatar, 2023)  | Regenerate input sans bias               |
-| Step-Back Abstraction    | Zheng et al., ICLR 2024          | Principles before specifics: +7-27%      |
-| Explicit Planning        | Plan-and-Solve (Wang, ACL 2023)  | Missing-step errors: 12% -> 3%           |
-| Self-Generated Exemplars | Analogical (Yasunaga, ICLR 2024) | Own analogies beat provided examples     |
-| Metacognitive Stages     | Wang & Zhao, NAACL 2024          | Five-stage evaluation: +26.9%            |
-| Anti-Pattern Generation  | Contrastive CoT (Chia, 2023)     | Knowing what NOT to do: +10-16pts        |
-| Parallel Perspectives    | Multi-Agent Debate (Du, ICML 24) | Diverse viewpoints beat single-agent     |
-| Generate-Critique-Revise | Self-Refine (Madaan, NeurIPS 23) | Actionable feedback: +5-40%              |
-| Factored Verification    | Chain-of-Verification (Meta, 23) | Independent verification: 17% -> 70%     |
-| Complex Reasoning        | Complexity-Based (Fu, ICLR 2023) | More steps = better: +5.3-18%            |
-| Intermediate Extraction  | MCR (Yoran, 2024)                | All chains have value, not just majority |
+| 上下文澄清              | S2A (Weston & Sukhbaatar, 2023)  | 重新生成输入以去除偏差                   |
+| Step-Back 抽象          | Zheng et al., ICLR 2024          | 原则先于具体:+7-27%                     |
+| 显式规划                | Plan-and-Solve (Wang, ACL 2023)  | 遗漏步骤错误:12% → 3%                   |
+| 自生成示例              | Analogical (Yasunaga, ICLR 2024) | 自身类比优于提供示例                     |
+| 元认知阶段              | Wang & Zhao, NAACL 2024          | 五阶段评估:+26.9%                       |
+| 反模式生成              | Contrastive CoT (Chia, 2023)     | 知道什么不该做:+10-16pts                |
+| 并行视角                | Multi-Agent Debate (Du, ICML 24) | 多元视角优于单 agent                    |
+| 生成-评审-修订          | Self-Refine (Madaan, NeurIPS 23) | 可操作反馈:+5-40%                       |
+| 分解验证                | Chain-of-Verification (Meta, 23) | 独立验证:17% → 70%                      |
+| 复杂推理                | Complexity-Based (Fu, ICLR 2023) | 步骤越多越好:+5.3-18%                   |
+| 中间提取                | MCR (Yoran, 2024)                | 所有链都有价值,不只是多数派             |
 
-## Output Formats
+## 输出格式
 
-Final output adapts to question type (determined in Step 3):
+最终输出根据问题类型(在步骤 3 确定)自适应:
 
-- **Taxonomy**: Structure + rationale + edge cases + alternatives rejected
-- **Trade-off**: Dimensions + balance point + shift conditions + framework
-- **Definitional**: Definition + boundaries + adjacent concepts + misunderstandings
-- **Evaluative**: Criteria + assessment + confidence + change conditions
-- **Exploratory**: Landscape + framework + promising directions + gaps
+- **分类法**:结构 + 依据 + 边界情况 + 被拒绝的替代方案
+- **权衡取舍**:维度 + 平衡点 + 切换条件 + 框架
+- **定义性**:定义 + 边界 + 邻近概念 + 常见误解
+- **评价性**:标准 + 评估 + 置信度 + 改变条件
+- **探索性**:全景 + 框架 + 有潜力的方向 + 空白点
 
-## Implementation Notes
+## 实现说明
 
-The workflow uses `skills.lib.workflow.formatters.text` for output formatting.
-Step 5 generates different invoke_after based on mode (quick vs full). Step 13
-uses `--iteration` parameter computed by the script, with MAX_ITERATIONS=5
-hardcoded.
+工作流使用 `skills.lib.workflow.formatters.text` 进行输出格式化。步骤 5 根据模式(quick vs full)生成不同的 invoke_after。步骤 13 使用脚本计算的 `--iteration` 参数,`MAX_ITERATIONS=5` 硬编码。

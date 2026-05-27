@@ -1,11 +1,11 @@
 # correctness/
 
-Synthesized guidance for correctness problems.
+正确性问题的综合指导。
 
-## Files
+## 文件
 
-| File              | What                         | When to read                       |
+| 文件              | 内容                         | 何时阅读                       |
 | ----------------- | ---------------------------- | ---------------------------------- |
-| `sampling.md`     | Multi-sample aggregation     | Model gives inconsistent answers   |
-| `verification.md` | Explicit checking techniques | Model produces unverified claims   |
-| `refinement.md`   | Iterative improvement loops  | Output needs iterative improvement |
+| `sampling.md`     | 多样本聚合                   | 模型给出不一致的答案时         |
+| `verification.md` | 显式检验技术                 | 模型产出未经验证的声明时       |
+| `refinement.md`   | 迭代改进循环                 | 输出需要迭代改进时             |
